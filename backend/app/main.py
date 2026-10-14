@@ -12,8 +12,11 @@ from .models import (User,Tenant,Patient,Case,Consent,Document,Physician,Hospita
                      Appointment,Quote,TravelRequest,Conversation,Message,Task,Audit)
 from .security import current_user,roles,password_verify,token_for
 from .intake import intake_response, PROMPTS, LANGUAGES, IntakeAnswer
+from .ai import draft as ai_draft, provider_available
+from .whatsapp import router as whatsapp_router
 
 app=FastAPI(title='MedTour AI Coordination API',version='0.1.0',description='Development foundation. Not approved for production PHI or clinical care.')
+app.include_router(whatsapp_router)
 origins=[p.strip() for p in os.getenv('CORS_ORIGINS','http://localhost:3000').split(',') if p.strip()]
 app.add_middleware(CORSMiddleware,allow_origins=origins,allow_credentials=True,allow_methods=['GET','POST','PATCH'],allow_headers=['Authorization','Content-Type'])
 
@@ -85,6 +88,10 @@ class DocumentIn(BaseModel):
     case_id:str
     filename:str=Field(min_length=1,max_length=255)
     category:str=Field(default='report',max_length=70)
+class AIDraftIn(BaseModel):
+    case_id:str
+    language:str=Field(default="en")
+    message:str=Field(min_length=1,max_length=3000)
 class TaskIn(BaseModel):
     case_id:str
     title:str=Field(min_length=3,max_length=200)
@@ -198,6 +205,16 @@ def prompts(language:str,user:User=Depends(MODERATOR)):
 @app.post('/api/v1/intake/evaluate')
 def intake(body:IntakeAnswer,user:User=Depends(MODERATOR)):
     return intake_response(body.language,body.message)
+
+@app.post('/api/v1/intake/ai-draft')
+def intake_ai(body:AIDraftIn,db:Session=Depends(get_db),user:User=Depends(MODERATOR)):
+    c=require_case(db,user,body.case_id)
+    need_consent(db,user,c.patient_id,'ai_processing')
+    if body.language not in LANGUAGES:raise HTTPException(422,'Unsupported language')
+    # Never send input containing emergency keywords to an LLM instead of escalation.
+    safety=intake_response(body.language,body.message)
+    if safety['emergency_keyword_detected']:return safety
+    return ai_draft(body.message,body.language)
 
 @app.get('/api/v1/physicians')
 def physicians(db:Session=Depends(get_db),user:User=Depends(MODERATOR)):
@@ -334,7 +351,7 @@ def audits(limit:int=Query(100,ge=1,le=300),db:Session=Depends(get_db),user:User
 @app.get('/api/v1/integrations/status')
 def integrations(user:User=Depends(MODERATOR)):
     return {'whatsapp':{'status':'blocked_pending_business_eligibility','live_connected':False},
-            'ai':{'status':'not_configured','live_connected':False},
+            'ai':{'status':'enabled' if provider_available() else 'not_configured','live_connected':provider_available()},
             'file_uploads':{'status':'not_configured','live_connected':False},
             'visa':{'status':'human_coordination_only','live_connected':False},
             'hotels':{'status':'human_coordination_only','live_connected':False},

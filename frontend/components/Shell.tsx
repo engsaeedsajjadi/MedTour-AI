@@ -4,7 +4,7 @@ import {usePathname} from 'next/navigation';
 import {useEffect,useState} from 'react';
 import {getSession,logout,request} from '@/lib/api';
 const links=[
- ['dashboard','داشبورد'],['patients','بیماران'],['cases','پرونده‌ها'],['providers','پزشکان و مراکز'],['quotations','پیش‌فاکتورها'],['appointments','نوبت‌ها'],['travel','سفر و ویزا'],['conversations','گفت‌وگوها']
+ ['dashboard','داشبورد'],['patients','بیماران'],['cases','پرونده‌ها'],['providers','پزشکان'],['hospitals','بیمارستان‌ها'],['quotations','پیش‌فاکتورها'],['appointments','نوبت‌ها'],['travel','سفر و ویزا'],['conversations','گفت‌وگوها']
 ] as const;
 export default function Shell({title,children}:{title:string,children:React.ReactNode}){
  const path=usePathname();const [email,setEmail]=useState('');

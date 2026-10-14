@@ -1,0 +1,2 @@
+import ResourcePage from '@/components/ResourcePage';
+export default function Hospitals(){return <ResourcePage title="بیمارستان‌ها" path="/hospitals" fields={[{name:'name',label:'نام مرکز',required:true},{name:'city',label:'شهر'}]} columns={[{key:'name',label:'نام مرکز'},{key:'city',label:'شهر'},{key:'license_status',label:'وضعیت مجوز'}]} note="وضعیت اولیه هر مرکز «تأییدنشده» است. برای تأیید مجوز از فرآیند رسمی احراز اعتبار استفاده شود."/>;}

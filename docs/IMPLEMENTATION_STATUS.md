@@ -16,10 +16,10 @@ Legend: **IMPLEMENTED**=functional source + tests where noted; **FOUNDATION**=li
 | Visa, hotel, interpreter, transport requests | FOUNDATION | Manual request tracking, NOT real bookings/visa issuance. |
 | Conversation records and human handoff | FOUNDATION | Internal WebChat records only; patient messaging UI and incoming webhook not implemented. |
 | Arabic, English, Persian, Pashto, Dari | FOUNDATION | Structured prompts, not fluent LLM translations. |
-| AI medical interview, GPT/Gemini | PLANNED | No AI provider keys or medical NLP are configured. |
+| AI intake draft adapter | FOUNDATION | OpenAI-compatible HTTP endpoint requires explicit provider approval and consent; disabled by default; no live model connected. |
 | Emergency messages | FOUNDATION | Keyword warnings only. NOT reliable emergency triage. |
 | PDF/image secure upload | BLOCKED | Explicitly returns 503 until private encrypted storage and malware scan are integrated. |
-| WhatsApp Business Cloud API | BLOCKED | Official eligibility, agreements, opt-in and regulatory review required. |
+| WhatsApp Business Cloud API | BLOCKED | Signed webhook verification scaffold implemented, but durable ingest and production activation are blocked until official eligibility, agreements, and opt-in. |
 | Doctor portal, hospital portal, patient portal | PLANNED | Backend needs resource-level permissions and dedicated user flows. |
 | Currency rate retrieval, payments, real bookings | PLANNED | No production external integrations. |
 | Multi-tenant SaaS billing, representatives | PLANNED | Separate design phase. |

@@ -10,9 +10,9 @@ Multilingual (fa/ar/en/ps/prs), WhatsApp-first international patient coordinatio
 - Real persistence with SQLAlchemy. PostgreSQL recommended, SQLite only for isolated development/tests; explicit tenant filtering and access controls.
 - Bearer JWT authentication with PBKDF2 passwords, configurable bootstrap admin, RBAC, tenant-scoped audit events.
 - Patient case state transitions, approved quote workflow, referral review, manual/verified booking states, provider verification rules.
-- Five-language structured intake prompts; consent-gated processing; deterministic emergency **keyword escalation (not medical triage)**.
+- Five-language structured intake prompts, disabled-by-default OpenAI-compatible AI draft adapter; consent-gated processing; deterministic emergency **keyword escalation (not medical triage)**.
 - Secure document *metadata and upload-ticket* endpoint. Binary storage adapter not yet integrated: API refuses to claim the document was uploaded (fail-closed).
-- Web chat conversation endpoints + human handoff and opt-in metadata. WhatsApp integration is blocked until official API eligibility is verified.
+- Web chat conversation endpoints + human handoff and opt-in metadata. WhatsApp integration has HMAC webhook verification scaffold but is intentionally blocked until official API eligibility and durable processing are verified.
 - Next.js responsive Persian RTL admin starter with functional CRUD views for core entities.
 - Docker Compose (Postgres + API + Next.js), pytest API suite, GitHub Actions CI, environment templates.
 

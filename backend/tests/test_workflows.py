@@ -96,3 +96,24 @@ def test_integration_status_is_honest(context):
     r=client.get('/api/v1/integrations/status',headers=auth('a'))
     assert r.status_code==200
     assert all(x.get('live_connected') is False for x in r.json().values())
+
+def test_ai_draft_fail_closed_without_approval(seeded):
+    (client,auth,_,_),a,p,c=seeded
+    q=client.post('/api/v1/intake/ai-draft',headers=a,json={'case_id':c['id'],'language':'ps','message':'I need to see a doctor'})
+    assert q.status_code==409  # independent opt-in to AI data processing
+    client.post('/api/v1/consents',headers=a,json={'patient_id':p['id'],'purpose':'ai_processing','accepted':True,'notice_version':'v1'})
+    q=client.post('/api/v1/intake/ai-draft',headers=a,json={'case_id':c['id'],'language':'ps','message':'I need to see a doctor'})
+    assert q.status_code==503
+    emergency=client.post('/api/v1/intake/ai-draft',headers=a,json={'case_id':c['id'],'language':'en','message':'I have chest pain'})
+    assert emergency.status_code==200 and emergency.json()['emergency_keyword_detected'] is True
+
+def test_whatsapp_webhook_disabled_and_signature(context):
+    from app.whatsapp import valid_signature
+    import hashlib,hmac
+    client,auth,_,_=context
+    assert client.get('/api/v1/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token=secret&hub.challenge=123').status_code==503
+    assert client.post('/api/v1/webhooks/whatsapp',content=b'{}').status_code==503
+    body=b'{"entry":[]}'
+    signature='sha256='+hmac.new(b'test-secret',body,hashlib.sha256).hexdigest()
+    assert valid_signature(body,signature,'test-secret')
+    assert not valid_signature(body,signature,'different')
