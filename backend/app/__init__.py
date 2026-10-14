@@ -1,0 +1,1 @@
+"""MedTour AI API foundation."""

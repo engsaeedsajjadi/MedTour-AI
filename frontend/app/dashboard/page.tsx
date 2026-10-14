@@ -1,0 +1,10 @@
+'use client';
+import {useEffect,useState} from 'react';
+import Link from 'next/link';
+import Shell from '@/components/Shell';
+import {request} from '@/lib/api';
+type Counts=Record<string,number>;
+const cards=[['patients','بیماران','/patients'],['cases','پرونده‌های فعال','/cases'],['physicians','پزشکان','/providers'],['hospitals','مراکز درمانی','/providers'],['quotes','پیش‌فاکتورها','/quotations'],['travel_requests','درخواست‌های سفر','/travel']];
+export default function Dashboard(){const [stats,setStats]=useState<Counts>({}),[integrations,setIntegrations]=useState<Record<string,{status:string}>>({}),[error,setError]=useState('');useEffect(()=>{request<Counts>('/dashboard').then(setStats).catch(e=>setError(e.message));request<Record<string,{status:string}>>('/integrations/status').then(setIntegrations).catch(()=>{});},[]);
+ return <Shell title="داشبورد مدیریتی"><div className="welcome"><div><div className="eyebrow">PATIENT JOURNEY • CONTROL CENTER</div><h2>مرکز عملیات گردشگری سلامت</h2><p>وضعیت زنده درخواست‌ها و فرآیندهای هماهنگی بیماران بین‌المللی.</p></div><span>✚</span></div>{error&&<div className="errorBox">{error}</div>}<div className="statsGrid">{cards.map(([key,label,url])=><Link key={key} href={url} className="statCard"><small>{label}</small><strong>{stats[key]??'—'}</strong><span>مشاهده فهرست ←</span></Link>)}</div><div className="dashboardLower"><section className="panel"><div className="panelHeader"><h2>وضعیت اتصال سرویس‌ها</h2><span className="subtle">اطلاعات واقعی تنظیمات</span></div><div className="integrationList">{Object.entries(integrations).map(([key,val])=><div key={key}><b>{key.replaceAll('_',' ')}</b><span className="pending">{val.status.replaceAll('_',' ')}</span></div>)}</div></section><section className="panel checklist"><div className="panelHeader"><h2>گام‌های عملیاتی</h2></div><p>۱. ثبت بیمار و دریافت رضایت.</p><p>۲. ایجاد پرونده اولیه و بررسی مدارک.</p><p>۳. ارجاع به پزشک تأییدشده.</p><p>۴. استعلام قیمت و تأیید انسانی.</p><p>۵. هماهنگی خدمات سفر و درمان.</p><div className="infoBanner">این سامانه هنوز مجاز به پردازش داده واقعی پزشکی نیست.</div></section></div></Shell>;
+}
