@@ -1,29 +1,13 @@
-# Implementation status — 2026-10-14
+# Implementation status — 2026-10-15
 
-Legend: **IMPLEMENTED**=functional source + tests where noted; **FOUNDATION**=limited integration; **BLOCKED**=external consent/eligibility/access; **PLANNED**=not built.
+This file supersedes the earlier 2026-10-14 foundation status. See [MASTER_45_TRACKER.md](MASTER_45_TRACKER.md) for item-by-item coverage of the original 45-part prompt.
 
-| Feature | State | Note |
-| --- | --- | --- |
-| Git repository source and local commit | IMPLEMENTED | See release ZIP and git history. Remote GitHub creation/push requires repo creation capability. |
-| FastAPI and relational data models | IMPLEMENTED | PostgreSQL in Compose; SQLite tests. |
-| Login, short-lived JWT, user roles | IMPLEMENTED | Development provisioning only; token revocation and MFA remain. |
-| Tenant-scoped endpoints | FOUNDATION | Explicit tenant checks and tests. PostgreSQL RLS + production migrations remain. |
-| Patient registration and active intake consent | IMPLEMENTED | Operator workflow with consent required for cases. |
-| Case workflow and audit | IMPLEMENTED | Controlled state transitions. |
-| Physician and hospital registration | IMPLEMENTED | Verification is human-controlled. |
-| Referral and appointment workflow | IMPLEMENTED | Appointment requires manual confirmation reference. |
-| Treatment quotation draft and approval | IMPLEMENTED | Manual estimate, no external pricing data. |
-| Visa, hotel, interpreter, transport requests | FOUNDATION | Manual request tracking, NOT real bookings/visa issuance. |
-| Conversation records and human handoff | FOUNDATION | Internal WebChat records only; patient messaging UI and incoming webhook not implemented. |
-| Arabic, English, Persian, Pashto, Dari | FOUNDATION | Structured prompts, not fluent LLM translations. |
-| AI intake draft adapter | FOUNDATION | OpenAI-compatible HTTP endpoint requires explicit provider approval and consent; disabled by default; no live model connected. |
-| Emergency messages | FOUNDATION | Keyword warnings only. NOT reliable emergency triage. |
-| PDF/image secure upload | BLOCKED | Explicitly returns 503 until private encrypted storage and malware scan are integrated. |
-| WhatsApp Business Cloud API | BLOCKED | Signed webhook verification scaffold implemented, but durable ingest and production activation are blocked until official eligibility, agreements, and opt-in. |
-| Doctor portal, hospital portal, patient portal | PLANNED | Backend needs resource-level permissions and dedicated user flows. |
-| Currency rate retrieval, payments, real bookings | PLANNED | No production external integrations. |
-| Multi-tenant SaaS billing, representatives | PLANNED | Separate design phase. |
-| Frontend Arabic/Pashto/English localization | PLANNED | Admin is Persian RTL; backend has five-language initial prompts. |
-| End-to-end deployment and security certification | PLANNED | NOT production ready. |
+**Done in source and validated by synthetic backend tests:** tenant-scoped record management, login/JWT + refresh rotation/logout, patient/consent/case records, directory verification guards, referral and appointment requests, draft/itemized quotation approval, case-linked travel and coordination operations with approval references, CMS draft/publish, knowledge approval, agent/lead attribution, manually verified financial entries, portal token issue/revoke, patient journey/chat, developer encrypted test-file access checks, Meta webhook signature/idempotency and consent quarantine, core stats, safe organization settings.
 
-**Verified:** API tests in `backend/tests/` run locally using in-memory synthetic patients. Frontend packages require installation/build in an environment with npm registry access; not verified in this isolated build environment.
+**UI implemented (frontend build NOT yet verified):** Arabic/English/Pashto/Dari *content fields and admin intake prompts*; Persian RTL admin pages; patient portal and translated CMS page shell. Full human-validated localization and voice is missing.
+
+**Not implemented or gated:** compliant outbound WhatsApp, production clinical AI, production object storage/malware scanning, clinical portals, schedule concurrency, visa issuance, booking integrations, actual financial settlement, subscription plans and tenant billing, RLS+migrations, MFA and identity assurance, production compliant retention/consent, observability/load/security testing.
+
+**Verification executed:** `PYTHONPATH=backend pytest -q backend/tests` → **31 passed** with in-memory synthetic SQLite; 28 `.ts/.tsx` files parsed by TypeScript transpilation without syntax diagnostics. This does **not** substitute for `npm run typecheck`, `npm run build`, browser tests, PostgreSQL and Docker E2E.
+
+**Production security gate:** NOT MET. **45-part final acceptance:** NOT MET.

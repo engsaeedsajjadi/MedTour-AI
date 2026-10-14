@@ -15,3 +15,5 @@ dist/
 *.pem
 *.key
 uploads/
+
+.private_documents/

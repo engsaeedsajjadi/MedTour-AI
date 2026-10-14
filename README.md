@@ -1,58 +1,92 @@
-# MedTour AI — International Medical Tourism Coordination Platform
+# MedTour AI — Multilingual International Patient Coordination
 
-**Status: development foundation / NOT ready for real patient data.** This repository is an independent, original implementation inspired by the public interfaces/workflows of [HealthJourney](https://github.com/sartaj04/AI-Powered-Patient-Journey-Platform) (MIT), [Nile Care](https://github.com/YoumnKaram561/Nile-Care) (MIT), [Medplum](https://github.com/medplum/medplum) (Apache-2.0), and [Chatwoot](https://github.com/chatwoot/chatwoot) (mixed MIT / commercial Enterprise terms). **No source code from those repositories is copied or vendored.** They remain separate upstream integration/reference candidates; see [docs/UPSTREAM.md](docs/UPSTREAM.md).
+**Version:** `0.4.0-alpha` · **Status:** expanded functional development build; **not production-ready** and **not a certified healthcare product**.
 
-Multilingual (fa/ar/en/ps/prs), WhatsApp-first international patient coordination for treatment in Iran. Built for privacy-aware human-supervised operations. **No provider has been connected, no live bookings or visa approvals are possible from this foundation.**
+Patient-first medical tourism **coordination** system for international patients seeking care in Iran. Preferred channel: WhatsApp where the business and location are eligible; otherwise a private multilingual web portal and operator inbox. The system does **not** make diagnoses, prescribe care, issue visas, guarantee prices, or confirm reservations without independent human/provider verification.
 
-## Implemented now
+> **Do not store real patient data or activate WhatsApp/outbound AI in this build.** Production rollout requires regulatory advice, credential verification, migration/RLS hardening, data-protection review, security testing, verified external providers and operational approvals.
 
-- FastAPI API; tenant-scoped case, patient, hospital, physician, referral, appointment, quote, travel-request, task, consent and conversation records.
-- Real persistence with SQLAlchemy. PostgreSQL recommended, SQLite only for isolated development/tests; explicit tenant filtering and access controls.
-- Bearer JWT authentication with PBKDF2 passwords, configurable bootstrap admin, RBAC, tenant-scoped audit events.
-- Patient case state transitions, approved quote workflow, referral review, manual/verified booking states, provider verification rules.
-- Five-language structured intake prompts, disabled-by-default OpenAI-compatible AI draft adapter; consent-gated processing; deterministic emergency **keyword escalation (not medical triage)**.
-- Secure document *metadata and upload-ticket* endpoint. Binary storage adapter not yet integrated: API refuses to claim the document was uploaded (fail-closed).
-- Web chat conversation endpoints + human handoff and opt-in metadata. WhatsApp integration has HMAC webhook verification scaffold but is intentionally blocked until official API eligibility and durable processing are verified.
-- Next.js responsive Persian RTL admin starter with functional CRUD views for core entities.
-- Docker Compose (Postgres + API + Next.js), pytest API suite, GitHub Actions CI, environment templates.
+## What works in the development build
 
-## Quick start (development, non-PHI data ONLY)
+- **Coordination core:** tenant-filtered accounts, JWT authentication, refresh rotation/replay blocking/logout, RBAC, patients, consents, medical cases, verified physician directory, hospitals, referrals, manually confirmed appointments, admin-approved quotations and line items.
+- **Travel:** visa, hotels, transport, interpreter, diagnostic referrals and admission coordination as *manual* workflow requests; reference-required state transitions, history, lead attribution and agents.
+- **Communication:** persisting staff/portal web messages, human handoff, five-language **initial structured** intake text, safety-keyword escalation, optional approved-provider AI draft and translation adapter.
+- **WhatsApp:** official Meta HMAC webhook validation, configured tenant/account matching, consent-based existing patient routing, idempotent receipt and quarantine of unknown contacts. **Disabled by default, no outbound sending.** Eligibility and credentials remain an external prerequisite.
+- **Files:** authenticated AES-GCM encrypted file storage for **synthetic documents on development machines only**, off by default. This is not the approved production document service or malware scanning workflow.
+- **Patient-facing:** revocable, time-limited patient access links; journey status, approved quotes, confirmed appointments, controlled webchat.
+- **Administration:** Persian RTL Next.js dashboard and CRUD/operations pages; approved CMS, approved knowledge base, price provenance, reports, service tracking, configurable safe tenant settings.
+- **Finance:** deduplicated, admin-verified manual monetary records, **not payment collection or a regulated financial ledger**.
+- **Verification:** **31 passing synthetic-data backend tests** (in the development environment), TypeScript syntax transpilation for 28 source files. **Full Next.js dependency installation, typecheck and browser E2E were not completed in the current environment.**
+
+## What is NOT finished
+
+The 45-section enterprise master specification **has not yet reached full acceptance**. Critical remaining work includes PostgreSQL Row-Level Security and Alembic production migrations; full patient identity assurance and MFA; doctor/hospital independently scoped portals; real compliant WhatsApp outbound communication; five-language human-validated AI/voice; secure production object storage and virus scanning; approved external visa/hotel/provider APIs; payment gateways; subscription billing; load tests; frontend E2E and independent clinical/privacy/security review.
+
+The complete section-by-section matrix is in **[docs/MASTER_45_TRACKER.md](docs/MASTER_45_TRACKER.md)**. No unfinished feature is represented as completed.
+
+## Technology
+
+| Area | Current technology |
+|---|---|
+| API | FastAPI / Python 3.12 / Pydantic |
+| Web | Next.js 16 / React 19 / TypeScript |
+| Database | PostgreSQL 17 (SQLite for synthetic tests only) |
+| ORM | SQLAlchemy |
+| Identity | PBKDF2, short access JWT, rotating 7-day refresh token |
+| Encrypted *development* files | AES-256-GCM via `cryptography` |
+| AI | disabled-until-approved OpenAI-compatible HTTP adapter |
+| WhatsApp | disabled-until-approved official Meta webhook adapter |
+| Infrastructure | Docker Compose, GitHub Actions backend/frontend CI |
+
+This code was independently written with architecture patterns informed by public repositories: [HealthJourney (MIT)](https://github.com/sartaj04/AI-Powered-Patient-Journey-Platform), [Nile Care (MIT)](https://github.com/YoumnKaram561/Nile-Care), [Medplum (Apache 2.0)](https://github.com/medplum/medplum) and [Chatwoot (MIT core / separately licensed Enterprise)](https://github.com/chatwoot/chatwoot). **Their source code has not been merged into this package.** See [docs/UPSTREAM.md](docs/UPSTREAM.md).
+
+## Development setup (synthetic test data only)
+
+1. Make a copy of `.env.example` named `.env`.
+2. Set `POSTGRES_PASSWORD`, update the password segment inside `DATABASE_URL` to match, and set **unique** `JWT_SECRET` (32+ characters) and `BOOTSTRAP_ADMIN_PASSWORD` (12+).
+3. With Docker Desktop running:
 
 ```bash
-cp .env.example .env
-# Set a unique JWT_SECRET and BOOTSTRAP_ADMIN_PASSWORD in .env
-# then:
-docker compose up --build
-# in another terminal:
+docker compose up --build -d
+docker compose ps
 docker compose exec api python -m app.bootstrap
 ```
 
-UI: http://localhost:3000   |  API: http://localhost:8000/docs
+4. Log in at `http://localhost:3000/login`. OpenAPI at `http://localhost:8000/docs`.
 
-Local backend without Docker:
+No default admin password is bundled. Bootstrap refuses to overwrite existing users.
+
+### Run the synthetic API tests
 
 ```bash
 cd backend
 python -m venv .venv
-# activate venv, then:
+# Activate the venv, then:
 pip install -r requirements.txt
-# SQLite is permitted only for development:
-export DATABASE_URL=sqlite:///./medtour_dev.sqlite3
-export JWT_SECRET='development-only-change-me-to-a-strong-random-secret'
-export APP_ENV=development
-python -m app.bootstrap  # requires BOOTSTRAP_ADMIN_PASSWORD, TENANT_SLUG, BOOTSTRAP_ADMIN_EMAIL
-uvicorn app.main:app --reload
-pytest -q
+python -m pytest -q
 ```
 
-## Important safety boundaries
+**Windows guide:** [docs/LOCAL_TEST_PLAN_FA.md](docs/LOCAL_TEST_PLAN_FA.md)
 
-Do NOT use real patient data until privacy/legal/security review and a controlled production deployment are complete. The bootstrap account must never have a default password. Do NOT use the demo/local SQLite environment for actual health records. Physician verification is **not automated**; privileged users must review licenses. Patient medical decisions, travel fitness, appointments, prices, and visas **require verified humans/third parties**. There is no guarantee of WhatsApp/API eligibility for Iran; disabled integration is intentional.
+### Portal access
 
-## Repository guides
+After adding a patient, record explicit `communication` consent. In the authenticated OpenAPI interface use `POST /api/v1/portal/invites/{patient_id}`. Give the short-lived token privately to the **synthetic test patient**. Open `http://localhost:3000/patient-portal#access=TOKEN`; the fragment is removed from the address bar after ingestion.
 
-- [Implementation status](docs/IMPLEMENTATION_STATUS.md)
+### Secure files in development (optional)
+
+The default upload response is `503`, by design. For synthetic files, set `ALLOW_DEV_ENCRYPTED_UPLOADS=true`, `PRIVATE_DOCUMENT_DIR` and a unique 32-byte URL-safe base64 `DOCUMENT_ENCRYPTION_KEY`. This is development-only, lacks a malware-scanning integration and is **not approved for clinical records**.
+
+## GitHub publication
+
+Create an **empty private** repository named `MedTour-AI` under the account `engsaeedsajjadi` and run `./publish_github.ps1` from Windows PowerShell. The ZIP includes Git metadata with local commits for easy publishing. No GitHub repository has been created automatically by this package.
+
+## Documentation
+
+- [Master 45-section tracker](docs/MASTER_45_TRACKER.md)
+- [Local tests](docs/LOCAL_TEST_PLAN_FA.md)
+- [Release notes](docs/RELEASE_NOTES_2026_10_15.md)
+- [Threats and security](docs/SECURITY.md)
 - [Architecture](docs/ARCHITECTURE.md)
-- [Security and release gates](docs/SECURITY.md)
-- [Upstream repositories and licenses](docs/UPSTREAM.md)
-- [Roadmap to master prompt](docs/ROADMAP.md)
+- [Verified upstream references](docs/UPSTREAM.md)
+
+The platform remains a **development alpha** and must undergo local tests and independent production/security review before handling patients.

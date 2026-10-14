@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_DB: medtour
       POSTGRES_USER: medtour
-      POSTGRES_PASSWORD: dev_only_change
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a local database password in .env}
     ports:
       - "127.0.0.1:5544:5432"
     volumes:

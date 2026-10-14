@@ -2,6 +2,7 @@ import os
 from sqlalchemy import select
 from .database import Base, engine, SessionLocal
 from .models import Tenant, User
+from . import enterprise_models  # register tables
 from .security import password_hash
 
 def bootstrap():

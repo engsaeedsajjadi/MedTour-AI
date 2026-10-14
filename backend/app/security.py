@@ -7,6 +7,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 from .database import get_db
 from .models import User
+from .enterprise_models import RevokedAccess
 
 BEARER = HTTPBearer(auto_error=False)
 
@@ -39,6 +40,9 @@ def current_user(credentials:HTTPAuthorizationCredentials|None=Depends(BEARER),d
         data=jwt.decode(credentials.credentials, secret(), algorithms=['HS256'],options={'require':['exp','sub','tid','jti']})
         user=db.query(User).filter(User.id==data['sub'],User.tenant_id==data['tid'],User.active==True).first()
         if not user or user.role!=data.get('role'): raise ValueError('stale or invalid identity')
+        revoked=db.query(RevokedAccess.id).filter(RevokedAccess.tenant_id==user.tenant_id,
+            RevokedAccess.jti_hash==hashlib.sha256(data['jti'].encode()).hexdigest()).first()
+        if revoked: raise ValueError('Access token has been revoked')
         return user
     except (jwt.PyJWTError, ValueError, KeyError):
         raise HTTPException(status_code=401,detail='Invalid or expired token')

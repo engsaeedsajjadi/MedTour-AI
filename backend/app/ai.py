@@ -51,3 +51,26 @@ def draft(message:str,language:str)->dict:
                 'disclaimer':'Administrative assistant only; not medical advice.'}
     except (httpx.HTTPError,ValueError,KeyError,IndexError,TypeError) as exc:
         raise HTTPException(502,'AI provider error; escalate to human operator') from exc
+
+def translate(text:str,source_language:str,target_language:str)->str:
+    """Explicitly approved provider only; drafts must be human-reviewed."""
+    from .intake import LANGUAGES
+    if source_language not in LANGUAGES or target_language not in LANGUAGES:
+        raise HTTPException(422,'Unsupported language')
+    if not provider_available():raise HTTPException(503,'Approved AI translation provider is unavailable')
+    root=os.environ['AI_BASE_URL'].rstrip('/')
+    if not root.startswith('https://'):raise HTTPException(503,'AI endpoint must use HTTPS')
+    try:
+        with httpx.Client(timeout=20,follow_redirects=False) as client:
+            resp=client.post(root+'/chat/completions',headers={'Authorization':'Bearer '+os.environ['AI_API_KEY']},json={
+                'model':os.environ['AI_MODEL'],
+                'messages':[{'role':'system','content':
+                  f'Translate faithfully from {source_language} to {target_language}. Preserve uncertainty, proper names, numbers, and clinical terminology. '
+                  'Do not add diagnoses, advice, facts or interpretations. Return translation only.'},
+                  {'role':'user','content':text}], 'temperature':0,'max_tokens':1200})
+        resp.raise_for_status()
+        result=resp.json()['choices'][0]['message']['content']
+        if not isinstance(result,str) or not result.strip() or len(result)>9000:raise ValueError('Invalid translation')
+        return result.strip()
+    except (httpx.HTTPError,KeyError,IndexError,ValueError,TypeError):
+        raise HTTPException(502,'AI translation draft failed; use a human translator')

@@ -1,6 +1,6 @@
 import os
 from .database import Base, engine
-from . import models  # noqa
+from . import models, enterprise_models  # noqa
 
 if __name__=='__main__':
     if os.getenv('APP_ENV','development')=='production':

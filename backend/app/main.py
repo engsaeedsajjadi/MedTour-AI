@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
+from . import enterprise_models  # register enterprise tables
 from .database import get_db
 from .models import (User,Tenant,Patient,Case,Consent,Document,Physician,Hospital,Referral,
                      Appointment,Quote,TravelRequest,Conversation,Message,Task,Audit)
@@ -15,7 +16,7 @@ from .intake import intake_response, PROMPTS, LANGUAGES, IntakeAnswer
 from .ai import draft as ai_draft, provider_available
 from .whatsapp import router as whatsapp_router
 
-app=FastAPI(title='MedTour AI Coordination API',version='0.1.0',description='Development foundation. Not approved for production PHI or clinical care.')
+app=FastAPI(title='MedTour AI Coordination API',version='0.4.0-alpha',description='Development foundation. Not approved for production PHI or clinical care.')
 app.include_router(whatsapp_router)
 origins=[p.strip() for p in os.getenv('CORS_ORIGINS','http://localhost:3000').split(',') if p.strip()]
 app.add_middleware(CORSMiddleware,allow_origins=origins,allow_credentials=True,allow_methods=['GET','POST','PATCH'],allow_headers=['Authorization','Content-Type'])
@@ -152,7 +153,8 @@ def login(body:LoginIn,db:Session=Depends(get_db)):
     if not tenant:raise HTTPException(401,'Invalid credentials')
     user=db.scalar(select(User).where(User.tenant_id==tenant.id,User.email==body.email.lower().strip(),User.active==True))
     if not user or not password_verify(body.password,user.password_hash):raise HTTPException(401,'Invalid credentials')
-    return {'access_token':token_for(user),'token_type':'bearer','role':user.role,'tenant_id':user.tenant_id}
+    from .session_api import issue_refresh
+    return {'access_token':token_for(user),'refresh_token':issue_refresh(db,user),'token_type':'bearer','role':user.role,'tenant_id':user.tenant_id}
 
 @app.get('/api/v1/auth/me')
 def me(user:User=Depends(current_user)):
@@ -350,9 +352,20 @@ def audits(limit:int=Query(100,ge=1,le=300),db:Session=Depends(get_db),user:User
 
 @app.get('/api/v1/integrations/status')
 def integrations(user:User=Depends(MODERATOR)):
-    return {'whatsapp':{'status':'blocked_pending_business_eligibility','live_connected':False},
+    return {'whatsapp':{'status':'inbound_configured_no_outbound' if __import__('app.whatsapp',fromlist=['enabled']).enabled() else 'blocked_pending_business_eligibility','live_connected':False},
             'ai':{'status':'enabled' if provider_available() else 'not_configured','live_connected':provider_available()},
             'file_uploads':{'status':'not_configured','live_connected':False},
             'visa':{'status':'human_coordination_only','live_connected':False},
             'hotels':{'status':'human_coordination_only','live_connected':False},
             'medical_providers':{'status':'manual_verified_workflow','live_connected':False}}
+
+# Enterprise domain routers (always enforce tenant and role boundaries)
+from .enterprise_api import router as enterprise_router
+app.include_router(enterprise_router)
+from .patient_portal import router as patient_portal_router
+app.include_router(patient_portal_router)
+from .document_storage import router as document_storage_router
+app.include_router(document_storage_router)
+
+from .session_api import router as session_router
+app.include_router(session_router)

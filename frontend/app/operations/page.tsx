@@ -1,0 +1,16 @@
+'use client';
+import Shell from '@/components/Shell';
+import {request,Row} from '@/lib/api';
+import {useEffect,useState} from 'react';
+const TYPES=['visa','hotel','transport','interpreter','home_visit','hospital_admission','diagnostics','followup','insurance','airport_pickup','hotel_vendor','transport_vendor','interpreter_vendor'];
+const FLOW:Record<string,string[]>={requested:['in_review','cancelled'],in_review:['awaiting_external','cancelled','rejected'],awaiting_external:['confirmed','rejected','cancelled'],confirmed:['completed','cancelled']};
+export default function Operations(){
+ const [items,setItems]=useState<Row[]>([]),[error,setError]=useState(''),[kind,setKind]=useState('visa'),[caseId,setCaseId]=useState(''),[title,setTitle]=useState(''),[working,setWorking]=useState(false),[filter,setFilter]=useState('');
+ const load=()=>request<Row[]>('/operations'+(filter?'?kind='+filter:'')).then(setItems).catch(e=>setError(e.message));
+ useEffect(load,[filter]);
+ async function create(e:React.FormEvent){e.preventDefault();setError('');setWorking(true);try{await request('/operations',{method:'POST',body:JSON.stringify({kind,case_id:caseId||null,title,metadata:{}})});setTitle('');load();}catch(e){setError((e as Error).message)}finally{setWorking(false)}}
+ async function move(id:string,status:string){const reference=status==='confirmed'?window.prompt('شماره تأیید رسمی پزشک/مرکز/ارائه‌دهنده را وارد کنید:'):undefined;if(status==='confirmed'&&!reference)return;try{await request(`/operations/${id}/transition`,{method:'POST',body:JSON.stringify({status,reference})});load();}catch(e){setError((e as Error).message)}}
+ return <Shell title="هماهنگی خدمات درمان و سفر"><div className="infoBanner">هر عملیات ابتدا درخواست است؛ رزرو یا ویزا بدون مرجع تأیید مستقل قطعی نمی‌شود.</div>{error&&<div className="errorBox">{error}</div>}
+ <section className="panel"><div className="panelHeader"><h2>درخواست جدید</h2></div><form className="formGrid" onSubmit={create}><label>نوع خدمت<select value={kind} onChange={e=>setKind(e.target.value)}>{TYPES.map(x=><option key={x}>{x}</option>)}</select></label><label>شناسه پرونده (برای خدمات بیمار ضروری)<input value={caseId} onChange={e=>setCaseId(e.target.value)}/></label><label>عنوان درخواست<input required minLength={3} value={title} onChange={e=>setTitle(e.target.value)}/></label><div className="formActions"><button disabled={working} className="button">ثبت درخواست</button></div></form></section>
+ <section className="panel"><div className="panelHeader"><h2>پیگیری عملیات</h2><select value={filter} onChange={e=>setFilter(e.target.value)}><option value="">همه</option>{TYPES.map(x=><option key={x}>{x}</option>)}</select></div><div className="tableScroll"><table><thead><tr><th>خدمت</th><th>عنوان</th><th>وضعیت</th><th>مرجع تأیید</th><th>تغییر وضعیت</th></tr></thead><tbody>{items.map(x=><tr key={String(x.id)}><td>{String(x.kind)}</td><td>{String(x.title)}</td><td><span className="badge">{String(x.status)}</span></td><td>{String(x.confirmed_reference||'—')}</td><td>{(FLOW[String(x.status)]||[]).map(status=><button style={{margin:'3px'}} className="button secondary" key={status} onClick={()=>move(String(x.id),status)}>{status}</button>)}</td></tr>)}</tbody></table></div></section></Shell>
+}
