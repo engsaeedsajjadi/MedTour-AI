@@ -8,15 +8,15 @@ Legend: **implemented (local)** = code + synthetic API tests; **partial** = some
 |---|---|---|---|
 | 1 | Role and mission | Partial | Operations coordination foundation, not end-to-end real-world fulfillment. |
 | 2 | Non-negotiable principles | Partial | Human-gated prices, appointment status, visas; no clinical-autonomy claim. External security and compliance review pending. |
-| 3 | Technology stack | Partial | Next.js/FastAPI/Postgres/SQLAlchemy; Redis worker, migrations and hardened object storage missing. |
+| 3 | Technology stack | Partial | Next.js/FastAPI/SQLAlchemy/Postgres, Redis service, Alembic baseline migration, gated S3/KMS adapter; production RLS and running workers incomplete. |
 | 4 | Enterprise product modules | Partial | Multi-domain operational API and staff UI added; distinct completed submodules incomplete. |
-| 5 | WhatsApp-first channel | Partial / external gate | Signed Meta webhook + tenant mapping + idempotent metadata + consent-aware inbound handoff. No real authorized outbound/production integration. |
-| 6 | Multilingual receptionist | Partial | Five-language initial safety/admin prompts; fluent, validated voice/chat AI still missing. |
-| 7 | Medical intake | Partial | Consent, staged questionnaires, keyword escalation, human review; no clinical validation. |
-| 8 | Secure medical documents | Partial | AES-GCM encrypted **development-only** storage with access checks. Production object storage and malware scanning absent. |
+| 5 | WhatsApp-first channel | Partial / external gate | Signed Meta webhook, idempotent inbound, authorization-gated template outbox, manager approval and explicit send-worker command. No live authorized production integration tested. |
+| 6 | Multilingual receptionist | Partial | Five-language full administrative questionnaire in staff and patient portal, multilingual translation draft requiring explicit consent and human approval. Linguistic QA and speech AI pending. |
+| 7 | Medical intake | Partial | Consent, full five-question patient-facing structured flow, emergency keyword escalation and clinician handoff. No clinical validation. |
+| 8 | Secure medical documents | Partial | Staff + patient AES-GCM dev uploads with consent, checksum, size and type limits; gated production S3 SSE-KMS + ClamAV scan adapter implemented but actual external infrastructure and tests absent. |
 | 9 | Patient CRM | Partial | Patient/case/consent/stage, tasks, lead source, timeline seed. Advanced duplicate resolution, follow-ups missing. |
 | 10 | Administrative control center | Partial | Persian RTL pages + actual API CRUD; more workflows and admin search needed. |
-| 11 | Human inbox | Partial | Stored conversations, operator handoff, patient web chat; no live translation queue or Chatwoot sync. |
+| 11 | Human inbox | Partial | Stored conversations, handoff, portal webchat, translation draft/review workflow, approved template outbox; no Chatwoot sync or live authorized send. |
 | 12 | Physician management | Partial | Verified-directory control + referrals; physician-bound login/workspace and credential verification evidence missing. |
 | 13 | Hospital management | Partial | Hospital CRUD/approval; own scoped portal and external hospital scheduling missing. |
 | 14 | Provider matching | Partial | Nonclinical verified-specialty directory search; qualified clinician review mandatory. |
@@ -26,26 +26,26 @@ Legend: **implemented (local)** = code + synthetic API tests; **partial** = some
 | 18 | Accommodation | Partial / external gate | Hotel requests and vendor records; actual provider reservation/stock missing. |
 | 19 | Transportation/interpreters | Partial | Manual requests, vendor entities; scheduling and dispatch APIs missing. |
 | 20 | International agents | Partial | Agents and referral tracking; agent login/contract management and lawful compensation missing. |
-| 21 | Patient portal | Partial | Expiring revocable access, journey, web chat. Identity assurance, upload, translations, OTP missing. |
+| 21 | Patient portal | Partial | Expiring revocable access, one-time purpose consent links, journey, web chat, patient document upload and structured five-language intake; strong identity assurance/OTP missing. |
 | 22 | Multilingual public website | Partial | CMS public pages and RTL structure; complete pages, legal content, SEO, translation validation missing. |
 | 23 | CMS | Partial | Locale-specific draft/publish/content API + UI; medical review role/versioning missing. |
-| 24 | AI orchestration | Partial / external gate | Optional gated AI drafting/translation adapter, approved knowledge articles; no orchestration/telemetry or validated RAG. |
+| 24 | AI orchestration | Partial / external gate | Optional gated AI drafting/translation adapter, consent-gated human translation review, approved knowledge articles; no full orchestrator, speech or validated RAG. |
 | 25 | Voice messaging | Not delivered | STT/TTS languages, message decoding, validation and privacy gates. |
-| 26 | Multi-tenancy | Partial | Tenant scoped ORM endpoints/tests; Postgres RLS and production provisioning missing. |
-| 27 | Identity and access | Partial | JWT+PBKDF2+RBAC, admin staff addition; MFA, invitations, revoke/refresh, scoped doctor authorization missing. |
-| 28 | Healthcare privacy/security | Partial | Consent gates, encrypted local files, selective audit, tenant checks; pen test, production KMS, retention/legal review missing. |
+| 26 | Multi-tenancy | Partial | Tenant-scoped ORM endpoints/tests and Alembic baseline. PostgreSQL RLS, historical DB migration and production provisioning missing. |
+| 27 | Identity and access | Partial | JWT+PBKDF2+RBAC, Redis-backed login throttling, refresh rotation/replay detection/logout, one-time patient consent links; MFA and doctor-bound role still missing. |
+| 28 | Healthcare privacy/security | Partial | Consent including patient-attested links, revocation, staff+portal file guards, ClamAV/KMS/S3 adapter, selective audit, rate limiter; external pentest, active KMS, RLS and privacy review still missing. |
 | 29 | Payments & finance | Partial | Admin-verified manual ledger with dedupe; not an actual payment gateway or complete ledger. |
-| 30 | Notifications & workflows | Partial | Lifecycle events and task tracking; resilient queues, customer delivery and schedules missing. |
+| 30 | Notifications & workflows | Partial | Lifecycle events, task tracking and durable DB outbox with manual approval; no scheduled reliable worker/real provider delivery. |
 | 31 | Reports & analytics | Partial | Real tenant-scoped counts, operation statuses, verified payment counts; exports and deeper analytics missing. |
-| 32 | Database | Partial | 30+ SQLAlchemy entities, constraints/indexes; Alembic versioned production migrations pending. |
+| 32 | Database | Partial | SQLAlchemy tenant entities, new intake/consent/translation/outbound objects and Alembic baseline migration for fresh DB; legacy DB migration and PostgreSQL RLS pending. |
 | 33 | APIs | Partial | Documented OpenAPI routes, Pydantic validation, status transitions; rate limiting, general idempotency and versioned contracts pending. |
 | 34 | UI/UX | Partial | Functional Persian-first admin pages; responsive accessibility and complete language coverage not verified. |
-| 35 | DevOps/production | Partial | Docker Compose, dev bootstrap, CI API tests, environment sample. Production security/deployment gates missing. |
-| 36 | Testing | Partial | 28 backend tests with synthetic records; frontend build, integration with Postgres, browser E2E/pentest/load tests missing. |
+| 35 | DevOps/production | Partial | Docker Compose includes Postgres+Redis, migration startup, health endpoint, dev bootstrap and CI API tests; actual Docker startup/deployment and security gates pending. |
+| 36 | Testing | Partial | 44 backend tests with synthetic data, migration smoke test, TypeScript syntax pass; frontend build, real Postgres, Docker, browser E2E/pentest/load tests missing. |
 | 37 | SaaS subscription | Not delivered | Plan definitions/quotas/entitlements/billing/subscription lifecycle. |
 | 38 | Configuration controls | Partial | Tenant setting allowlist, CMS/knowledge/price/vendor/staff pages; full feature policy needs work. |
-| 39 | Implementation phases | Partial | Core local workflows exist, other phases remain. |
-| 40 | End-to-end scenarios | Partial | API-level flows tested; no real approved provider journey, web UI E2E or external booking. |
+| 39 | Implementation phases | Partial | Expanded security, document, language and messaging core delivered at development level; many other phases remain. |
+| 40 | End-to-end scenarios | Partial | API-level synthetic flows (including patient consent, intake, document and template queue) tested; no real provider journey, web UI E2E or external booking. |
 | 41 | Performance & operations | Not delivered | No measured service-level objective, worker queue metrics or benchmark results. |
 | 42 | Deliverables | Partial | Source, docs and tests delivered, not a complete 30-artifact certified package. |
 | 43 | Execution discipline | Implemented (process) | Workflows are auditable and tests execute; blockers are explicitly documented. |

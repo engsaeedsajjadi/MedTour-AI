@@ -1,29 +1,24 @@
-# Verification log — 2026-10-14
+# Verification — 2026-10-15 — v0.5.0-alpha
 
-Executed in an isolated build container:
+Environment: Python 3.13 build container, local SQLite for *synthetic-only tests*. Production application is targeted at Python 3.12 / PostgreSQL 17.
 
 ```text
 cd backend && pytest -q
-............ [100%]
-12 passed in 5.62s
+............................................                             [100%]
+44 passed in 20.15s
 ```
 
-Test coverage exercises:
-- Authentication and invalid login.
-- Consent prerequisite for patient case creation.
-- Tenant A / Tenant B separation on case/patient access.
-- Authorization for quotation approval.
-- Physician verification requirement before referral and appointment booking.
-- Manual booking confirmation reference requirement.
-- Travel service cannot be confirmed without external reference.
-- Secure document upload fails closed until storage is configured.
-- Persian/Arabic/Pashto/Dari/English initial intake and one Arabic emergency keyword.
-- Case status transitions, handoff, messages and audit events.
-- AI provider requires consent and remains disabled by default.
-- WhatsApp signed webhook validation and disabled integration state.
+Also exercised:
+- `python -m compileall -q backend/app` => completed.
+- Alembic autogeneration / `alembic upgrade head` on new temporary SQLite => successful.
+- `alembic check` on migrated temporary SQLite => no new upgrade operations detected (before the last schema regeneration; regenerated baseline subsequently upgraded and used by tests).
+- TypeScript compiler AST parse of 30 source files before the consent screen, and separately checked frontend syntax after UI edits; full TypeScript semantic checks require installed npm dependencies.
+- `docker-compose.yml` parsed as valid YAML.
 
-Frontend: 16 TypeScript/TSX files syntactically parsed with the TypeScript compiler, 0 parse errors. `npm install` and `next build` **not run**, since this container cannot access the npm registry. UI/browser integration remains unverified.
+Not executed / not verified:
+- `npm run build`, full Next.js/React type-check and browser E2E: npm dependency install timed out in this environment.
+- Docker container startup, actual PostgreSQL, S3/KMS/ClamAV and Redis network integration tests.
+- Official WhatsApp outbound and AI model / speech provider integration.
+- Security penetration testing, clinician evaluation, language expertise validation, legal audit, stress/performance benchmarking.
 
-Docker Compose startup not run; no Docker daemon or external databases exercised. PostgreSQL Row-Level Security is not yet enforced. No clinician, legal or penetration test has been performed.
-
-Do not claim the product is ready for real patients.
+**Security statement:** these are local development verification results, not evidence of healthcare certification or live deployment readiness.

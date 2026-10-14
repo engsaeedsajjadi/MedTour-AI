@@ -319,7 +319,7 @@ def staff_list(db:Session=Depends(get_db),user:User=Depends(ADMIN)):
     return [{'id':x.id,'email':x.email,'role':x.role,'active':x.active} for x in xs]
 
 # Staged structured intake remains human-managed; no autonomous medical diagnosis.
-QUESTION_KEYS=['service_request','age_range','existing_diagnosis','previous_consultation','existing_reports']
+from .intake import QUESTION_KEYS,next_question
 class IntakeStart(BaseModel):
     case_id:str
     language:str='en'
@@ -332,7 +332,7 @@ def intake_start(body:IntakeStart,db:Session=Depends(get_db),user:User=Depends(O
     if not consent or not consent.accepted:raise HTTPException(409,'Intake consent required')
     x=PatientIntake(tenant_id=user.tenant_id,case_id=c.id,language=body.language)
     write(db,user,x,'intake_session_started')
-    return {'id':x.id,'stage':x.stage,'question_key':QUESTION_KEYS[0],'prompt':PROMPTS[x.language][1]}
+    return {'id':x.id,'stage':x.stage,'question_key':QUESTION_KEYS[0],'prompt':next_question(x.language,0)}
 
 class AnswerIn(BaseModel):
     answer:str=Field(min_length=1,max_length=3000)
@@ -352,7 +352,7 @@ def intake_answer(pk:str,body:AnswerIn,db:Session=Depends(get_db),user:User=Depe
     x.stage+=1
     if x.stage==len(QUESTION_KEYS):x.status='awaiting_clinician_review'
     write(db,user,x,'intake_answer_recorded')
-    return {'id':x.id,'status':x.status,'stage':x.stage,'next_question_key':QUESTION_KEYS[x.stage] if x.status=='in_progress' else None,'human_review_required':True}
+    return {'id':x.id,'status':x.status,'stage':x.stage,'next_question_key':QUESTION_KEYS[x.stage] if x.status=='in_progress' else None,'next_prompt':next_question(x.language,x.stage) if x.status=='in_progress' else None,'human_review_required':True}
 
 @router.get('/intake/sessions/{pk}')
 def intake_read(pk:str,db:Session=Depends(get_db),user:User=Depends(OPERATOR)):

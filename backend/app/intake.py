@@ -35,3 +35,34 @@ def intake_response(language: str,message:str)->dict:
         'human_review_required':True,
         'message':EMERGENCY_RESPONSE[lang] if flagged else PROMPTS[lang][1],
         'disclaimer':'Automated text-routing only, not medical triage, medical advice, or diagnosis.'}
+
+# Distinct questionnaire copy per locale, reviewed by coordinators before use.
+# These prompts are administrative, not a diagnostic decision tree.
+QUESTION_KEYS=('service_request','age_range','existing_diagnosis','previous_consultation','existing_reports')
+INTAKE_QUESTIONS={
+ 'en':('What medical service are you looking for?', 'What is the patient’s age range?',
+       'Has a physician already given a diagnosis? You may answer no or unknown.',
+       'Have you consulted a healthcare professional about this concern?',
+       'Do you have earlier medical reports? Use the secure document portal for uploads.'),
+ 'fa':('چه نوع خدمات پزشکی نیاز دارید؟','بازه سنی بیمار چقدر است؟',
+       'آیا قبلاً پزشک تشخیصی ثبت کرده است؟ می‌توانید خیر یا نامشخص پاسخ دهید.',
+       'آیا درباره این موضوع با پزشک مشورت کرده‌اید؟',
+       'آیا مدارک پزشکی قبلی دارید؟ فقط از پرتال امن استفاده کنید.'),
+ 'ar':('ما الخدمة الطبية التي تبحث عنها؟','ما الفئة العمرية للمريض؟',
+       'هل سبق للطبيب تقديم تشخيص؟ يمكنك الإجابة بلا أو غير معروف.',
+       'هل استشرت طبيباً بخصوص هذه الحالة؟',
+       'هل لديك تقارير طبية سابقة؟ استخدم البوابة الآمنة للرفع.'),
+ 'ps':('تاسو د کوم ډول طبي خدمت غوښتنه لرئ؟','د ناروغ د عمر حدود څومره دي؟',
+       'آیا ډاکټر مخکې تشخیص ورکړی؟ تاسو کولی شئ نه یا نه پوهېږم ووایاست.',
+       'آیا د دې ستونزې په اړه مو له ډاکټر سره سلا کړې ده؟',
+       'آیا مخکېني طبي راپورونه لرئ؟ یوازې خوندي پورټل وکاروئ.'),
+ 'prs':('به کدام خدمات صحی ضرورت دارید؟','محدوده سن مریض چقدر است؟',
+        'آیا داکتر قبلاً تشخیصی ارائه کرده است؟ می‌توانید نخیر یا نامعلوم بگویید.',
+        'آیا برای این مشکل با داکتر مشوره کرده‌اید؟',
+        'آیا راپورهای طبی قبلی دارید؟ لطفاً از پورتال مصون استفاده کنید.'),
+}
+
+def next_question(lang:str,stage:int)->str|None:
+    if lang not in LANGUAGES:raise ValueError('Unsupported language')
+    if stage<0 or stage>len(QUESTION_KEYS):raise ValueError('Invalid stage')
+    return INTAKE_QUESTIONS[lang][stage] if stage<len(QUESTION_KEYS) else None

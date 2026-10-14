@@ -14,15 +14,36 @@ services:
       interval: 5s
       timeout: 3s
       retries: 15
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - medtour_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
   api:
     build: ./backend
     env_file: .env
+    environment:
+      PRIVATE_DOCUMENT_DIR: /home/appuser/.medtour_documents
+    volumes:
+      - medtour_secure_dev:/home/appuser/.medtour_documents
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
       db:
         condition: service_healthy
-    command: ["sh", "-c", "python -m app.initialize && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+      redis:
+        condition: service_healthy
+    command: ["sh", "-c", "python -m alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health/ready', timeout=3)"]
+      interval: 10s
+      timeout: 4s
+      retries: 12
   web:
     build: ./frontend
     environment:
@@ -30,6 +51,9 @@ services:
     ports:
       - "127.0.0.1:3000:3000"
     depends_on:
-      - api
+      api:
+        condition: service_healthy
 volumes:
+  medtour_secure_dev:
+  medtour_redis:
   medtour_pg:

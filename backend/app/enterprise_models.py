@@ -1,7 +1,7 @@
 """Additional operational entities. These are coordination records, NOT clinical orders."""
 from __future__ import annotations
 from datetime import datetime, timezone
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, Index
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, BigInteger, String, Text, UniqueConstraint, Index
 from sqlalchemy.orm import Mapped, mapped_column
 from .database import Base
 from .models import TenantEntity, uid, utcnow
@@ -33,7 +33,7 @@ class ServicePrice(TenantEntity,Base):
     service_code:Mapped[str]=mapped_column(String(90))
     label:Mapped[str]=mapped_column(String(200))
     currency:Mapped[str]=mapped_column(String(3))
-    amount_minor:Mapped[int]=mapped_column(Integer)
+    amount_minor:Mapped[int]=mapped_column(BigInteger)
     source:Mapped[str]=mapped_column(String(180))
     verified_by:Mapped[str]=mapped_column(ForeignKey('users.id'))
     valid_until:Mapped[datetime]=mapped_column(DateTime(timezone=True))
@@ -44,7 +44,7 @@ class QuoteItem(TenantEntity,Base):
     quote_id:Mapped[str]=mapped_column(ForeignKey('quotes.id'),index=True)
     label:Mapped[str]=mapped_column(String(200))
     units:Mapped[int]=mapped_column(Integer,default=1)
-    unit_amount_minor:Mapped[int]=mapped_column(Integer)
+    unit_amount_minor:Mapped[int]=mapped_column(BigInteger)
     provenance:Mapped[str]=mapped_column(String(300))
 
 class WorkflowEvent(TenantEntity,Base):
@@ -101,7 +101,7 @@ class MessageEvent(TenantEntity,Base):
     __tablename__='message_events'
     event_id:Mapped[str]=mapped_column(String(150))
     channel:Mapped[str]=mapped_column(String(30))
-    status:Mapped[str]=mapped_column(String(30),default='received')
+    status:Mapped[str]=mapped_column(String(60),default='received')
     provider_account_id:Mapped[str]=mapped_column(String(120))
     payload_hash:Mapped[str]=mapped_column(String(64))
     # No unconsented inbound medical content stored.
@@ -142,7 +142,7 @@ class MoneyEntry(TenantEntity,Base):
     case_id:Mapped[str]=mapped_column(ForeignKey('cases.id'))
     entry_type:Mapped[str]=mapped_column(String(40))
     currency:Mapped[str]=mapped_column(String(3))
-    amount_minor:Mapped[int]=mapped_column(Integer)
+    amount_minor:Mapped[int]=mapped_column(BigInteger)
     source_reference:Mapped[str]=mapped_column(String(200))
     verified_by:Mapped[str]=mapped_column(ForeignKey('users.id'))
     __table_args__=(UniqueConstraint('tenant_id','entry_type','source_reference'),)
@@ -168,3 +168,41 @@ class RevokedAccess(TenantEntity,Base):
     user_id:Mapped[str]=mapped_column(ForeignKey('users.id'))
     jti_hash:Mapped[str]=mapped_column(String(64),unique=True,index=True)
     expires_at:Mapped[datetime]=mapped_column(DateTime(timezone=True))
+
+
+class TranslationDraft(TenantEntity,Base):
+    __tablename__='translation_drafts'
+    conversation_id:Mapped[str]=mapped_column(ForeignKey('conversations.id'),index=True)
+    source_language:Mapped[str]=mapped_column(String(10))
+    target_language:Mapped[str]=mapped_column(String(10))
+    source_text:Mapped[str]=mapped_column(Text)
+    draft_text:Mapped[str]=mapped_column(Text)
+    status:Mapped[str]=mapped_column(String(24),default='pending_review')
+    reviewer_id:Mapped[str|None]=mapped_column(ForeignKey('users.id'),nullable=True)
+    reviewed_at:Mapped[datetime|None]=mapped_column(DateTime(timezone=True),nullable=True)
+
+class OutboundMessage(TenantEntity,Base):
+    __tablename__='outbound_messages'
+    conversation_id:Mapped[str]=mapped_column(ForeignKey('conversations.id'),index=True)
+    patient_id:Mapped[str]=mapped_column(ForeignKey('patients.id'),index=True)
+    idempotency_key:Mapped[str]=mapped_column(String(100))
+    destination_channel:Mapped[str]=mapped_column(String(30),default='whatsapp')
+    template_name:Mapped[str]=mapped_column(String(100))
+    locale:Mapped[str]=mapped_column(String(10))
+    status:Mapped[str]=mapped_column(String(35),default='pending_approval')
+    approved_by:Mapped[str|None]=mapped_column(ForeignKey('users.id'),nullable=True)
+    provider_message_id:Mapped[str|None]=mapped_column(String(160),nullable=True)
+    attempt_count:Mapped[int]=mapped_column(Integer,default=0)
+    last_error_code:Mapped[str|None]=mapped_column(String(45),nullable=True)
+    sent_at:Mapped[datetime|None]=mapped_column(DateTime(timezone=True),nullable=True)
+    __table_args__=(UniqueConstraint('tenant_id','idempotency_key'),)
+
+
+class PatientConsentChallenge(TenantEntity,Base):
+    __tablename__='patient_consent_challenges'
+    patient_id:Mapped[str]=mapped_column(ForeignKey('patients.id'),index=True)
+    token_hash:Mapped[str]=mapped_column(String(64),unique=True,index=True)
+    purpose:Mapped[str]=mapped_column(String(40))
+    expires_at:Mapped[datetime]=mapped_column(DateTime(timezone=True))
+    used_at:Mapped[datetime|None]=mapped_column(DateTime(timezone=True),nullable=True)
+    issued_by:Mapped[str]=mapped_column(ForeignKey('users.id'))

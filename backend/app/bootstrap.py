@@ -12,14 +12,16 @@ def bootstrap():
     email=os.environ.get('BOOTSTRAP_ADMIN_EMAIL','admin@example.invalid').strip().lower()
     slug=os.environ.get('TENANT_SLUG','medtour-local')
     name=os.environ.get('TENANT_NAME','MedTour Local')
-    Base.metadata.create_all(bind=engine)
+    # First run: python -m alembic upgrade head (run migrations before provisioning).
     with SessionLocal() as db:
         tenant=db.scalar(select(Tenant).where(Tenant.slug==slug))
         if not tenant:
             tenant=Tenant(slug=slug,name=name)
             db.add(tenant); db.flush()
         exists=db.scalar(select(User).where(User.tenant_id==tenant.id,User.email==email))
-        if exists: raise RuntimeError('Bootstrap user already exists; no overwrite performed')
+        if exists:
+            print('Development bootstrap user already exists; no changes made')
+            return
         db.add(User(tenant_id=tenant.id,email=email,password_hash=password_hash(password),role='admin'))
         db.commit()
         print('Development bootstrap complete:',slug,email)

@@ -85,6 +85,7 @@ def test_case_transition_audit_and_handoff(seeded):
     conv=client.post('/api/v1/conversations',headers=a,json={'patient_id':p['id']}).json()
     hand=client.post('/api/v1/conversations/'+conv['id']+'/handoff',headers=a)
     assert hand.json()['human_handoff'] is True
+    client.post('/api/v1/consents',headers=a,json={'patient_id':p['id'],'purpose':'communication','accepted':True,'notice_version':'v1'})
     message=client.post('/api/v1/conversations/'+conv['id']+'/messages',headers=a,json={'body':'Welcome to the coordination service','language':'en'})
     assert message.status_code==201
     assert len(client.get('/api/v1/conversations/'+conv['id']+'/messages',headers=a).json())==1

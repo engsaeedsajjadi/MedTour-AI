@@ -1,7 +1,7 @@
 from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import uuid4
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, Float, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, BigInteger, String, Text, Float, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 from .database import Base
 
@@ -51,6 +51,7 @@ class Consent(TenantEntity, Base):
     purpose: Mapped[str] = mapped_column(String(80))
     accepted: Mapped[bool] = mapped_column(Boolean)
     notice_version: Mapped[str] = mapped_column(String(40))
+    source: Mapped[str] = mapped_column(String(30),default='staff_recorded')
 
 class Document(TenantEntity, Base):
     __tablename__ = 'documents'
@@ -60,6 +61,9 @@ class Document(TenantEntity, Base):
     category: Mapped[str] = mapped_column(String(70), default='report')
     status: Mapped[str] = mapped_column(String(40), default='storage_not_configured')
     storage_key: Mapped[str | None] = mapped_column(String(350), nullable=True)
+    mime_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    size_bytes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    sha256_hex: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
 class Physician(TenantEntity, Base):
     __tablename__ = 'physicians'
@@ -93,7 +97,7 @@ class Quote(TenantEntity, Base):
     __tablename__ = 'quotes'
     case_id: Mapped[str] = mapped_column(ForeignKey('cases.id'))
     currency: Mapped[str] = mapped_column(String(3))
-    amount_minor: Mapped[int] = mapped_column(Integer)
+    amount_minor: Mapped[int] = mapped_column(BigInteger)
     details: Mapped[str] = mapped_column(Text, default='')
     status: Mapped[str] = mapped_column(String(40), default='draft')
     approved_by: Mapped[str | None] = mapped_column(ForeignKey('users.id'), nullable=True)

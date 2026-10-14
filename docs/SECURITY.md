@@ -1,18 +1,27 @@
-# Security review / production release blockers
+# Security & privacy boundaries — v0.5.0-alpha
 
-**Development only**. Do not import actual medical files or identifying patient data until all of the following are addressed.
+This repository has **not** passed an external security, privacy, clinical or regulatory audit. Do not store real patient records.
 
-1. Confirm all relevant healthcare, tourism, privacy, cross-border processing, and vendor eligibility obligations. Require clinical governance and written partner contracts.
-2. Implement production migration system and FORCE ROW LEVEL SECURITY on all tenant tables; add cross-tenant DB tests with separate credentials. Current explicit query filters are not enough for Enterprise certification.
-3. Encrypt documents in private object storage; use scan-before-read, short-lived signed links, protected metadata, upload lifecycle, retention policy and removal access logs. Current upload intentionally fails closed.
-4. Implement MFA for privileged accounts, short sessions, refresh token rotation and revocation, breached-password screening and rate limits / anti-brute force.
-5. Implement server-to-server consent collection signed by the patient/representative, consent revocation enforcement, notice history and legal hold/retention.
-6. Keep PII and PHI out of telemetry, URL paths, prompts and debug logs; require DPA and region checks for LLM, speech and messaging providers.
-7. Audit all endpoints for assignment-level/relationship-level authorization; current operator can access all patients within the tenant, which may not meet least-privilege requirements.
-8. Validate provider credentials, privileges and sanctions; ensure physician approval of any treatment plan and emergency routing oversight.
-9. Add immutable audit and incident response, key/secret rotation, backup restore drills, penetration tests, scanning and disaster recovery.
-10. WhatsApp Business Cloud API activation only if Meta officially authorizes the business and flows. Web chat remains the fallback. Respect opt-in and message-template restrictions.
-11. Do not enable external payment processing unless gateway legal eligibility, identity verification, webhook security and reconciliation are complete.
-12. Confirm quotations and bookings using verified sources; visas must never be marked approved by the app itself.
+## Implemented controls (development baseline)
 
-Authentication implemented here is a **foundation** only. No claim is made of HIPAA, GDPR or ISO certification or of compliance with the law of any particular country.
+- Scoped tenant queries and roles at API boundaries; deny unauthorized cross-tenant patient/case operations; short-lived JWT; refresh rotation and logout revocation.
+- Login attempt throttling: Redis counter in configured environments, in-memory only for dev/tests. Production denies login if Redis is unavailable.
+- Purpose-specific consent records; one-time patient-attested consent link; withdrawal revokes portal access and pending outbound templates.
+- Patient portal uses a high-entropy header token (no patient tokens in query URLs or logs). Identity must be independently assured in a production flow.
+- Patient/staff document uploads enforce case ownership, purpose-specific consent, byte limit, magic bytes and SHA-256 checksum. Development encrypted files are marked **unscanned**.
+- Production S3 adapter is disabled without all required approvals, KMS key, private bucket and ClamAV host. Malware scan fails closed; no public presigned URLs are issued.
+- Signed HMAC inbound Meta webhook, tenant/account matching, idempotent receipt log, no storing unsupported unsolicited medical media.
+- Outbound WhatsApp restricted to approved generic templates, human approval and explicitly enabled provider adapter. Any ambiguous send is placed in `needs_reconciliation`, never silently retried.
+- AI is opt-in and human-reviewed. Stored AI logs must not contain prompts or patient medical content.
+
+## Critical production gaps
+
+1. **Database RLS:** current tenant filtering is application enforced; PostgreSQL RLS has NOT been activated. Implement tenant context and policies consistently, including portal access and webhook sessions, and test under PostgreSQL before production.
+2. **Strong identity:** MFA for privileged users, verified patient identity and clinic/physician credential verification are incomplete.
+3. **Document scanning:** end-to-end S3/KMS/ClamAV deployment, bucket policies, virus signatures/updates, object lifecycle, key rotation and incident response remain to be tested.
+4. **Data privacy:** production privacy notice, privacy impact assessment, retention and erasure processes, cross-border data transfers and approved processors remain pending.
+5. **Operations:** immutable external audit trail, central observability, secrets vault, WAF, infrastructure hardening, monitoring, backup restoration and penetration testing not independently validated.
+6. **Messaging:** privacy rules, recipient country eligibility and approved templates must be verified for every market; no external provider approvals are part of this source package.
+7. **Frontend:** browser security review, dependency audit, full semantic type checking, CSP, accessibility and E2E tests pending.
+
+The AI must never diagnose, prescribe, promise treatment outcomes, approve visas, prices or confirmed appointments. Urgent symptoms require immediate local emergency escalation, with human review.

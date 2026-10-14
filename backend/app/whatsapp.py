@@ -8,7 +8,7 @@ from __future__ import annotations
 import os,hmac,hashlib,json
 from fastapi import APIRouter,HTTPException,Request,Query,Depends
 from fastapi.responses import PlainTextResponse
-from sqlalchemy import select
+from sqlalchemy import select,or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from .database import get_db
@@ -64,7 +64,7 @@ async def receive(request:Request,db:Session=Depends(get_db)):
                                      payload_hash=digest,status='quarantined_no_matching_consent')
                     db.add(row)
                     phone=str(incoming.get('from',''))
-                    patient=db.scalar(select(Patient).where(Patient.tenant_id==tenant.id,Patient.contact==phone))
+                    patient=db.scalar(select(Patient).where(Patient.tenant_id==tenant.id,or_(Patient.contact==phone,Patient.contact=='+'+phone)))
                     # Never save a message body before an explicit, current communication consent.
                     if not patient:
                         quarantined+=1;continue

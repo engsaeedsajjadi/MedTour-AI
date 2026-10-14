@@ -2,7 +2,7 @@ from __future__ import annotations
 import os
 from datetime import datetime, timezone
 from typing import Literal
-from fastapi import FastAPI, Depends, HTTPException, Query
+from fastapi import FastAPI, Depends, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sqlalchemy import select, func
@@ -15,8 +15,9 @@ from .security import current_user,roles,password_verify,token_for
 from .intake import intake_response, PROMPTS, LANGUAGES, IntakeAnswer
 from .ai import draft as ai_draft, provider_available
 from .whatsapp import router as whatsapp_router
+from .rate_limit import throttle
 
-app=FastAPI(title='MedTour AI Coordination API',version='0.4.0-alpha',description='Development foundation. Not approved for production PHI or clinical care.')
+app=FastAPI(title='MedTour AI Coordination API',version='0.5.0-alpha',description='Development foundation. Not approved for production PHI or clinical care.')
 app.include_router(whatsapp_router)
 origins=[p.strip() for p in os.getenv('CORS_ORIGINS','http://localhost:3000').split(',') if p.strip()]
 app.add_middleware(CORSMiddleware,allow_origins=origins,allow_credentials=True,allow_methods=['GET','POST','PATCH'],allow_headers=['Authorization','Content-Type'])
@@ -117,7 +118,7 @@ def public(obj):
     allowed={
         Patient:['id','full_name','country','language','contact','created_at'],
         Case:['id','patient_id','complaint','specialty','status','assigned_operator_id','created_at'],
-        Consent:['id','patient_id','purpose','accepted','notice_version','created_at'],
+        Consent:['id','patient_id','purpose','accepted','notice_version','source','created_at'],
         Document:['id','patient_id','case_id','filename','category','status','created_at'],
         Physician:['id','full_name','specialty','city','credential_status','created_at'],
         Hospital:['id','name','city','license_status','created_at'],
@@ -144,11 +145,32 @@ def require_provider(db:Session,user:User,physician_id:str):
     if physician.credential_status!='verified': raise HTTPException(409,'Physician must be manually verified first')
     return physician
 
+@app.middleware('http')
+async def security_headers(request:Request,call_next):
+    response=await call_next(request)
+    response.headers['X-Content-Type-Options']='nosniff'
+    response.headers['X-Frame-Options']='DENY'
+    response.headers['Referrer-Policy']='no-referrer'
+    response.headers['Cache-Control']='no-store'
+    if os.getenv('APP_ENV')=='production':
+        response.headers['Strict-Transport-Security']='max-age=31536000; includeSubDomains'
+    return response
+
 @app.get('/api/v1/health/live')
-def health(): return {'status':'live','phase':'foundation','production_ready':False}
+def health(): return {'status':'live','phase':'development','production_ready':False}
+
+@app.get('/api/v1/health/ready')
+def ready(db:Session=Depends(get_db)):
+    try:
+        db.execute(select(func.count()).select_from(Tenant)).scalar_one()
+    except Exception as exc:
+        raise HTTPException(503,'Database unavailable') from exc
+    return {'status':'ready','database':'reachable','production_ready':False}
+
 
 @app.post('/api/v1/auth/login')
-def login(body:LoginIn,db:Session=Depends(get_db)):
+def login(body:LoginIn,request:Request,db:Session=Depends(get_db)):
+    throttle((request.client.host if request.client else 'unknown')+':'+body.tenant_slug+':'+body.email.lower().strip())
     tenant=db.scalar(select(Tenant).where(Tenant.slug==body.tenant_slug))
     if not tenant:raise HTTPException(401,'Invalid credentials')
     user=db.scalar(select(User).where(User.tenant_id==tenant.id,User.email==body.email.lower().strip(),User.active==True))
@@ -171,7 +193,14 @@ def patients(limit:int=Query(50,ge=1,le=200),db:Session=Depends(get_db),user:Use
 @app.post('/api/v1/patients',status_code=201)
 def create_patient(body:PatientIn,db:Session=Depends(get_db),user:User=Depends(MODERATOR)):
     if body.language not in LANGUAGES:raise HTTPException(422,'Unsupported language')
-    return save(db,user,Patient(tenant_id=user.tenant_id,**body.model_dump()),'patient_created')
+    import re
+    supplied=body.model_dump()
+    cleaned=body.contact.strip()
+    # Normalize phone-like contacts to a canonical digit-only international identifier.
+    if re.fullmatch(r'\+?[\d ()-]{8,25}',cleaned):
+        cleaned=''.join(c for c in cleaned if c.isdigit())
+    supplied['contact']=cleaned
+    return save(db,user,Patient(tenant_id=user.tenant_id,**supplied),'patient_created')
 
 @app.get('/api/v1/patients/{patient_id}')
 def patient_detail(patient_id:str,db:Session=Depends(get_db),user:User=Depends(MODERATOR)):
@@ -180,7 +209,20 @@ def patient_detail(patient_id:str,db:Session=Depends(get_db),user:User=Depends(M
 @app.post('/api/v1/consents',status_code=201)
 def consent(body:ConsentIn,db:Session=Depends(get_db),user:User=Depends(MODERATOR)):
     require_owned(db,Patient,body.patient_id,user)
-    return save(db,user,Consent(tenant_id=user.tenant_id,**body.model_dump()),'consent_recorded')
+    row=Consent(tenant_id=user.tenant_id,**body.model_dump())
+    db.add(row);db.flush()
+    if not body.accepted:
+        # Withdrawals invalidate patient access; old approval must not stay effective.
+        from .enterprise_models import PortalAccess,OutboundMessage,TranslationDraft
+        grants=db.scalars(select(PortalAccess).where(PortalAccess.tenant_id==user.tenant_id,
+               PortalAccess.patient_id==body.patient_id,PortalAccess.revoked==False)).all()
+        for g in grants:g.revoked=True
+        outgoing=db.scalars(select(OutboundMessage).where(OutboundMessage.tenant_id==user.tenant_id,
+            OutboundMessage.patient_id==body.patient_id,OutboundMessage.status.in_(['pending_approval','approved']))).all()
+        for message in outgoing:message.status='blocked'
+    audit(db,user,'consent_recorded' if body.accepted else 'consent_withdrawn',row)
+    db.commit();db.refresh(row)
+    return public(row)
 
 @app.get('/api/v1/cases')
 def cases(limit:int=Query(50,ge=1,le=200),db:Session=Depends(get_db),user:User=Depends(MODERATOR)):
@@ -322,6 +364,8 @@ def messages(id:str,db:Session=Depends(get_db),user:User=Depends(MODERATOR)):
 @app.post('/api/v1/conversations/{id}/messages',status_code=201)
 def message(id:str,body:MessageIn,db:Session=Depends(get_db),user:User=Depends(MODERATOR)):
     c=require_owned(db,Conversation,id,user)
+    if c.channel!='webchat':raise HTTPException(409,'Use approved template workflow for WhatsApp')
+    need_consent(db,user,c.patient_id,'communication')
     if body.language not in LANGUAGES:raise HTTPException(422,'Unsupported language')
     return save(db,user,Message(tenant_id=user.tenant_id,conversation_id=c.id,sender='operator',**body.model_dump()),'message_sent_webchat')
 @app.post('/api/v1/conversations/{id}/handoff')
@@ -336,7 +380,14 @@ def document_ticket(body:DocumentIn,db:Session=Depends(get_db),user:User=Depends
     if c.patient_id!=body.patient_id:raise HTTPException(422,'Case and patient do not match')
     need_consent(db,user,body.patient_id,'medical_documents')
     # Fail closed: no fake presigned URL, no misleading "uploaded" state.
-    raise HTTPException(503,'Private object-storage adapter and malware scanning must be configured before uploads are enabled')
+    from .document_storage import local_enabled
+    from .secure_media import s3_ready
+    if not (s3_ready() or local_enabled()):
+        raise HTTPException(503,'Private object storage and malware scanner must be configured before uploads are enabled')
+    return {'status':'authenticated_upload_available','method':'multipart_post',
+        'staff_endpoint':f'/api/v1/secure-documents/cases/{c.id}',
+        'patient_endpoint':f'/api/v1/secure-documents/portal/cases/{c.id}',
+        'requires_approved_private_patient_access':True,'presigned_public_url':None}
 
 @app.get('/api/v1/tasks')
 def tasks(db:Session=Depends(get_db),user:User=Depends(MODERATOR)):
@@ -354,7 +405,7 @@ def audits(limit:int=Query(100,ge=1,le=300),db:Session=Depends(get_db),user:User
 def integrations(user:User=Depends(MODERATOR)):
     return {'whatsapp':{'status':'inbound_configured_no_outbound' if __import__('app.whatsapp',fromlist=['enabled']).enabled() else 'blocked_pending_business_eligibility','live_connected':False},
             'ai':{'status':'enabled' if provider_available() else 'not_configured','live_connected':provider_available()},
-            'file_uploads':{'status':'not_configured','live_connected':False},
+            'file_uploads':{'status':'configured_pending_external_verification' if __import__('app.secure_media',fromlist=['s3_ready']).s3_ready() else 'not_configured','live_connected':False},
             'visa':{'status':'human_coordination_only','live_connected':False},
             'hotels':{'status':'human_coordination_only','live_connected':False},
             'medical_providers':{'status':'manual_verified_workflow','live_connected':False}}
@@ -369,3 +420,12 @@ app.include_router(document_storage_router)
 
 from .session_api import router as session_router
 app.include_router(session_router)
+
+from .communications import router as communications_router
+app.include_router(communications_router)
+
+from .portal_intake import router as portal_intake_router
+app.include_router(portal_intake_router)
+
+from .consent_links import router as consent_links_router
+app.include_router(consent_links_router)
