@@ -1,0 +1,27 @@
+# Keep Docker build context minimal and independent from local installs.
+node_modules/
+.next/
+out/
+dist/
+build/
+coverage/
+.git/
+.gitignore
+.vscode/
+.idea/
+
+# Keep local configuration and credentials out of image builds.
+.env
+.env.*
+*.pem
+*.key
+*.crt
+
+# Generated logs and caches.
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.tsbuildinfo
+.DS_Store
