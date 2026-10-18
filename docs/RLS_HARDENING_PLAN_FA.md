@@ -1,40 +1,43 @@
-# MedTour AI — PostgreSQL RLS Hardening Plan (FA)
-Date: 2026-10-18 — Evidence from local development database and repository inspection.
+# طرح سخت‌سازی Row-Level Security در MedTour AI
 
-## Verified baseline
-- PostgreSQL 17 local instance: 39 public tables. RLS disabled, FORCE disabled and 0 policies for all tables.
-- The database role `medtour` has SUPERUSER, BYPASSRLS, CREATEDB and CREATEROLE, owns all 39 public tables, and is the actual API connection role.
-- Existing backend API and synthetic tests include application-layer tenant checks. Passing tests do not prove database-layer tenant isolation.
-- `TenantEntity` ORM mixin attaches non-null `tenant_id` to 37 operational tables. `tenants` and `alembic_version` require distinct treatment.
-- Existing app uses pooled SQLAlchemy sessions without a PostgreSQL transaction-local, authenticated tenant context.
-- Existing inter-table FKs typically reference `id` alone. Composite tenant-bound constraints require a separate compatibility audit.
-- Database backup+isolated restore was tested; keep a verified backup for any future schema change.
+تاریخ بررسی: ۱۸ اکتبر ۲۰۲۶ — مستند ممیزی کد و دیتابیس توسعه، نه تأییدیه امنیت تولید.
 
-## Security constraints
-1. **Never turn on RLS in the existing database without first integrating all application paths and testing a restored clone.**
-2. **Never use the SUPERUSER/BYPASSRLS/table-owner role as the runtime API principal.** Keep a privileged migrator separate and retain protected credentials.
-3. Grant a non-owner `medtour_app` role only required DML permissions; no CREATE/ALTER/TRUNCATE/BYPASSRLS/GRANT ROLE. No direct `tenants` or `alembic_version` access unless justified.
-4. Tenant row access uses an *authenticated* context scoped to each transaction. A policy pattern for tenant tables is: `USING (tenant_id = NULLIF(current_setting('medtour.tenant_id',true),'')) WITH CHECK (tenant_id = NULLIF(current_setting('medtour.tenant_id',true),''))`. This is illustrative, not an approved production policy.
-5. **Caution:** custom PostgreSQL session variables can be set by ordinary SQL from the same connection. A raw `SET medtour.tenant_id = ...` value is *not* independently tamper-proof against arbitrary SQL injection. Treat it as defense in depth, not a substitute for injection prevention or a DB-verified context design.
-6. Use `set_config(..., true)` *within each transaction*. Committing mid-request resets the setting; the SQLAlchemy Session lifecycle and all commit/rollback/reuse paths must be audited.
-7. Keep PostgreSQL RLS policy evaluation, identifier authorization and cross-tenant FK integrity in scope. PostgreSQL foreign-key/uniqueness checks can bypass RLS; consider tenant-paired uniqueness and composite FKs.
-8. Ensure backups, monitoring, cron, webhook and migration jobs have separately reviewed roles; do not grant blanket permissions to the runtime role.
+## وضعیت تأییدشده
 
-## Special pre-auth flows
-- Staff login: resolve tenant slug and verify login credentials without global unrestricted access to all staff records. Only a narrow auth bootstrap path should be allowed.
-- Refresh rotation: resolve refresh hash securely, then establish authenticated tenant context; preserve replay detection and revoked family semantics.
-- Patient portal / consent links: resolve high-entropy hash, validate tenant, expiry and revocation before accessing protected patient data.
-- WhatsApp webhook: verify HMAC signature and tenant/account mapping, avoid unauthenticated cross-tenant reads.
-- Public CMS: use a strictly read-only publishing mechanism or an approved minimal public retrieval function.
-- Background workers and migrations: separate identities and explicit scoped approvals.
+- PostgreSQL 17 شامل ۳۹ جدول در schema عمومی است؛ روی هیچ‌کدام RLS یا FORCE RLS فعال نیست و تعداد Policyها صفر است.
+- نقش `medtour` از نوع `SUPERUSER` و `BYPASSRLS` است، همه ۳۹ جدول را مالک است و API نیز با همین نقش وصل می‌شود.
+- تست‌های کنونی جداسازی Tenant در سطح برنامه موفق بوده‌اند؛ اما این نتیجه، کنترل دسترسی مستقل در دیتابیس را ثابت نمی‌کند.
+- مدل‌ها از mixin به نام `TenantEntity` برای ۳۷ جدول عملیاتی با ستون اجباری `tenant_id` استفاده می‌کنند. `tenants` و `alembic_version` الگوی دسترسی متفاوتی نیاز دارند.
+- SQLAlchemy در کد کنونی زمینه Tenant معتبر را در هر تراکنش PostgreSQL مقداردهی نمی‌کند.
+- بسیاری از کلیدهای خارجی به شناسه `id` متصل‌اند؛ لازم است سازگاری کلیدهای مرکب `(tenant_id, id)` برای روابط چندمستأجری جداگانه ممیزی شود.
+- نسخه پشتیبان و بازیابی ایزوله قبلاً تست شده‌اند؛ هیچ تغییر Schema روی محیط فعال بدون پشتیبان معتبر انجام نشود.
 
-## Phases (do not run on live data until gates are satisfied)
-A. Use `scripts/rls-isolated-probe.ps1` to validate PostgreSQL RLS semantics on *synthetic data* in a disposable, network-isolated PostgreSQL 17 container. No existing DB is read.
-B. Create a dedicated, non-superuser API role and a privilege-mapped migration **only on a disposable clone**; confirm actual PostgreSQL table grants, no role escalation, and no owner bypass.
-C. Implement a verified tenant context and scoped database sessions for every endpoint, including pre-auth and background paths. Add negative tests for missing/forged context and transaction-pool reuse.
-D. Add RLS policies on all 37 tenant-scoped tables and audited policies/visibility for `tenants`; keep `alembic_version` migrator-only. Verify SELECT/INSERT/UPDATE/DELETE, including cross-tenant foreign key references.
-E. Validate against real PostgreSQL (not only SQLite), Alembic upgrades, CI, full 48+ tests, API login/refresh/logout/portal/consent/webhook and rollback behavior.
-F. Review separate database credentials, role ownership, backup-restoration procedure, monitoring and rollback. Only then stage a production-like pilot with approved synthetic data.
+## اصول لازم برای پیاده‌سازی
 
-## What the isolated probe proves—and does not
-The probe demonstrates that an unprivileged, non-owning PostgreSQL role cannot SELECT/INSERT/UPDATE another tenant's rows under a simple policy, and that a local setting is reset at commit. It does *not* exercise the MedTour ORM, live DB, login flows, SQL injection hardening or all 37 tables, and does not establish enterprise readiness.
+1. روی دیتابیس جاری **RLS را بدون تست یکپارچه اپلیکیشن فعال نکنید**؛ ممکن است ورود و پرتال بیمار از کار بیفتد.
+2. نقش API جدید، مانند `medtour_app`، باید `NOSUPERUSER`، `NOBYPASSRLS` و غیرمالک جدول‌ها باشد. اعتبارنامه Migration و API باید از هم جدا باشند.
+3. به نقش API صرفاً مجوزهای DML موردنیاز داده شود؛ از `TRUNCATE`، `CREATE`، `ALTER` و دسترسی به جداول مدیریتی بدون نیاز صریح خودداری شود.
+4. برای جداول tenant-scoped، یک نمونه Policy آزمایشی عبارت است از `USING (tenant_id = NULLIF(current_setting('medtour.tenant_id',true),'')) WITH CHECK (tenant_id = NULLIF(current_setting('medtour.tenant_id',true),''))`. این الگو به‌تنهایی Policy آماده Production نیست.
+5. هشدار: متغیر دلخواه PostgreSQL مانند `medtour.tenant_id` را می‌توان از طریق SQL همان اتصال تنظیم کرد؛ بنابراین در برابر SQL Injection که اجازه اجرای SQL دلخواه بدهد، به‌تنهایی مرز امنیتی غیرقابل‌جعل محسوب نمی‌شود. زمینه باید از هویت احرازشده و رویه مورد اعتماد پایگاه داده یا روش معادل اعتبارسنجی شود.
+6. برای جلوگیری از انتقال Tenant بین درخواست‌ها، زمینه فقط در محدوده تراکنش تنظیم شود: `set_config(..., true)`. بعد از `commit`، `rollback` و استفاده مجدد از Connection، زمینه باید آزموده شود.
+7. FK و Unique Constraint ممکن است با رفتار مستقل از RLS اجرا شوند؛ اعتبار Tenant در روابط جداول نیز باید بررسی شود.
+
+## مسیرهای حساس قبل از احراز هویت
+
+- **Login:** تشخیص محدود Tenant با slug و تأیید رمز عبور بدون مجوز خواندن آزاد همه کاربران.
+- **Refresh / Logout:** شناسایی توکن هش‌شده و اعتبارسنجی نشست، سپس تنظیم زمینه Tenant، همراه با جلوگیری از Replay.
+- **پرتال بیمار و لینک رضایت:** اعتبار توکن، هدف، انقضا و ابطال قبل از دسترسی به اطلاعات بیمار.
+- **Webhook واتساپ:** ابتدا تأیید HMAC و اتصال حساب ارائه‌دهنده به Tenant، سپس دسترسی محدود.
+- **CMS عمومی:** مسیر خواندنی محدود برای صفحات منتشرشده، بدون مشاهده پیش‌نویس‌ها و داده داخلی.
+- **Migration، Jobs و Backup:** نقش‌های جدا با دسترسی ممیزی‌شده.
+
+## فازهای اجرا و معیار پذیرش
+
+1. اجرای `scripts/rls-isolated-probe.ps1` با اطلاعات کاملاً ساختگی و PostgreSQL بدون شبکه. هیچ داده اصلی خوانده یا تغییر نمی‌شود.
+2. ایجاد نقش اجرایی غیرمدیر و Policyها فقط روی کپی بازیابی‌شده دیتابیس؛ آزمون حداقل دسترسی، مالکیت جدول و عدم عبور از RLS.
+3. یکپارچه‌سازی Tenant Context معتبر با SQLAlchemy و تمام مسیرهای ورود، Refresh، پرتال، رضایت و Webhook؛ آزمون عدم نشت Context بین تراکنش‌ها.
+4. افزودن Migrationهای کنترل‌شده برای Policyهای ۳۷ جدول عملیاتی و بازبینی روابط و کلیدهای خارجی Tenant-aware.
+5. اجرای تست یکپارچگی روی PostgreSQL واقعی در محیط ایزوله، مجموعه ۴۸+ تست Backend، CI، و آزمون‌های منفی Cross-Tenant.
+6. تأیید روش بازگشت، پشتیبان، نقش Migration، مانیتورینگ و سپس استقرار آزمایشی با داده ساختگی.
+
+**دامنه آزمون مرحله ۱:** فقط کارکرد پایه RLS و نقش غیرمدیر را روی جداول ساختگی اثبات می‌کند؛ RLS واقعی MedTour AI، مسیرهای Auth یا همه ۳۷ جدول را تست نمی‌کند و مجوز استفاده از داده پزشکی واقعی نیست.
