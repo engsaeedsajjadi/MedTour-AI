@@ -12,7 +12,10 @@ def throttle(raw_identity:str,limit:int=10,window:int=600):
     uri=os.getenv('REDIS_URL')
     if env=='production' and not uri:
         raise HTTPException(503,'Rate limiting unavailable')
-    if uri:
+    # Unit tests must use their isolated in-memory counter even when Docker
+    # passes REDIS_URL from .env. Never share production/development Redis
+    # login counters with the test suite.
+    if uri and env!='test':
         try:
             import redis
             r=redis.Redis.from_url(uri,socket_connect_timeout=1,socket_timeout=2)
