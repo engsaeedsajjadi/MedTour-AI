@@ -49,10 +49,12 @@ mt1.<key-id>.<purpose>.<tenant-uuid>.<unix-expiry>.<random-256-bit>.<hmac-sha256
 ```powershell
 cd "D:\Downloads\MedTour-AI-Enterprise-v0.5.0-alpha\MedTour-AI"
 git pull --ff-only origin main
+& .\scripts\test-stage-19-15-auth-boundaries.ps1 -TokenRoutingOnly
+# After the targeted checks pass, run the complete suite:
 & .\scripts\test-stage-19-15-auth-boundaries.ps1 -FullSuite
 ```
 
-کل ۵۴ تست پیشین و تست‌های ماژول ۱۹.۱۷ باید اجرا شوند. تا دریافت خروجی کاربر، این مرحله «آماده آزمایش» است.
+ابتدا تست‌های اختصاصی ۱۹.۱۷ اجرا می‌شوند و سپس مجموعه کامل شامل ۵۴ تست پیشین به‌علاوه تست‌های جدید باید اجرا شود. تا دریافت خروجی کاربر، این مرحله «آماده آزمایش» است.
 
 ## مراحل بعدی قبل از مهاجرت
 
