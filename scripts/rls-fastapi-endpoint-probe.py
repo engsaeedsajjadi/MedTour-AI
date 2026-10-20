@@ -57,6 +57,10 @@ def client_for(role: str, password: str):
 
 
 def main():
+    if (os.getenv("APP_ENV") != "test"
+            or os.getenv("DATABASE_URL") != "sqlite://"
+            or os.getenv("PROBE_DB_HOST") != "medtour-test-db"):
+        raise RuntimeError("Refusing to run outside the isolated synthetic FastAPI test runner")
     engines = []
     try:
         for role, passkey, own_tid in (
