@@ -40,7 +40,7 @@ VALUES ('mt_clone_a','__TENANT_A__'),('mt_clone_b','__TENANT_B__');
 -- session_user (the authenticated login principal) as the lookup identity.
 -- Ordinary SQL cannot change session_user to another login role.
 CREATE FUNCTION medtour_principal_private.tenant_for_login()
-RETURNS varchar(36)
+RETURNS text
 LANGUAGE sql STABLE SECURITY DEFINER
 SET search_path = pg_catalog, medtour_principal_private
 AS $fn$
