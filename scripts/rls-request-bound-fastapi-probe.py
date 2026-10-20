@@ -155,6 +155,19 @@ def main():
                 )["purpose"] == "communication"
                 print(f"PASS: real HTTP portal and consent route by token MAC and DB hash for tenant {index+1}", flush=True)
 
+            # A validly signed JWT must still identify an active user in
+            # the SAME tenant DB; an internally inconsistent sub/tid pair is denied.
+            token_a = auth[0]["Authorization"].split(" ", 1)[1]
+            claims = jwt.decode(token_a, os.environ["JWT_SECRET"], algorithms=["HS256"])
+            claims["tid"] = tids[1]  # legitimate signature, wrong tenant for user A
+            mismatched_jwt = jwt.encode(
+                claims, os.environ["JWT_SECRET"], algorithm="HS256"
+            )
+            assert_status(client.get("/api/v1/auth/me", headers={
+                "Authorization": "Bearer " + mismatched_jwt
+            }), 401, "Valid signature with cross-tenant JWT claims")
+            print("PASS: JWT identity must exist under its signed tenant's DB principal", flush=True)
+
             forged = tokens[tids[0]]["portal"].split(".")
             forged[3] = tids[1]
             count_before = checkouts[0]
