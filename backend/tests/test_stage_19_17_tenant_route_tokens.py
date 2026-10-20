@@ -142,7 +142,7 @@ def test_unrecognized_purpose_and_tenant_uuid_are_rejected(keyring):
     with pytest.raises(ValueError):
         keyring.issue(purpose="refresh", tenant_id="not-a-uuid", ttl_seconds=300, now=NOW)
     with pytest.raises(ValueError):
-        keyring.issue(purpose="refresh", tenant_id=TENANT_A.upper(), ttl_seconds=300, now=NOW)
+        keyring.issue(purpose="refresh", tenant_id="AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA", ttl_seconds=300, now=NOW)
     with pytest.raises(ValueError):
         keyring.verify("foo", expected_purpose="admin", now=NOW)
 
