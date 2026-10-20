@@ -38,7 +38,7 @@ BEGIN
   EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY',r.relname);
   EXECUTE format('ALTER TABLE public.%I FORCE ROW LEVEL SECURITY',r.relname);
   EXECUTE format(
-   'CREATE POLICY medtour_clone_app_tenant ON public.%I TO medtour_app FOR ALL USING (tenant_id = NULLIF(current_setting(''medtour.tenant_id'',true),'''')) WITH CHECK (tenant_id = NULLIF(current_setting(''medtour.tenant_id'',true),''''))',r.relname);
+   'CREATE POLICY medtour_clone_app_tenant ON public.%I FOR ALL TO medtour_app USING (tenant_id = NULLIF(current_setting(''medtour.tenant_id'',true),'''')) WITH CHECK (tenant_id = NULLIF(current_setting(''medtour.tenant_id'',true),''''))',r.relname);
   table_count := table_count + 1;
  END LOOP;
  IF table_count <> 37 THEN RAISE EXCEPTION 'Schema drift: expected 37 tenant tables, found %',table_count; END IF;
