@@ -135,7 +135,7 @@ def main():
         else:
             raise AssertionError("Revoked and released lease opened another DB session")
         with reg.acquire_slug(b.slug) as still_active:
-            assert row_check(still_active.factory, b.tenant_id, e("PATIENT_B"), e("PATIENT_A")) == b.database_role
+            assert row_check(still_active, b.tenant_id, e("PATIENT_B"), e("PATIENT_A")) == b.database_role
         print("PASS: tenant revocation blocks new leases, drains active work and preserves other tenant", flush=True)
 
         reg.close()
