@@ -76,6 +76,8 @@ try {
         # stderr INSIDE the container: Windows PowerShell 5.1 can convert native
         # stderr to a terminating NativeCommandError when ErrorActionPreference=Stop.
         # The shell returns 0 ONLY for the specific expected password denial.
+        # Pass the script on STDIN (not as a Windows-native sh -c argument),
+        # preserving embedded quote marks and multiline shell syntax.
         $wrongPasswordCheck = @'
 result=$(psql -X -h 127.0.0.1 -U "$PGUSER" -d medtour_principal_clone -c 'SELECT 1' 2>&1)
 status=$?
@@ -85,7 +87,7 @@ fi
 printf '%s\n' "Unexpected wrong-password test result: $result" >&2
 exit 1
 '@
-        docker exec -e "PGPASSWORD=$badPassword" -e "PGUSER=$role" $containerName sh -c $wrongPasswordCheck | Out-Null
+        $wrongPasswordCheck | docker exec -i -e "PGPASSWORD=$badPassword" -e "PGUSER=$role" $containerName sh | Out-Null
         AssertDocker "Wrong-password denial test did not yield the expected PostgreSQL authentication error for $role"
         Write-Host "PASS: $role rejects an incorrect password"
 
