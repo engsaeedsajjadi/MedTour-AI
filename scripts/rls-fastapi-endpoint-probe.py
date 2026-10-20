@@ -107,7 +107,9 @@ def main():
                     "/api/v1/patients", headers=own_headers,
                     json={"full_name": "Synthetic HTTP integration patient", "language": "en"},
                 ), 201, f"{role} patient CREATE")
-                assert created["tenant_id"] == own.tenant_id
+                assert created.get("id")
+                must(client.get(f"/api/v1/patients/{created['id']}", headers=own_headers),
+                     200, f"{role} created patient visible")
                 print(f"PASS: {role} FastAPI writes through its authenticated DB role", flush=True)
 
                 portal_headers = {"X-Patient-Access": own_portal}
