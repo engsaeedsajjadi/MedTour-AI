@@ -28,6 +28,24 @@ function AssertDocker([string]$message) {
     if ($LASTEXITCODE -ne 0) { throw $message }
 }
 
+# Powershell 5.1 native pipelines may insert UTF-8 BOM or alter newlines.
+# Copy bytes written with explicit BOM-free UTF-8 instead of piping text to sh/psql.
+function CopyTextIntoClone([string]$sourceText, [string]$destination) {
+    $tempFile = [System.IO.Path]::GetTempFileName()
+    try {
+        $cr = [string][char]13
+        $lf = [string][char]10
+        $cleanText = $sourceText.TrimStart([char]0xFEFF).Replace(($cr + $lf), $lf).Replace($cr, $lf)
+        $utf8NoBom = New-Object System.Text.UTF8Encoding -ArgumentList $false
+        [System.IO.File]::WriteAllText($tempFile, $cleanText, $utf8NoBom)
+        docker cp $tempFile ($containerName + ':' + $destination) | Out-Null
+        AssertDocker "Could not copy the test input to the disposable container"
+    }
+    finally {
+        Remove-Item -LiteralPath $tempFile -Force -ErrorAction SilentlyContinue
+    }
+}
+
 try {
     Write-Host 'Creating offline PostgreSQL 17 principal-isolation proof...'
     # Force host SCRAM password authentication, avoiding socket/trust false positives.
@@ -64,20 +82,18 @@ try {
     }
     $setupSql = Get-Content -LiteralPath $setupPath -Raw -Encoding UTF8
     foreach ($key in $ids.Keys) { $setupSql = $setupSql.Replace($key,$ids[$key]) }
-    $setupSql | docker exec -i $containerName psql -X -v ON_ERROR_STOP=1 -U postgres -d medtour_principal_clone
+    CopyTextIntoClone $setupSql '/tmp/medtour-principal-setup.sql'
+    docker exec $containerName psql -X -v ON_ERROR_STOP=1 -U postgres -d medtour_principal_clone -f /tmp/medtour-principal-setup.sql
     AssertDocker 'Protected role and policy provisioning failed'
 
     foreach ($role in @('mt_clone_a','mt_clone_b')) {
         $expected = if ($role -eq 'mt_clone_a') { $passwordA } else { $passwordB }
         $badPassword = 'not-the-password-' + [guid]::NewGuid().ToString('N')
 
-        # A deliberately invalid password must produce an actual PostgreSQL
-        # authentication failure, not a Docker/network error. Handle expected
-        # stderr INSIDE the container: Windows PowerShell 5.1 can convert native
-        # stderr to a terminating NativeCommandError when ErrorActionPreference=Stop.
-        # The shell returns 0 ONLY for the specific expected password denial.
-        # Pass the script on STDIN (not as a Windows-native sh -c argument),
-        # preserving embedded quote marks and multiline shell syntax.
+        # The deliberately wrong password must produce a specific PostgreSQL
+        # password-authentication denial, not a transport or configuration failure.
+        # Write the POSIX script to BOM-free UTF-8 and docker cp it into the clone;
+        # this avoids PowerShell 5.1 pipe encoding and native argument quoting.
         $wrongPasswordCheck = @'
 result=$(psql -X -h 127.0.0.1 -U "$PGUSER" -d medtour_principal_clone -c 'SELECT 1' 2>&1)
 status=$?
@@ -87,9 +103,8 @@ fi
 printf '%s\n' "Unexpected wrong-password test result: $result" >&2
 exit 1
 '@
-        # git on Windows may checkout CRLF; POSIX sh requires LF line endings.
-        $wrongPasswordCheck = $wrongPasswordCheck.Replace("`r", "")
-        $wrongPasswordCheck | docker exec -i -e "PGPASSWORD=$badPassword" -e "PGUSER=$role" $containerName sh | Out-Null
+        CopyTextIntoClone $wrongPasswordCheck '/tmp/medtour-wrong-password.sh'
+        docker exec -e "PGPASSWORD=$badPassword" -e "PGUSER=$role" $containerName sh /tmp/medtour-wrong-password.sh | Out-Null
         AssertDocker "Wrong-password denial test did not yield the expected PostgreSQL authentication error for $role"
         Write-Host "PASS: $role rejects an incorrect password"
 
@@ -117,7 +132,8 @@ exit 1
             '__BLOCKED_PATIENT__' = [guid]::NewGuid().ToString()
         }
         foreach ($key in $repl.Keys) { $verifySql = $verifySql.Replace($key,$repl[$key]) }
-        $verifySql | docker exec -i -e "PGPASSWORD=$expected" $containerName psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -U $role -d medtour_principal_clone
+        CopyTextIntoClone $verifySql '/tmp/medtour-principal-verify.sql'
+        docker exec -e "PGPASSWORD=$expected" $containerName psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -U $role -d medtour_principal_clone -f /tmp/medtour-principal-verify.sql
         AssertDocker "Principal-bound RLS verification failed for $role"
     }
 
