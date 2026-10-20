@@ -143,6 +143,14 @@ def main():
         assert no_db.lookup(tampered, purpose="portal") is None
         print("PASS: invalid hint opens no database connection", flush=True)
 
+        # Misconfigured credentials (without access to this DB role) fail closed.
+        bad_engine, bad_factory = new_pool("mt_clone_a", "invalid-" + uuid4().hex)
+        engines.append(bad_engine)
+        bad_router = TenantCredentialLookup(keyring=keyring,
+                                            sessions_by_tenant={tid_a: bad_factory})
+        assert bad_router.lookup(issued[tid_a]["portal"], purpose="portal") is None
+        print("PASS: invalid DB credentials do not trigger privileged fallback", flush=True)
+
         for role, password, tenant_id, patient_id in configs:
             with pools[tenant_id]() as db:
                 refresh = db.scalar(
@@ -163,14 +171,6 @@ def main():
             for purpose in ("refresh", "portal", "consent"):
                 assert resolver.lookup(issued[tenant_id][purpose], purpose=purpose) is None
         print("PASS: database revocation/consumption denies each signed token", flush=True)
-
-        # Misconfigured credentials (without access to this DB role) fail closed.
-        bad_engine, bad_factory = new_pool("mt_clone_a", "invalid-" + uuid4().hex)
-        engines.append(bad_engine)
-        bad_router = TenantCredentialLookup(keyring=keyring,
-                                            sessions_by_tenant={tid_a: bad_factory})
-        assert bad_router.lookup(issued[tid_a]["portal"], purpose="portal") is None
-        print("PASS: invalid DB credentials do not trigger privileged fallback", flush=True)
 
         print("PASS: STAGE 19.18 ISOLATED SIGNED TENANT ROUTING AND DB HASH LOOKUP COMPLETED", flush=True)
         print("LIMITATION: production get_db / refresh / portal / consent endpoints do not use this resolver", flush=True)
