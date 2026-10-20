@@ -1,7 +1,7 @@
 # Stage 19.15: run synthetic FastAPI tenant-boundary tests without network
 # or access to running MedTour AI services/Compose volumes.
 # Requires a previously built local medtour-ai-api Docker image.
-param([switch]$FullSuite, [string]$ApiImage = 'medtour-ai-api')
+param([switch]$FullSuite, [switch]$TokenRoutingOnly, [string]$ApiImage = 'medtour-ai-api')
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
@@ -9,6 +9,13 @@ $testsDir = Join-Path $repoRoot 'backend/tests'
 $appDir = Join-Path $repoRoot 'backend/app'
 if (!(Test-Path -LiteralPath $appDir)) { throw "Backend package not found: $appDir" }
 $stageTest = Join-Path $testsDir 'test_stage_19_15_tenant_auth_boundaries.py'
+$tokenTest = Join-Path $testsDir 'test_stage_19_17_tenant_route_tokens.py'
+if ($FullSuite -and $TokenRoutingOnly) {
+    throw 'Use either -FullSuite or -TokenRoutingOnly, not both'
+}
+if ($TokenRoutingOnly -and !(Test-Path -LiteralPath $tokenTest)) {
+    throw "Token-routing test missing; pull main first: $tokenTest"
+}
 if (!(Test-Path -LiteralPath $stageTest)) {
     throw "Required test missing; pull main before running: $stageTest"
 }
@@ -23,7 +30,11 @@ function AssertDocker([string]$message) {
     if ($LASTEXITCODE -ne 0) { throw $message }
 }
 try {
-    $target = if ($FullSuite) { '/tmp/medtour-tests' } else {
+    $target = if ($FullSuite) {
+        '/tmp/medtour-tests'
+    } elseif ($TokenRoutingOnly) {
+        '/tmp/medtour-tests/test_stage_19_17_tenant_route_tokens.py'
+    } else {
         '/tmp/medtour-tests/test_stage_19_15_tenant_auth_boundaries.py'
     }
     # No Docker network, no live database credentials, no Compose volumes.
@@ -61,6 +72,9 @@ try {
     }
     if ($FullSuite) {
         Write-Host 'PASS: FULL SYNTHETIC BACKEND TEST SUITE COMPLETED IN OFFLINE CONTAINER' -ForegroundColor Green
+    }
+    elseif ($TokenRoutingOnly) {
+        Write-Host 'PASS: STAGE 19.17 TENANT ROUTING TOKEN UNIT TESTS COMPLETED' -ForegroundColor Green
     }
     else {
         Write-Host 'PASS: STAGE 19.15 SYNTHETIC TENANT AUTH BOUNDARY TESTS COMPLETED' -ForegroundColor Green
