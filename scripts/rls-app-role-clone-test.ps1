@@ -37,13 +37,17 @@ try {
     AssertDockerExit 'Failed to create isolated PostgreSQL'
     $started = $true
 
+    # The official PostgreSQL image initially launches a socket-only temporary
+    # server for initdb, then shuts it down before starting the final postmaster.
+    # A Unix-socket pg_isready can report "ready" during that transient phase.
+    # TCP readiness only succeeds once the final server is accepting connections.
     $ready = $false
-    for ($i=1; $i -le 40; $i++) {
-        docker exec $containerName pg_isready -U postgres -h /var/run/postgresql 2>$null | Out-Null
+    for ($i=1; $i -le 60; $i++) {
+        docker exec $containerName pg_isready -h 127.0.0.1 -p 5432 -U postgres -d postgres 2>$null | Out-Null
         if ($LASTEXITCODE -eq 0) { $ready = $true; break }
         Start-Sleep -Seconds 1
     }
-    if (!$ready) { throw 'Isolated PostgreSQL failed readiness check' }
+    if (!$ready) { throw 'Final PostgreSQL postmaster did not become ready over TCP in the isolated container' }
 
     docker cp "$BackupFile" ($containerName + ':/tmp/medtour-backup.dump') | Out-Null
     AssertDockerExit 'Copying synthetic backup failed'
