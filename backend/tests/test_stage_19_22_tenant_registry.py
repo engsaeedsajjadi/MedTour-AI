@@ -92,7 +92,8 @@ def test_bounded_enrollment_and_all_three_lookup_methods():
     reg.enroll(config(TID_B, "principal-b", "wa-b", "mt_clone_b"))
     with reg.acquire_slug("principal-a") as lease:
         assert lease.tenant_id == TID_A
-        assert lease.factory is not None
+        with lease.session() as db:
+            assert db is not None
     with reg.acquire_phone("wa-b") as lease:
         assert lease.tenant_id == TID_B
     with reg.acquire_tenant(TID_B) as lease:
@@ -184,7 +185,8 @@ def test_revocation_denies_new_leases_while_active_lease_drains():
     assert reg.snapshot_counts()["active_leases"] == 0
     assert reg.snapshot_counts()["draining_pools"] == 0
     with pytest.raises(RuntimeError):
-        _ = lease.factory
+        with lease.session():
+            pass
     reg.close()
 
 
@@ -199,10 +201,29 @@ def test_close_during_active_lease_does_not_dispose_until_release():
             reg.acquire_tenant(TID_A)
         with pytest.raises(RuntimeError):
             reg.enroll(config(TID_B, "principal-b", "wa-b", "mt_clone_b"))
-        assert lease.factory is not None
+        with lease.session() as db:
+            assert db is not None
     assert fake.engines[0].disposals == 1
     reg.close()
 
+
+
+def test_cannot_release_while_sqlalchemy_session_context_remains_active():
+    reg, fake = registry()
+    reg.enroll(config())
+    lease = reg.acquire_tenant(TID_A)
+    with lease.session() as db:
+        with pytest.raises(RuntimeError, match="active DB sessions"):
+            lease.close()
+        assert db is not None
+    reg.revoke(TID_A)
+    assert fake.engines[0].disposals == 0
+    lease.close()
+    assert fake.engines[0].disposals == 1
+    with pytest.raises(RuntimeError):
+        with lease.session():
+            pass
+    reg.close()
 
 def test_multiple_concurrent_leases_are_drained_before_disposal():
     reg, fake = registry()
