@@ -71,7 +71,10 @@ class TenantPrincipalConfig:
 
 @dataclass
 class _Slot:
-    config: TenantPrincipalConfig
+    tenant_id: str
+    slug: str
+    whatsapp_phone_id: str
+    database_role: str
     engine: Engine
     factory: sessionmaker
     active_leases: int = 0
@@ -94,7 +97,7 @@ class TenantPoolLease:
 
     @property
     def tenant_id(self):
-        return self._slot.config.tenant_id
+        return self._slot.tenant_id
 
     def __enter__(self):
         if self._released:
@@ -139,6 +142,7 @@ class StagedTenantPoolRegistry:
         self._by_tenant: dict[str, _Slot] = {}
         self._by_slug: dict[str, str] = {}
         self._by_phone: dict[str, str] = {}
+        self._retiring_roles: set[str] = set()
         self._closed = False
         self._lock = threading.RLock()
 
@@ -198,7 +202,10 @@ class StagedTenantPoolRegistry:
                 if self._closed:
                     raise RuntimeError("Tenant registry is shut down")
                 self._assert_available(config)
-                self._by_tenant[config.tenant_id] = _Slot(config, engine, factory)
+                self._by_tenant[config.tenant_id] = _Slot(
+                    config.tenant_id, config.slug, config.whatsapp_phone_id,
+                    config.database_role, engine, factory,
+                )
                 self._by_slug[config.slug] = config.tenant_id
                 self._by_phone[config.whatsapp_phone_id] = config.tenant_id
                 accepted = True
@@ -215,7 +222,9 @@ class StagedTenantPoolRegistry:
             or config.whatsapp_phone_id in self._by_phone
         ):
             raise ValueError("Duplicate tenant, slug or WhatsApp provider mapping")
-        if any(s.config.database_role == config.database_role for s in self._by_tenant.values()):
+        if config.database_role in self._retiring_roles or any(
+            s.database_role == config.database_role for s in self._by_tenant.values()
+        ):
             raise ValueError("A PostgreSQL LOGIN role cannot be shared by tenants")
 
     def _acquire(self, tenant_id: str) -> TenantPoolLease:
@@ -252,6 +261,8 @@ class StagedTenantPoolRegistry:
                 raise RuntimeError("Invalid tenant lease release")
             slot.active_leases -= 1
             dispose = slot.retired and slot.active_leases == 0
+            if dispose:
+                self._retiring_roles.discard(slot.database_role)
         if dispose:
             slot.engine.dispose()
 
@@ -263,10 +274,12 @@ class StagedTenantPoolRegistry:
             if slot is None:
                 raise LookupError("Tenant not provisioned")
             slot.retired = True
-            self._by_slug.pop(slot.config.slug, None)
-            self._by_phone.pop(slot.config.whatsapp_phone_id, None)
+            self._by_slug.pop(slot.slug, None)
+            self._by_phone.pop(slot.whatsapp_phone_id, None)
             if slot.active_leases == 0:
                 engine_to_dispose = slot.engine
+            else:
+                self._retiring_roles.add(slot.database_role)
         if engine_to_dispose is not None:
             engine_to_dispose.dispose()
 
@@ -280,6 +293,8 @@ class StagedTenantPoolRegistry:
                 slot.retired = True
                 if slot.active_leases == 0:
                     to_dispose.append(slot.engine)
+                else:
+                    self._retiring_roles.add(slot.database_role)
             self._by_tenant.clear()
             self._by_slug.clear()
             self._by_phone.clear()
