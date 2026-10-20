@@ -1,7 +1,7 @@
 # Stage 19.15: run synthetic FastAPI tenant-boundary tests without network
 # or access to running MedTour AI services/Compose volumes.
 # Requires a previously built local medtour-ai-api Docker image.
-param([switch]$FullSuite, [switch]$TokenRoutingOnly, [string]$ApiImage = 'medtour-ai-api')
+param([switch]$FullSuite, [switch]$TokenRoutingOnly, [switch]$AtomicTransactionsOnly, [string]$ApiImage = 'medtour-ai-api')
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
@@ -10,11 +10,15 @@ $appDir = Join-Path $repoRoot 'backend/app'
 if (!(Test-Path -LiteralPath $appDir)) { throw "Backend package not found: $appDir" }
 $stageTest = Join-Path $testsDir 'test_stage_19_15_tenant_auth_boundaries.py'
 $tokenTest = Join-Path $testsDir 'test_stage_19_17_tenant_route_tokens.py'
-if ($FullSuite -and $TokenRoutingOnly) {
-    throw 'Use either -FullSuite or -TokenRoutingOnly, not both'
+$atomicTest = Join-Path $testsDir 'test_stage_19_19_staged_transactions.py'
+if (@($FullSuite, $TokenRoutingOnly, $AtomicTransactionsOnly).Where({ $_ }).Count -gt 1) {
+    throw 'Select only one of -FullSuite, -TokenRoutingOnly or -AtomicTransactionsOnly'
 }
 if ($TokenRoutingOnly -and !(Test-Path -LiteralPath $tokenTest)) {
     throw "Token-routing test missing; pull main first: $tokenTest"
+}
+if ($AtomicTransactionsOnly -and !(Test-Path -LiteralPath $atomicTest)) {
+    throw "Atomic transaction test missing; pull main first: $atomicTest"
 }
 if (!(Test-Path -LiteralPath $stageTest)) {
     throw "Required test missing; pull main before running: $stageTest"
@@ -34,6 +38,8 @@ try {
         '/tmp/medtour-tests'
     } elseif ($TokenRoutingOnly) {
         '/tmp/medtour-tests/test_stage_19_17_tenant_route_tokens.py'
+    } elseif ($AtomicTransactionsOnly) {
+        '/tmp/medtour-tests/test_stage_19_19_staged_transactions.py'
     } else {
         '/tmp/medtour-tests/test_stage_19_15_tenant_auth_boundaries.py'
     }
@@ -75,6 +81,9 @@ try {
     }
     elseif ($TokenRoutingOnly) {
         Write-Host 'PASS: STAGE 19.17 TENANT ROUTING TOKEN UNIT TESTS COMPLETED' -ForegroundColor Green
+    }
+    elseif ($AtomicTransactionsOnly) {
+        Write-Host 'PASS: STAGE 19.19 ATOMIC TRANSACTION UNIT TESTS COMPLETED' -ForegroundColor Green
     }
     else {
         Write-Host 'PASS: STAGE 19.15 SYNTHETIC TENANT AUTH BOUNDARY TESTS COMPLETED' -ForegroundColor Green
