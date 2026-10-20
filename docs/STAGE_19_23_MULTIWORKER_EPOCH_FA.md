@@ -1,6 +1,6 @@
 # مرحله ۱۹.۲۳ — ابطال Tenant بین چند Worker با Central Epoch
 
-**تاریخ: ۲۰ اکتبر ۲۰۲۶ — وضعیت: کد و آزمون‌ها در GitHub ثبت شده‌اند؛ PASS اجرای محلی/Clone این مرحله هنوز دریافت نشده است.**
+**تاریخ: ۲۰ اکتبر ۲۰۲۶ — وضعیت: آزمون PostgreSQL Clone با پیام `PASS: STAGE 19.23 ISOLATED MULTIWORKER TENANT EPOCH REVOCATION TEST COMPLETED` توسط کاربر تأیید شده است. کد Runtime اصلی و چند Process عملیاتی هنوز مهاجرت نکرده‌اند.**
 
 ## نتایج قطعی مراحل قبلی
 
