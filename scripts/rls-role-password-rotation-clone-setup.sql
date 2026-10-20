@@ -39,6 +39,7 @@ DECLARE
   epoch_value bigint;
   currently_enabled boolean;
   connections_killed integer;
+  victim record;
 BEGIN
  IF session_user <> 'mt_rotation_operator'
     OR current_database() <> 'medtour_principal_clone'
@@ -66,9 +67,14 @@ BEGIN
  SELECT count(*)::integer INTO connections_killed
  FROM pg_catalog.pg_stat_activity
  WHERE datname=current_database() AND usename='mt_clone_a' AND pid<>pg_backend_pid();
- PERFORM pg_catalog.pg_terminate_backend(pid)
- FROM pg_catalog.pg_stat_activity
- WHERE datname=current_database() AND usename='mt_clone_a' AND pid<>pg_backend_pid();
+ FOR victim IN
+  SELECT pid FROM pg_catalog.pg_stat_activity
+  WHERE datname=current_database() AND usename='mt_clone_a' AND pid<>pg_backend_pid()
+ LOOP
+  IF NOT pg_catalog.pg_terminate_backend(victim.pid, 5000) THEN
+    RAISE EXCEPTION 'DENIED: a stale tenant login session did not terminate';
+  END IF;
+ END LOOP;
 
  RETURN connections_killed;
 END
