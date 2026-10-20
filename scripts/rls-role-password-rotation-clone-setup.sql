@@ -17,6 +17,15 @@ CREATE ROLE mt_rotation_operator LOGIN PASSWORD '__ROTATE_OPERATOR_PASS__'
 GRANT CONNECT ON DATABASE medtour_principal_clone TO mt_rotation_operator;
 GRANT USAGE ON SCHEMA medtour_control TO mt_rotation_operator;
 
+-- A rotation epoch can be consumed once only; failed transactions roll back.
+CREATE TABLE medtour_control.synthetic_rotation_history (
+ tenant_id varchar(36) NOT NULL,
+ generation bigint NOT NULL,
+ rotated_at timestamptz NOT NULL DEFAULT now(),
+ PRIMARY KEY (tenant_id,generation)
+);
+REVOKE ALL ON medtour_control.synthetic_rotation_history FROM PUBLIC;
+
 -- Narrow privilege elevation for exactly one synthetic tenant role:
 -- a separate test-only operator cannot alter arbitrary database principals,
 -- read patient rows, update tenant epochs or issue general DDL.
@@ -47,6 +56,9 @@ BEGIN
     OR currently_enabled IS DISTINCT FROM false THEN
   RAISE EXCEPTION 'DENIED: tenant must be disabled at exact epoch';
  END IF;
+
+ INSERT INTO medtour_control.synthetic_rotation_history(tenant_id,generation)
+ VALUES(target_tenant, expected_generation);
 
  EXECUTE pg_catalog.format(
    'ALTER ROLE %I LOGIN PASSWORD %L', 'mt_clone_a', new_secret
