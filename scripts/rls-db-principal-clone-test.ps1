@@ -79,14 +79,27 @@ try {
         Write-Host "PASS: $role rejects an incorrect password"
 
         $verifySql = Get-Content -LiteralPath $verifyPath -Raw -Encoding UTF8
+        if ($role -eq 'mt_clone_a') {
+            $otherRole = 'mt_clone_b'
+            $ownTenant = $ids['__TENANT_A__']
+            $otherTenant = $ids['__TENANT_B__']
+            $ownPatient = $ids['__PATIENT_A__']
+            $otherPatient = $ids['__PATIENT_B__']
+        } else {
+            $otherRole = 'mt_clone_a'
+            $ownTenant = $ids['__TENANT_B__']
+            $otherTenant = $ids['__TENANT_A__']
+            $ownPatient = $ids['__PATIENT_B__']
+            $otherPatient = $ids['__PATIENT_A__']
+        }
         $repl = @{
-            '__EXPECTED_ROLE__'=$role
-            '__OTHER_ROLE__'= if($role -eq 'mt_clone_a'){'mt_clone_b'}else{'mt_clone_a'}
-            '__OWN_TENANT__'= if($role -eq 'mt_clone_a'){$ids['__TENANT_A__']}else{$ids['__TENANT_B__']}
-            '__OTHER_TENANT__'= if($role -eq 'mt_clone_a'){$ids['__TENANT_B__']}else{$ids['__TENANT_A__']}
-            '__OWN_PATIENT__'= if($role -eq 'mt_clone_a'){$ids['__PATIENT_A__']}else{$ids['__PATIENT_B__']}
-            '__OTHER_PATIENT__'= if($role -eq 'mt_clone_a'){$ids['__PATIENT_B__']}else{$ids['__PATIENT_A__']}
-            '__BLOCKED_PATIENT__'=[guid]::NewGuid().ToString()
+            '__EXPECTED_ROLE__' = $role
+            '__OTHER_ROLE__' = $otherRole
+            '__OWN_TENANT__' = $ownTenant
+            '__OTHER_TENANT__' = $otherTenant
+            '__OWN_PATIENT__' = $ownPatient
+            '__OTHER_PATIENT__' = $otherPatient
+            '__BLOCKED_PATIENT__' = [guid]::NewGuid().ToString()
         }
         foreach ($key in $repl.Keys) { $verifySql = $verifySql.Replace($key,$repl[$key]) }
         $verifySql | docker exec -i -e "PGPASSWORD=$expected" $containerName psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -U $role -d medtour_principal_clone
