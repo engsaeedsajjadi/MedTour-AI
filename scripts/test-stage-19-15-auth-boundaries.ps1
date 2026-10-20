@@ -6,6 +6,8 @@ $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $testsDir = Join-Path $repoRoot 'backend/tests'
+$appDir = Join-Path $repoRoot 'backend/app'
+if (!(Test-Path -LiteralPath $appDir)) { throw "Backend package not found: $appDir" }
 $stageTest = Join-Path $testsDir 'test_stage_19_15_tenant_auth_boundaries.py'
 if (!(Test-Path -LiteralPath $stageTest)) {
     throw "Required test missing; pull main before running: $stageTest"
@@ -35,6 +37,10 @@ try {
     AssertDocker 'Could not create the isolated Python test runner'
     $created = $true
 
+    # Use the checked-out application code rather than a potentially stale
+    # pre-existing Docker image. Only the disposable runner receives these files.
+    docker cp $appDir ($runner + ':/app/') | Out-Null
+    AssertDocker 'Could not copy checked-out backend package to temporary runner'
     docker cp $testsDir ($runner + ':/tmp/medtour-tests') | Out-Null
     AssertDocker 'Could not copy synthetic pytest suite to isolated runner'
     docker start $runner | Out-Null
@@ -51,7 +57,7 @@ try {
     }
     finally { $ErrorActionPreference = $previousPreference }
     if ([int]($exitCode | Select-Object -Last 1) -ne 0) {
-        throw "Stage 19.15 security regression tests FAILED (exit $exitCode)"
+        throw "Offline backend security regression tests FAILED (exit $exitCode)"
     }
     if ($FullSuite) {
         Write-Host 'PASS: FULL SYNTHETIC BACKEND TEST SUITE COMPLETED IN OFFLINE CONTAINER' -ForegroundColor Green
