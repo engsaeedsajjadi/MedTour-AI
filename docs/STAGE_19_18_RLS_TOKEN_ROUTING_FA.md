@@ -1,6 +1,6 @@
 # مرحله ۱۹.۱۸ — اثبات اتصال Token Hint امضاشده به PostgreSQL با RLS
 
-**وضعیت:** کد و اسکریپت در شاخه `main` ایجاد شده‌اند؛ اجرای Docker و PASS نهایی هنوز دریافت نشده است.
+**وضعیت:** آزمون روی PostgreSQL ایزوله با پیام `PASS: STAGE 19.18 ISOLATED SIGNED TENANT ROUTING AND DB HASH LOOKUP TEST COMPLETED` توسط کاربر تأیید شد. اتصال عملیاتی API همچنان تغییر نکرده است.
 
 ## آخرین وضعیت تأییدشده
 
