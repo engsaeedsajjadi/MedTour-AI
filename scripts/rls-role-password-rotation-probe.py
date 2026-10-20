@@ -17,6 +17,7 @@ from sqlalchemy.exc import DBAPIError
 from app.models import Patient
 from app.staged_tenant_epoch_control import PostgreSQLEpochReader, StagedCoordinatedTenantRegistry
 from app.staged_tenant_pool_registry import TenantPrincipalConfig
+from app.staged_rotation_contract import prepare_rotation
 
 
 def env(key: str) -> str:
@@ -151,6 +152,13 @@ def main():
         assert isinstance(backend_pid, int)
 
         assert control_change(writer, a.tenant_id, 1, False) == 2
+        handoff = prepare_rotation(
+            reader=PostgreSQLEpochReader(readers[0]),
+            old=a, replacement=config("A", new_a),
+            disabled_generation=2,
+        )
+        assert handoff.to_generation == 3
+        assert new_a not in repr(handoff)
         for worker in workers:
             deny(lambda w=worker: w.acquire_tenant(a.tenant_id), "disabled tenant")
             with worker.acquire_tenant(b.tenant_id) as lease:
@@ -223,10 +231,17 @@ def main():
         print("PASS: both workers recover with the new secret at epoch 3 under RLS", flush=True)
 
         # A privileged rollback of just the *generation* must not be allowed.
-        expect_denied(
-            lambda: control_change(writer, a.tenant_id, 1, True),
-            "Control epoch rollback",
-        )
+        def rollback_epoch():
+            with writer.begin() as conn:
+                conn.execute(
+                    text(
+                        "UPDATE medtour_control.tenant_epochs "
+                        "SET generation=1 WHERE tenant_id=:tenant"
+                    ),
+                    {"tenant": a.tenant_id},
+                )
+
+        expect_denied(rollback_epoch, "Control epoch rollback")
         print("PASS: old epoch cannot be replayed to reopen stale workers", flush=True)
         print("PASS: STAGE 19.24 ISOLATED TENANT POSTGRESQL CREDENTIAL ROTATION TEST COMPLETED", flush=True)
         print("LIMITATION: clone-only operator; real Secret Manager, cross-process rollout and API routing are not migrated", flush=True)
