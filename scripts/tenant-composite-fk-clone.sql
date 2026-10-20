@@ -5,6 +5,14 @@
 \pset pager off
 BEGIN;
 
+-- Defense against accidental execution on the main database.
+DO $clone_only$
+BEGIN
+ IF current_database() <> 'medtour_fk_clone' OR current_user <> 'postgres' THEN
+  RAISE EXCEPTION 'Refusing to run: must use the disposable medtour_fk_clone database as postgres';
+ END IF;
+END $clone_only$;
+
 CREATE TEMP TABLE mt_fk_targets ON COMMIT DROP AS
 SELECT
     con.conname AS old_fk,
