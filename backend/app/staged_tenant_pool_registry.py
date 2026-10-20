@@ -142,7 +142,7 @@ class StagedTenantPoolRegistry:
         self._by_tenant: dict[str, _Slot] = {}
         self._by_slug: dict[str, str] = {}
         self._by_phone: dict[str, str] = {}
-        self._retiring_roles: set[str] = set()
+        self._retiring_slots: dict[str, _Slot] = {}
         self._closed = False
         self._lock = threading.RLock()
 
@@ -222,7 +222,7 @@ class StagedTenantPoolRegistry:
             or config.whatsapp_phone_id in self._by_phone
         ):
             raise ValueError("Duplicate tenant, slug or WhatsApp provider mapping")
-        if config.database_role in self._retiring_roles or any(
+        if config.database_role in self._retiring_slots or any(
             s.database_role == config.database_role for s in self._by_tenant.values()
         ):
             raise ValueError("A PostgreSQL LOGIN role cannot be shared by tenants")
@@ -262,7 +262,7 @@ class StagedTenantPoolRegistry:
             slot.active_leases -= 1
             dispose = slot.retired and slot.active_leases == 0
             if dispose:
-                self._retiring_roles.discard(slot.database_role)
+                self._retiring_slots.pop(slot.database_role, None)
         if dispose:
             slot.engine.dispose()
 
@@ -279,7 +279,7 @@ class StagedTenantPoolRegistry:
             if slot.active_leases == 0:
                 engine_to_dispose = slot.engine
             else:
-                self._retiring_roles.add(slot.database_role)
+                self._retiring_slots[slot.database_role] = slot
         if engine_to_dispose is not None:
             engine_to_dispose.dispose()
 
@@ -294,7 +294,7 @@ class StagedTenantPoolRegistry:
                 if slot.active_leases == 0:
                     to_dispose.append(slot.engine)
                 else:
-                    self._retiring_roles.add(slot.database_role)
+                    self._retiring_slots[slot.database_role] = slot
             self._by_tenant.clear()
             self._by_slug.clear()
             self._by_phone.clear()
@@ -306,7 +306,11 @@ class StagedTenantPoolRegistry:
         with self._lock:
             return {
                 "tenants": len(self._by_tenant),
-                "active_leases": sum(s.active_leases for s in self._by_tenant.values()),
+                "active_leases": (
+                    sum(s.active_leases for s in self._by_tenant.values())
+                    + sum(s.active_leases for s in self._retiring_slots.values())
+                ),
+                "draining_pools": len(self._retiring_slots),
                 "max_tenants": self._max_tenants,
                 "connections_budget": self._max_tenants * self._pool_size,
                 "closed": self._closed,
