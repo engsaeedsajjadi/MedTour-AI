@@ -1,7 +1,7 @@
 # Stage 19.15: run synthetic FastAPI tenant-boundary tests without network
 # or access to running MedTour AI services/Compose volumes.
 # Requires a previously built local medtour-ai-api Docker image.
-param([switch]$FullSuite, [switch]$TokenRoutingOnly, [switch]$AtomicTransactionsOnly, [switch]$HttpRouterOnly, [switch]$PreauthOnly, [string]$ApiImage = 'medtour-ai-api')
+param([switch]$FullSuite, [switch]$TokenRoutingOnly, [switch]$AtomicTransactionsOnly, [switch]$HttpRouterOnly, [switch]$PreauthOnly, [switch]$TenantRegistryOnly, [string]$ApiImage = 'medtour-ai-api')
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
@@ -13,8 +13,9 @@ $tokenTest = Join-Path $testsDir 'test_stage_19_17_tenant_route_tokens.py'
 $atomicTest = Join-Path $testsDir 'test_stage_19_19_staged_transactions.py'
 $httpTest = Join-Path $testsDir 'test_stage_19_20_http_router.py'
 $preauthTest = Join-Path $testsDir 'test_stage_19_21_preauth.py'
-if (@($FullSuite, $TokenRoutingOnly, $AtomicTransactionsOnly, $HttpRouterOnly, $PreauthOnly).Where({ $_ }).Count -gt 1) {
-    throw 'Select only one of -FullSuite, -TokenRoutingOnly, -AtomicTransactionsOnly, -HttpRouterOnly or -PreauthOnly'
+$registryTest = Join-Path $testsDir 'test_stage_19_22_tenant_registry.py'
+if (@($FullSuite, $TokenRoutingOnly, $AtomicTransactionsOnly, $HttpRouterOnly, $PreauthOnly, $TenantRegistryOnly).Where({ $_ }).Count -gt 1) {
+    throw 'Select only one of -FullSuite, -TokenRoutingOnly, -AtomicTransactionsOnly, -HttpRouterOnly, -PreauthOnly or -TenantRegistryOnly'
 }
 if ($TokenRoutingOnly -and !(Test-Path -LiteralPath $tokenTest)) {
     throw "Token-routing test missing; pull main first: $tokenTest"
@@ -27,6 +28,9 @@ if ($HttpRouterOnly -and !(Test-Path -LiteralPath $httpTest)) {
 }
 if ($PreauthOnly -and !(Test-Path -LiteralPath $preauthTest)) {
     throw "Pre-auth routing test missing; pull main first: $preauthTest"
+}
+if ($TenantRegistryOnly -and !(Test-Path -LiteralPath $registryTest)) {
+    throw "Tenant registry test missing; pull main first: $registryTest"
 }
 if (!(Test-Path -LiteralPath $stageTest)) {
     throw "Required test missing; pull main before running: $stageTest"
@@ -52,6 +56,8 @@ try {
         '/tmp/medtour-tests/test_stage_19_20_http_router.py'
     } elseif ($PreauthOnly) {
         '/tmp/medtour-tests/test_stage_19_21_preauth.py'
+    } elseif ($TenantRegistryOnly) {
+        '/tmp/medtour-tests/test_stage_19_22_tenant_registry.py'
     } else {
         '/tmp/medtour-tests/test_stage_19_15_tenant_auth_boundaries.py'
     }
@@ -102,6 +108,9 @@ try {
     }
     elseif ($PreauthOnly) {
         Write-Host 'PASS: STAGE 19.21 PREAUTH FAIL-CLOSED UNIT TESTS COMPLETED' -ForegroundColor Green
+    }
+    elseif ($TenantRegistryOnly) {
+        Write-Host 'PASS: STAGE 19.22 TENANT REGISTRY LEASE AND REVOCATION UNIT TESTS COMPLETED' -ForegroundColor Green
     }
     else {
         Write-Host 'PASS: STAGE 19.15 SYNTHETIC TENANT AUTH BOUNDARY TESTS COMPLETED' -ForegroundColor Green
