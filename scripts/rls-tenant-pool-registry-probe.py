@@ -34,8 +34,8 @@ def configuration(index: int):
     )
 
 
-def row_check(factory, tid: str, own_id: str, other_id: str):
-    with factory() as db:
+def row_check(lease, tid: str, own_id: str, other_id: str):
+    with lease.session() as db:
         identity = db.execute(
             text("SELECT session_user, medtour_principal_private.tenant_for_login()")
         ).one()
@@ -67,9 +67,9 @@ def main():
         ):
             with reg.acquire_slug(own.slug) as lease:
                 assert lease.tenant_id == own.tenant_id
-                assert row_check(lease.factory, own.tenant_id, own_id, other_id) == own.database_role
+                assert row_check(lease, own.tenant_id, own_id, other_id) == own.database_role
             with reg.acquire_phone(own.whatsapp_phone_id) as lease:
-                assert row_check(lease.factory, own.tenant_id, own_id, other_id) == own.database_role
+                assert row_check(lease, own.tenant_id, own_id, other_id) == own.database_role
         print("PASS: slug, Meta account and tenant registry leases preserve RLS isolation", flush=True)
 
         with ThreadPoolExecutor(max_workers=4) as tasks:
@@ -124,9 +124,16 @@ def main():
                 raise AssertionError("Revoked tenant accepted a new lease")
         # Existing in-flight request is allowed to complete under its pinned DB
         # principal. Revocation does not instantaneously terminate active SQL.
-        assert row_check(outstanding.factory, a.tenant_id, e("PATIENT_A"), e("PATIENT_B")) == a.database_role
+        assert row_check(outstanding, a.tenant_id, e("PATIENT_A"), e("PATIENT_B")) == a.database_role
         outstanding.close()
         assert reg.snapshot_counts()["draining_pools"] == 0
+        try:
+            with outstanding.session():
+                pass
+        except RuntimeError:
+            pass
+        else:
+            raise AssertionError("Revoked and released lease opened another DB session")
         with reg.acquire_slug(b.slug) as still_active:
             assert row_check(still_active.factory, b.tenant_id, e("PATIENT_B"), e("PATIENT_A")) == b.database_role
         print("PASS: tenant revocation blocks new leases, drains active work and preserves other tenant", flush=True)
@@ -148,7 +155,7 @@ def main():
 
 def _thread_row_check(reg, config, own_id, foreign_id):
     with reg.acquire_tenant(config.tenant_id) as lease:
-        return row_check(lease.factory, config.tenant_id, own_id, foreign_id) == config.database_role
+        return row_check(lease, config.tenant_id, own_id, foreign_id) == config.database_role
 
 
 if __name__ == "__main__":
