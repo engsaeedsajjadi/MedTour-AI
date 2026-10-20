@@ -124,7 +124,7 @@ try {
     else {
         Write-Host 'PASS: STAGE 19.15 SYNTHETIC TENANT AUTH BOUNDARY TESTS COMPLETED' -ForegroundColor Green
     }
-    Write-Warning 'Only SQLite API regression tests were run. No PostgreSQL RLS/real API role-routing integration has been performed.'
+    Write-Warning 'This command ran offline unit/regression tests only. PostgreSQL/RLS integration must be run using its separate isolated clone script.'
 }
 finally {
     if ($created) {
