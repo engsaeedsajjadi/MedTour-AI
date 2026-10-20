@@ -95,8 +95,12 @@ try {
     AssertDocker 'Isolated role/tenant RLS setup failed'
     Write-Host 'PASS: 37 RLS policies bound to two database LOGIN principals'
 
+    # The probe is launched as /tmp/*.py, so Python's script directory is
+    # /tmp instead of Dockerfile WORKDIR /app. Include /app on sys.path
+    # explicitly without changing the operational API image or source.
     $runnerArgs = @(
         '--name', $runnerName, '--network', $networkName,
+        '-e', 'PYTHONPATH=/app',
         '-e', 'PROBE_DB_HOST=medtour-test-db',
         '-e', "PROBE_PASSWORD_A=$passwordA",
         '-e', "PROBE_PASSWORD_B=$passwordB",
