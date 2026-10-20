@@ -87,6 +87,8 @@ fi
 printf '%s\n' "Unexpected wrong-password test result: $result" >&2
 exit 1
 '@
+        # git on Windows may checkout CRLF; POSIX sh requires LF line endings.
+        $wrongPasswordCheck = $wrongPasswordCheck.Replace("`r", "")
         $wrongPasswordCheck | docker exec -i -e "PGPASSWORD=$badPassword" -e "PGUSER=$role" $containerName sh | Out-Null
         AssertDocker "Wrong-password denial test did not yield the expected PostgreSQL authentication error for $role"
         Write-Host "PASS: $role rejects an incorrect password"
