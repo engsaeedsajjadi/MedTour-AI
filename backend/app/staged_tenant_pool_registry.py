@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import re
 import threading
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Callable
 from uuid import UUID
@@ -88,12 +89,26 @@ class TenantPoolLease:
         self._registry = registry
         self._slot = slot
         self._released = False
+        self._active_sessions = 0
+        self._lock = threading.RLock()
 
-    @property
-    def factory(self):
-        if self._released:
-            raise RuntimeError("Tenant DB lease has been released")
-        return self._slot.factory
+    @contextmanager
+    def session(self):
+        """Open a single non-reusable DB session bounded to this lease.
+
+        Acquiring a factory that outlives a lease would defeat revocation;
+        consumers receive only a session tied to this context.
+        """
+        with self._lock:
+            if self._released:
+                raise RuntimeError("Tenant DB lease has been released")
+            self._active_sessions += 1
+        try:
+            with self._slot.factory() as db:
+                yield db
+        finally:
+            with self._lock:
+                self._active_sessions -= 1
 
     @property
     def tenant_id(self):
@@ -108,9 +123,13 @@ class TenantPoolLease:
         self.close()
 
     def close(self):
-        if not self._released:
+        with self._lock:
+            if self._active_sessions:
+                raise RuntimeError("Cannot release a tenant lease with active DB sessions")
+            if self._released:
+                return
             self._released = True
-            self._registry._release(self._slot)
+        self._registry._release(self._slot)
 
 
 class StagedTenantPoolRegistry:
@@ -197,7 +216,10 @@ class StagedTenantPoolRegistry:
         accepted = False
         try:
             self._validate_login(engine, config)
-            factory = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+            factory = sessionmaker(
+                bind=engine, autoflush=False, expire_on_commit=False,
+                close_resets_only=False,
+            )
             with self._lock:
                 if self._closed:
                     raise RuntimeError("Tenant registry is shut down")
