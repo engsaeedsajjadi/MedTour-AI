@@ -99,7 +99,7 @@ def test_bounded_enrollment_and_all_three_lookup_methods():
         assert lease.tenant_id == TID_B
     assert reg.snapshot_counts() == {
         "tenants": 2, "active_leases": 0, "max_tenants": 2,
-        "connections_budget": 4, "closed": False,
+        "connections_budget": 4, "draining_pools": 0, "closed": False,
     }
     for opts in fake.options:
         assert opts["pool_size"] == 2
@@ -166,6 +166,8 @@ def test_revocation_denies_new_leases_while_active_lease_drains():
     assert lease.tenant_id == TID_A
     reg.revoke(TID_A)
     assert reg.snapshot_counts()["tenants"] == 0
+    assert reg.snapshot_counts()["active_leases"] == 1
+    assert reg.snapshot_counts()["draining_pools"] == 1
     assert fake.engines[0].disposals == 0
     for selector, arg in (
         (reg.acquire_tenant, TID_A),
@@ -179,6 +181,8 @@ def test_revocation_denies_new_leases_while_active_lease_drains():
     lease.close()
     lease.close()
     assert fake.engines[0].disposals == 1
+    assert reg.snapshot_counts()["active_leases"] == 0
+    assert reg.snapshot_counts()["draining_pools"] == 0
     with pytest.raises(RuntimeError):
         _ = lease.factory
     reg.close()
