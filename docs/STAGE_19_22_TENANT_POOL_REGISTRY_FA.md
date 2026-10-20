@@ -19,13 +19,13 @@
 3. مسیر Lookup از طریق `tenant_id`، `slug` یا `WhatsApp phone_number_id` تنها برای مقادیر ثبت‌شده در Registry فعال است. این مقادیر در Endpointها یا Headerها امکان ایجاد نقش جدید ندارند.
 4. نگاشت تکراری Tenant/Slug/شماره حساب، استفاده هم‌زمان از Login یکسان برای دو Tenant و Registry بیش از ظرفیت رد می‌شود.
 5. سقف نمونه آزمایشی: حداکثر ۱۶ Tenant در هر Process، حداکثر ۴ Connection ثابت در هر Pool، بودجه هم‌زمان Pool برابر حداکثر ۳۲ Connection؛ `max_overflow=0`، `pool_timeout=5`، `pool_pre_ping=True` و `connect_timeout=5`.
-6. `revoke()` امکان دریافت Lease جدید را فوراً قطع می‌کند، ولی Sessionهای شروع‌شده را تا پایان Lease با همان نقش نگه می‌دارد؛ بعد از آخرین Lease، Pool مربوطه Dispose می‌شود. استفاده مجدد از Role تا پایان تخلیه ممنوع است.
+6. `revoke()` امکان دریافت Lease جدید را فوراً قطع می‌کند. برای استفاده از دیتابیس تنها رابط عمومی `with lease.session()` ارائه می‌شود؛ `sessionmaker` قابل نگه‌داری در اختیار فراخوان قرار نمی‌گیرد. Session با `close_resets_only=False` پس از خروج از Context دوباره باز نمی‌شود و بستن Lease با Session باز ممنوع است. پس از آخرین Lease، Pool Dispose می‌شود؛ استفاده مجدد از Role تا پایان تخلیه ممنوع است. این رفتار نیازمند SQLAlchemy 2.0.22 یا جدیدتر است.
 7. `close()` همه مسیرهای جدید را می‌بندد و Poolهای بلااستفاده را Dispose می‌کند. شمارنده‌های `snapshot_counts()` تعداد Leaseهای باقی‌مانده و Poolهای در حال تخلیه را بدون افشای Credential گزارش می‌دهند.
 8. Secret در `repr(TenantPrincipalConfig)` پنهان است و در خود Slot پس از Enroll دیگر نگه‌داری نمی‌شود؛ با این حال SQLAlchemy Engine ممکن است اطلاعات Credential را برای اتصال‌های بعدی در حافظه نگاه دارد و نباید فرض کرد Secret از تمام حافظه پاک شده است.
 
 ## فایل‌های تست
 
-- `backend/tests/test_stage_19_22_tenant_registry.py`: آزمون‌های آفلاین مربوط به ثبت، رد Duplicate، محدودیت ظرفیت، نگاشت اشتباه DB، Role ممتاز، Lease هم‌زمان، Revocation و Shutdown.
+- `backend/tests/test_stage_19_22_tenant_registry.py`: آزمون‌های آفلاین مربوط به ثبت، رد Duplicate، محدودیت ظرفیت، نگاشت اشتباه DB، Role ممتاز، Lease هم‌زمان، جلوگیری از Session پس از آزادشدن Lease، Revocation و Shutdown.
 - `scripts/rls-tenant-pool-registry-probe.py`: آزمون واقعی PostgreSQL 17 با نقش `mt_clone_a` و `mt_clone_b` و Policyهای RLS روی کپی ایزوله: مشاهده رکوردهای خودی، جلوگیری از نشت Tenant دیگر، کنترل اتصال‌های هم‌زمان، رد Pool اشتباه و لغو در زمان Lease.
 - `scripts/rls-tenant-pool-registry-clone-test.ps1`: اجرای Python و PostgreSQL داخل `docker network --internal` بدون دست‌زدن به Compose و Volume فعال.
 
