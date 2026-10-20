@@ -1,7 +1,7 @@
 # MedTour AI — مرحله ۱۹.۲۱: Login / Refresh / Meta pre-auth با نقش‌های Tenant
 
 **تاریخ:** ۲۰ اکتبر ۲۰۲۶  
-**وضعیت:** اسکریپت‌ها و فایل‌های آزمایشی ثبت‌شده در `main`؛ هنوز خروجی آزمون کاربر برای ۱۹.۲۱ دریافت نشده است.
+**وضعیت:** تست‌ها توسط کاربر تأیید شدند: `8 passed, 1 warning` در Unit و `PASS: STAGE 19.21 ISOLATED PREAUTH LOGIN REFRESH WEBHOOK ROUTING TEST COMPLETED` در PostgreSQL Clone. هنوز هیچ مهاجرت Production انجام نشده است.
 
 ## آخرین نتیجه تأییدشده
 
