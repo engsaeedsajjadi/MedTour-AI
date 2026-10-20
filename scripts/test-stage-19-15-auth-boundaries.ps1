@@ -1,7 +1,7 @@
 # Stage 19.15: run synthetic FastAPI tenant-boundary tests without network
 # or access to running MedTour AI services/Compose volumes.
 # Requires a previously built local medtour-ai-api Docker image.
-param([switch]$FullSuite, [switch]$TokenRoutingOnly, [switch]$AtomicTransactionsOnly, [switch]$HttpRouterOnly, [switch]$PreauthOnly, [switch]$TenantRegistryOnly, [switch]$EpochControlOnly, [string]$ApiImage = 'medtour-ai-api')
+param([switch]$FullSuite, [switch]$TokenRoutingOnly, [switch]$AtomicTransactionsOnly, [switch]$HttpRouterOnly, [switch]$PreauthOnly, [switch]$TenantRegistryOnly, [switch]$EpochControlOnly, [switch]$CredentialRotationOnly, [string]$ApiImage = 'medtour-ai-api')
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
@@ -15,8 +15,9 @@ $httpTest = Join-Path $testsDir 'test_stage_19_20_http_router.py'
 $preauthTest = Join-Path $testsDir 'test_stage_19_21_preauth.py'
 $registryTest = Join-Path $testsDir 'test_stage_19_22_tenant_registry.py'
 $epochTest = Join-Path $testsDir 'test_stage_19_23_multiworker_epoch.py'
-if (@($FullSuite, $TokenRoutingOnly, $AtomicTransactionsOnly, $HttpRouterOnly, $PreauthOnly, $TenantRegistryOnly, $EpochControlOnly).Where({ $_ }).Count -gt 1) {
-    throw 'Select only one of -FullSuite, -TokenRoutingOnly, -AtomicTransactionsOnly, -HttpRouterOnly, -PreauthOnly, -TenantRegistryOnly or -EpochControlOnly'
+$rotationTest = Join-Path $testsDir 'test_stage_19_24_rotation.py'
+if (@($FullSuite, $TokenRoutingOnly, $AtomicTransactionsOnly, $HttpRouterOnly, $PreauthOnly, $TenantRegistryOnly, $EpochControlOnly, $CredentialRotationOnly).Where({ $_ }).Count -gt 1) {
+    throw 'Select only one of -FullSuite, -TokenRoutingOnly, -AtomicTransactionsOnly, -HttpRouterOnly, -PreauthOnly, -TenantRegistryOnly, -EpochControlOnly or -CredentialRotationOnly'
 }
 if ($TokenRoutingOnly -and !(Test-Path -LiteralPath $tokenTest)) {
     throw "Token-routing test missing; pull main first: $tokenTest"
@@ -35,6 +36,9 @@ if ($TenantRegistryOnly -and !(Test-Path -LiteralPath $registryTest)) {
 }
 if ($EpochControlOnly -and !(Test-Path -LiteralPath $epochTest)) {
     throw "Multiworker epoch test missing; pull main first: $epochTest"
+}
+if ($CredentialRotationOnly -and !(Test-Path -LiteralPath $rotationTest)) {
+    throw "Credential rotation test missing; pull main first: $rotationTest"
 }
 if (!(Test-Path -LiteralPath $stageTest)) {
     throw "Required test missing; pull main before running: $stageTest"
@@ -64,6 +68,8 @@ try {
         '/tmp/medtour-tests/test_stage_19_22_tenant_registry.py'
     } elseif ($EpochControlOnly) {
         '/tmp/medtour-tests/test_stage_19_23_multiworker_epoch.py'
+    } elseif ($CredentialRotationOnly) {
+        '/tmp/medtour-tests/test_stage_19_24_rotation.py'
     } else {
         '/tmp/medtour-tests/test_stage_19_15_tenant_auth_boundaries.py'
     }
@@ -120,6 +126,9 @@ try {
     }
     elseif ($EpochControlOnly) {
         Write-Host 'PASS: STAGE 19.23 MULTIWORKER EPOCH FAIL-CLOSED UNIT TESTS COMPLETED' -ForegroundColor Green
+    }
+    elseif ($CredentialRotationOnly) {
+        Write-Host 'PASS: STAGE 19.24 CREDENTIAL ROTATION PREFLIGHT UNIT TESTS COMPLETED' -ForegroundColor Green
     }
     else {
         Write-Host 'PASS: STAGE 19.15 SYNTHETIC TENANT AUTH BOUNDARY TESTS COMPLETED' -ForegroundColor Green
