@@ -56,3 +56,15 @@
 در حالت فعلی `backend/app/database.py` همچنان تنها یک `DATABASE_URL` و یک `SessionLocal` عمومی دارد. تست ۱۹.۱۳ نشان‌دهنده امکان اجرای RLS با نقش ورود مستقل است، **نه یکپارچه‌سازی آن با FastAPI**. تا طراحی مسیرهای Login/Refresh/Portal/Webhook، Provisioning نقش‌ها، چرخه عمر Connection Pool و سیاست نگه‌داری Secrets تکمیل نشده‌اند، نقش `medtour` را در دیتابیس جاری تغییر ندهید و RLS را مستقیم فعال نکنید.
 
 مدل «نقش جداگانه برای هر Tenant» نیز تنها یک گزینه معماری است و باید از نظر تعداد Connectionها، هزینه عملیاتی، چرخش رمزها، حذف Tenant و جلوگیری از انتخاب نقش توسط ورودی غیرقابل‌اعتماد ارزیابی شود.
+
+
+### مرحله ۱۹.۱۴ — نتیجه نهایی دریافت شد
+
+کاربر در ۲۰ اکتبر ۲۰۲۶ خروجی موفق `PASS: STAGE 19.14 ISOLATED SQLALCHEMY TENANT-PRINCIPAL POOL TEST COMPLETED` را ارسال کرده است. این موفقیت فقط مربوط به Engine/Poolهای مستقل در Docker ایزوله است؛ کد واقعی `get_db` هنوز تنها یک اتصال سراسری دارد.
+
+### مرحله ۱۹.۱۵ — تست‌های رگرسیون و طرح مهاجرت (در انتظار اجرا)
+
+- `docs/TENANT_AUTH_ROUTING_STAGE_19_15_FA.md`: فهرست مسیرهای حساس قبل از احراز هویت، Resolver توکن‌ها و معیارهای پذیرش.
+- `backend/tests/test_stage_19_15_tenant_auth_boundaries.py`: شش تست امنیتی با داده ساختگی برای JWT، Login، Refresh، Portal، Consent و WhatsApp.
+- `scripts/test-stage-19-15-auth-boundaries.ps1`: اجرای آفلاین و بدون اتصال به Volume/Compose در یک کانتینر موقت؛ دارای گزینه `-FullSuite`.
+- این تست‌ها هنوز توسط کاربر اجرا نشده‌اند و جایگزین آزمون RLS با FastAPI واقعی نیستند.
