@@ -36,7 +36,7 @@ function CopyTextIntoClone([string]$sourceText, [string]$destination) {
         $cr = [string][char]13
         $lf = [string][char]10
         $cleanText = $sourceText.TrimStart([char]0xFEFF).Replace(($cr + $lf), $lf).Replace($cr, $lf)
-        $utf8NoBom = New-Object System.Text.UTF8Encoding -ArgumentList $false
+        $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
         [System.IO.File]::WriteAllText($tempFile, $cleanText, $utf8NoBom)
         docker cp $tempFile ($containerName + ':' + $destination) | Out-Null
         AssertDocker "Could not copy the test input to the disposable container"
