@@ -71,11 +71,22 @@ try {
         $expected = if ($role -eq 'mt_clone_a') { $passwordA } else { $passwordB }
         $badPassword = 'not-the-password-' + [guid]::NewGuid().ToString('N')
 
-        # Confirm that the client MUST know this LOGIN role's password.
-        docker exec -e "PGPASSWORD=$badPassword" $containerName psql -X -h 127.0.0.1 -U $role -d medtour_principal_clone -c "SELECT 1" 2>$null | Out-Null
-        if ($LASTEXITCODE -eq 0) {
-            throw "Host password authentication is not enforced for $role"
-        }
+        # A deliberately invalid password must produce an actual PostgreSQL
+        # authentication failure, not a Docker/network error. Handle expected
+        # stderr INSIDE the container: Windows PowerShell 5.1 can convert native
+        # stderr to a terminating NativeCommandError when ErrorActionPreference=Stop.
+        # The shell returns 0 ONLY for the specific expected password denial.
+        $wrongPasswordCheck = @'
+result=$(psql -X -h 127.0.0.1 -U "$PGUSER" -d medtour_principal_clone -c 'SELECT 1' 2>&1)
+status=$?
+if [ "$status" -ne 0 ] && printf '%s' "$result" | grep -q 'password authentication failed'; then
+    exit 0
+fi
+printf '%s\n' "Unexpected wrong-password test result: $result" >&2
+exit 1
+'@
+        docker exec -e "PGPASSWORD=$badPassword" -e "PGUSER=$role" $containerName sh -c $wrongPasswordCheck | Out-Null
+        AssertDocker "Wrong-password denial test did not yield the expected PostgreSQL authentication error for $role"
         Write-Host "PASS: $role rejects an incorrect password"
 
         $verifySql = Get-Content -LiteralPath $verifyPath -Raw -Encoding UTF8
