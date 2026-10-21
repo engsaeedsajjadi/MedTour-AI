@@ -1,6 +1,6 @@
 # Master enterprise scope — audited delivery matrix
 
-Status date: 2026-10-15. The master prompt contains **45 sections**. This is a source-code progress matrix, **not a claim of production readiness**. External WhatsApp/AI provider integrations, clinical approvals, hospital booking, visa approvals, payment capture, and production authorization are unavailable without contracts, credentials, infrastructure, and regulatory approval.
+Status date: 2026-10-21. This document tracks delivery evidence, not production certification. Update: Telegram onboarding-only public gateway and synthetic regression suite delivered. The master prompt contains **45 sections**. This is a source-code progress matrix, **not a claim of production readiness**. External WhatsApp/AI provider integrations, clinical approvals, hospital booking, visa approvals, payment capture, and production authorization are unavailable without contracts, credentials, infrastructure, and regulatory approval.
 
 Legend: **implemented (local)** = code + synthetic API tests; **partial** = some code/routes exist but critical pieces missing; **not delivered** = no finished subsystem; **external gate** = activation depends on approvals/providers.
 
@@ -10,7 +10,7 @@ Legend: **implemented (local)** = code + synthetic API tests; **partial** = some
 | 2 | Non-negotiable principles | Partial | Human-gated prices, appointment status, visas; no clinical-autonomy claim. External security and compliance review pending. |
 | 3 | Technology stack | Partial | Next.js/FastAPI/SQLAlchemy/Postgres, Redis service, Alembic baseline migration, gated S3/KMS adapter; production RLS and running workers incomplete. |
 | 4 | Enterprise product modules | Partial | Multi-domain operational API and staff UI added; distinct completed submodules incomplete. |
-| 5 | WhatsApp-first channel | Partial / external gate | Signed Meta webhook, idempotent inbound, authorization-gated template outbox, manager approval and explicit send-worker command. No live authorized production integration tested. |
+| 5 | WhatsApp-first and alternate channels | Partial / external gate | Signed Meta webhook + gated outbox remain unactivated. New opt-in Telegram public onboarding adapter supports generic notices in 5 languages, signed-secret verification, Redis replay guard and independent ASGI entrypoint; no authenticated patient/CRM ingestion or live Telegram provider test yet. |
 | 6 | Multilingual receptionist | Partial | Five-language full administrative questionnaire in staff and patient portal, multilingual translation draft requiring explicit consent and human approval. Linguistic QA and speech AI pending. |
 | 7 | Medical intake | Partial | Consent, full five-question patient-facing structured flow, emergency keyword escalation and clinician handoff. No clinical validation. |
 | 8 | Secure medical documents | Partial | Staff + patient AES-GCM dev uploads with consent, checksum, size and type limits; gated production S3 SSE-KMS + ClamAV scan adapter implemented but actual external infrastructure and tests absent. |
@@ -31,7 +31,7 @@ Legend: **implemented (local)** = code + synthetic API tests; **partial** = some
 | 23 | CMS | Partial | Locale-specific draft/publish/content API + UI; medical review role/versioning missing. |
 | 24 | AI orchestration | Partial / external gate | Optional gated AI drafting/translation adapter, consent-gated human translation review, approved knowledge articles; no full orchestrator, speech or validated RAG. |
 | 25 | Voice messaging | Not delivered | STT/TTS languages, message decoding, validation and privacy gates. |
-| 26 | Multi-tenancy | Partial | Tenant-scoped ORM endpoints/tests and Alembic baseline. PostgreSQL RLS, historical DB migration and production provisioning missing. |
+| 26 | Multi-tenancy | Partial | Tenant-scoped ORM endpoints and staged PostgreSQL RLS/role/Epoch tests through 19.23 PASS in isolated clones. Original app.main/get_db still shared; migration, historical DB policies and production provisioning missing. |
 | 27 | Identity and access | Partial | JWT+PBKDF2+RBAC, Redis-backed login throttling, refresh rotation/replay detection/logout, one-time patient consent links; MFA and doctor-bound role still missing. |
 | 28 | Healthcare privacy/security | Partial | Consent including patient-attested links, revocation, staff+portal file guards, ClamAV/KMS/S3 adapter, selective audit, rate limiter; external pentest, active KMS, RLS and privacy review still missing. |
 | 29 | Payments & finance | Partial | Admin-verified manual ledger with dedupe; not an actual payment gateway or complete ledger. |
@@ -41,7 +41,7 @@ Legend: **implemented (local)** = code + synthetic API tests; **partial** = some
 | 33 | APIs | Partial | Documented OpenAPI routes, Pydantic validation, status transitions; rate limiting, general idempotency and versioned contracts pending. |
 | 34 | UI/UX | Partial | Functional Persian-first admin pages; responsive accessibility and complete language coverage not verified. |
 | 35 | DevOps/production | Partial | Docker Compose includes Postgres+Redis, migration startup, health endpoint, dev bootstrap and CI API tests; actual Docker startup/deployment and security gates pending. |
-| 36 | Testing | Partial | 44 backend tests with synthetic data, migration smoke test, TypeScript syntax pass; frontend build, real Postgres, Docker, browser E2E/pentest/load tests missing. |
+| 36 | Testing | Partial | Earlier 44-test baseline plus newer security-clone suites and Telegram onboarding tests (19 passed in standalone local environment). Full backend synthetic suite and PostgreSQL migration pilot previously PASS; live Telegram E2E, browser E2E/pentest/load and production evidence missing. |
 | 37 | SaaS subscription | Not delivered | Plan definitions/quotas/entitlements/billing/subscription lifecycle. |
 | 38 | Configuration controls | Partial | Tenant setting allowlist, CMS/knowledge/price/vendor/staff pages; full feature policy needs work. |
 | 39 | Implementation phases | Partial | Expanded security, document, language and messaging core delivered at development level; many other phases remain. |
