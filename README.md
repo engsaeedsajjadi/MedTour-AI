@@ -12,6 +12,7 @@ Patient-first medical tourism **coordination** system for international patients
 - **Travel:** visa, hotels, transport, interpreter, diagnostic referrals and admission coordination as *manual* workflow requests; reference-required state transitions, history, lead attribution and agents.
 - **Communication:** persisting staff/portal web messages, human handoff, five-language patient-facing **staged structured intake** and a human-reviewed AI translation draft workflow, safety-keyword escalation, optional approved-provider AI draft and translation adapter.
 - **WhatsApp:** official Meta HMAC webhook validation, configured tenant/account matching, consent-based existing patient routing, idempotent receipt and quarantine of unknown contacts. **Disabled by default. New approved-template outbox + explicit send worker; no live outbound calls tested.** Eligibility and credentials remain an external prerequisite.
+- **Telegram public onboarding (new, opt-in):** separate minimal ASGI gateway validates the official Telegram webhook secret, uses Redis replay fencing and sends non-clinical privacy notices in Persian, Arabic, English, Pashto and Dari. **Disabled by default; no patient/medical-text storage, no CRM intake, no AI and no verified live Telegram traffic.** Deployment steps in [docs/TELEGRAM_CHANNEL_MVP_FA.md](docs/TELEGRAM_CHANNEL_MVP_FA.md).
 - **Files:** authenticated AES-GCM encrypted storage for **synthetic documents on development machines only**, and a gated S3 SSE-KMS + ClamAV adapter for production. Neither real S3 nor scanner was verified here. Patient portal now has an authorized multipart upload endpoint.
 - **Patient-facing:** one-use purpose-specific patient consent links, revocable time-limited portal access links; journey status, approved quotes, confirmed appointments, controlled webchat.
 - **Administration:** Persian RTL Next.js dashboard and CRUD/operations pages; approved CMS, approved knowledge base, price provenance, reports, service tracking, configurable safe tenant settings.
@@ -99,3 +100,11 @@ Create an **empty private** repository named `MedTour-AI` under the account `eng
 - [Verified upstream references](docs/UPSTREAM.md)
 
 The platform remains a **development alpha** and must undergo local tests and independent production/security review before handling patients.
+
+## Offline Telegram onboarding verification
+
+```powershell
+& .\scripts\test-stage-19-15-auth-boundaries.ps1 -TelegramOnly
+```
+
+This test needs the existing local API Docker image, not a Meta account or Telegram token. No patient records are processed. **Never expose app.main to the internet merely for a Telegram webhook; deploy the isolated app.telegram_entrypoint:app behind HTTPS instead.**
