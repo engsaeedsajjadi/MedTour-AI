@@ -177,7 +177,7 @@ def main():
 
         # A refresh credential from an otherwise healthy tenant must not be
         # used after its epoch is disabled — even when its MAC is valid.
-        scoped_raw = keyring.issue("refresh", a.tenant_id, ttl_seconds=3600)
+        scoped_raw = keyring.issue(purpose="refresh", tenant_id=a.tenant_id, ttl_seconds=3600)
         for client in clients:
             code(client.post("/api/v1/auth/refresh", json={
                 "refresh_token": scoped_raw
