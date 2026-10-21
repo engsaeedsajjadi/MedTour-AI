@@ -163,7 +163,7 @@ class StagedPreAuthService:
                     SimpleNamespace(id=user_id, tenant_id=tenant_id, role=user_role)
                 )
                 return LoginResult(tenant_id, user_id, user_role, signed_jwt, raw)
-        except SQLAlchemyError:
+        except (SQLAlchemyError, LookupError):
             return None
 
     def refresh(self, credential: str) -> LoginResult | None:
@@ -238,5 +238,5 @@ class StagedPreAuthService:
                 if not self._db_role_matches(db, tenant_id):
                     return None
                 return VerifiedWebhookRoute(tenant_id, phone_id)
-        except SQLAlchemyError:
+        except (SQLAlchemyError, LookupError):
             return None
