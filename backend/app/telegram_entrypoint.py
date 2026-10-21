@@ -15,7 +15,12 @@ app = FastAPI(
     redoc_url=None,
     openapi_url=None,
 )
-app.include_router(telegram_router)
+# Keep precisely one audited FastAPI APIRoute across FastAPI/Starlette versions.
+# Recent FastAPI may register include_router() as an internal _IncludedRouter
+# object rather than materializing the path in app.routes. Directly register
+# the already-audited staged route and clear all framework routes first.
+app.router.routes.clear()
+app.router.routes.extend(telegram_router.routes)
 
 # A deployment gate: no accidental admin/PHI endpoint may leak into this entrypoint.
 assert len(app.routes) == 1 and app.routes[0].path == "/api/v1/webhooks/telegram"
