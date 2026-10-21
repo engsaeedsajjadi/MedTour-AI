@@ -15,10 +15,12 @@ from .security import current_user,roles,password_verify,token_for
 from .intake import intake_response, PROMPTS, LANGUAGES, IntakeAnswer
 from .ai import draft as ai_draft, provider_available
 from .whatsapp import router as whatsapp_router
+from .telegram import router as telegram_router, enabled as telegram_enabled
 from .rate_limit import throttle
 
 app=FastAPI(title='MedTour AI Coordination API',version='0.5.0-alpha',description='Development foundation. Not approved for production PHI or clinical care.')
 app.include_router(whatsapp_router)
+app.include_router(telegram_router)
 origins=[p.strip() for p in os.getenv('CORS_ORIGINS','http://localhost:3000').split(',') if p.strip()]
 app.add_middleware(CORSMiddleware,allow_origins=origins,allow_credentials=True,allow_methods=['GET','POST','PATCH'],allow_headers=['Authorization','Content-Type','X-Patient-Access'])
 
@@ -404,6 +406,7 @@ def audits(limit:int=Query(100,ge=1,le=300),db:Session=Depends(get_db),user:User
 @app.get('/api/v1/integrations/status')
 def integrations(user:User=Depends(MODERATOR)):
     return {'whatsapp':{'status':'inbound_configured_no_outbound' if __import__('app.whatsapp',fromlist=['enabled']).enabled() else 'blocked_pending_business_eligibility','live_connected':False},
+            'telegram':{'status':'generic_onboarding_configured' if telegram_enabled() else 'disabled_or_not_configured','live_connected':False,'patient_data_ingestion':False},
             'ai':{'status':'enabled' if provider_available() else 'not_configured','live_connected':provider_available()},
             'file_uploads':{'status':'configured_pending_external_verification' if __import__('app.secure_media',fromlist=['s3_ready']).s3_ready() else 'not_configured','live_connected':False},
             'visa':{'status':'human_coordination_only','live_connected':False},
