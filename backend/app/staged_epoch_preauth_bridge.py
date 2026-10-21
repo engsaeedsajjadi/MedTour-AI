@@ -107,7 +107,7 @@ def create_clone_preauth_pilot(
     # This is stronger than silently ignoring framework routes in the audit:
     # no built-in or unexpected endpoint is reachable through this app.
     app.router.routes.clear()
-    app.include_router(staged_preauth_router(service))
+    app.router.routes.extend(staged_preauth_router(service).routes)
     # Exactly three endpoints; intentionally NO admin, readiness, patient, case,
     # consent, live WhatsApp processor, AI, messaging or documents routes.
     allowed = {
@@ -121,7 +121,7 @@ def create_clone_preauth_pilot(
         for method in getattr(route, "methods", ())
         if method not in {"HEAD", "OPTIONS"}
     }
-    if present != allowed:
+    if len(app.routes) != len(allowed) or present != allowed:
         extra = sorted(present - allowed)
         missing = sorted(allowed - present)
         raise RuntimeError(
