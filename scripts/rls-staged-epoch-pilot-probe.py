@@ -12,7 +12,7 @@ import json
 import os
 
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, select, text
+from sqlalchemy import create_engine, select, func, text
 from sqlalchemy.engine import URL
 from sqlalchemy.orm import sessionmaker
 
@@ -162,8 +162,9 @@ def main():
         # Verify there was no persistence/PHI processing from accepted webhook.
         with EpochGuardedSessionFactory(registries[0], a.tenant_id)() as db:
             before_a = db.scalar(
-                select(MessageEvent.id).where(MessageEvent.tenant_id == a.tenant_id)
-                .limit(1)
+                select(func.count()).select_from(MessageEvent).where(
+                    MessageEvent.tenant_id == a.tenant_id
+                )
             )
         assert switch_epoch(writer, a.tenant_id, 1, False) == 2
         for client in clients:
@@ -199,8 +200,9 @@ def main():
             check_meta(client, a.whatsapp_phone_id, meta_secret, 200)
         with EpochGuardedSessionFactory(registries[0], a.tenant_id)() as db:
             after_a = db.scalar(
-                select(MessageEvent.id).where(MessageEvent.tenant_id == a.tenant_id)
-                .limit(1)
+                select(func.count()).select_from(MessageEvent).where(
+                    MessageEvent.tenant_id == a.tenant_id
+                )
             )
             assert before_a == after_a
         print("PASS: explicit generation-3 reprovisioning restores only approved staged routes", flush=True)
