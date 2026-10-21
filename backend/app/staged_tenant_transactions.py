@@ -171,7 +171,7 @@ class StagedTenantCredentialTransactions:
                 )
                 db.commit()
                 return result
-        except SQLAlchemyError:
+        except (SQLAlchemyError, LookupError):
             return None
 
     def consume_consent(
@@ -278,5 +278,5 @@ class StagedTenantCredentialTransactions:
                 )
                 db.commit()
                 return outcome
-        except SQLAlchemyError:
+        except (SQLAlchemyError, LookupError):
             return None
