@@ -101,6 +101,12 @@ def create_clone_preauth_pilot(
         redoc_url=None,
         openapi_url=None,
     )
+    # FastAPI/Starlette versions differ in what framework routes they install
+    # on startup (docs/OpenAPI/redirect helpers). For this narrowly scoped pilot,
+    # erase EVERY automatically-installed route before mounting our approved API.
+    # This is stronger than silently ignoring framework routes in the audit:
+    # no built-in or unexpected endpoint is reachable through this app.
+    app.router.routes.clear()
     app.include_router(staged_preauth_router(service))
     # Exactly three endpoints; intentionally NO admin, readiness, patient, case,
     # consent, live WhatsApp processor, AI, messaging or documents routes.
@@ -116,5 +122,10 @@ def create_clone_preauth_pilot(
         if method not in {"HEAD", "OPTIONS"}
     }
     if present != allowed:
-        raise RuntimeError("Unsafe route was mounted into synthetic migration pilot")
+        extra = sorted(present - allowed)
+        missing = sorted(allowed - present)
+        raise RuntimeError(
+            f"Unsafe route was mounted into synthetic migration pilot; "
+            f"unexpected={extra}, missing={missing}"
+        )
     return app
