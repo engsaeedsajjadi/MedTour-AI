@@ -54,8 +54,34 @@ def test_pilot_has_exactly_three_preauth_routes_and_no_phi_endpoints(monkeypatch
         assert client.get("/api/v1/cases").status_code == 404
         assert client.get("/api/v1/health/ready").status_code == 404
         assert client.get("/openapi.json").status_code == 404
+        assert client.get("/docs").status_code == 404
+        assert client.get("/redoc").status_code == 404
         assert client.post("/api/v1/webhooks/whatsapp",
                            content=b"{}").status_code == 403
+    finally:
+        registry.close()
+
+
+def test_pilot_strips_unexpected_framework_routes_before_mount(monkeypatch):
+    """Even if framework registers a route first, the pilot exposes only three."""
+    from fastapi import FastAPI
+    import app.staged_epoch_preauth_bridge as pilot_module
+
+    class FastAPIWithUnexpectedRoute(FastAPI):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.add_api_route(
+                "/framework-injected-unsafe", lambda: {"unsafe": True},
+                methods=["GET"],
+            )
+
+    authority, registry, fake, trusted = setup(monkeypatch)
+    try:
+        monkeypatch.setattr(pilot_module, "FastAPI", FastAPIWithUnexpectedRoute)
+        pilot = build(registry, trusted)
+        client = TestClient(pilot)
+        assert client.get("/framework-injected-unsafe").status_code == 404
+        assert len(pilot.routes) == 3
     finally:
         registry.close()
 
