@@ -173,3 +173,13 @@ def test_real_http_adapter_posts_static_notice_to_api(monkeypatch):
     import asyncio
     asyncio.run(telegram._send_message(TOKEN, 42, 'generic', 'https://example.invalid/privacy'))
     assert received == [{'chat_id':42, 'text':'generic\n\nPrivacy notice: https://example.invalid/privacy', 'disable_web_page_preview':True, 'protect_content':True}]
+
+
+
+def test_standalone_public_entrypoint_only_exposes_telegram_route(setup):
+    from app.telegram_entrypoint import app as public_app
+    public_client = TestClient(public_app)
+    paths = {(r.path, tuple(sorted(getattr(r, "methods", ())))) for r in public_app.routes}
+    assert paths == {("/api/v1/webhooks/telegram", ("POST",))}
+    for path in ("/docs", "/openapi.json", "/api/v1/patients", "/api/v1/auth/login"):
+        assert public_client.get(path).status_code == 404
