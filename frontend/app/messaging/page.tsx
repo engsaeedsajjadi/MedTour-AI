@@ -11,8 +11,16 @@ export default function Messaging(){
  const [source,setSource]=useState(''),[translation,setTranslation]=useState(''),[translationId,setTranslationId]=useState('');
  const [sourceLang,setSourceLang]=useState('fa'),[targetLang,setTargetLang]=useState('ar');
  const [error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false);
+ const [telegramStatus,setTelegramStatus]=useState('در حال بررسی');
  async function refresh(){try{setItems(await request<Row[]>('/communications/outbound'))}catch(e){setError((e as Error).message)}}
- useEffect(()=>{refresh()},[]);
+ useEffect(()=>{
+    void refresh();
+    void request<{telegram?:{status:string,live_connected:boolean}}>('/integrations/status')
+      .then(data=>setTelegramStatus(data.telegram?.status==='generic_onboarding_configured'?
+        'پیکربندی اولیه انجام شده؛ ارسال و دریافت زنده هنوز تأیید نشده است':
+        'غیرفعال یا نیازمند تنظیمات رسمی ربات'))
+      .catch(()=>setTelegramStatus('وضعیت سرویس در دسترس نیست'));
+ },[]);
  async function queue(e:React.FormEvent){e.preventDefault();setError('');setNotice('');setBusy(true);
   try{const id=crypto.randomUUID().replaceAll('-','');const r=await request<{id:string,status:string}>('/communications/outbound',{method:'POST',body:JSON.stringify({conversation_id:conversationId,locale,template_name:template,idempotency_key:id})});setNotice(`درخواست ${String(r.id).slice(0,8)} در انتظار تأیید مدیر است؛ پیامی ارسال نشده.`);await refresh()}
   catch(e){setError((e as Error).message)}finally{setBusy(false)}}
@@ -20,6 +28,12 @@ export default function Messaging(){
  async function draft(e:React.FormEvent){e.preventDefault();setBusy(true);setError('');setNotice('');try{const r=await request<{id:string,draft_text:string}>('/communications/translation-drafts',{method:'POST',body:JSON.stringify({conversation_id:conversationId,source_language:sourceLang,target_language:targetLang,source_text:source})});setTranslation(r.draft_text);setTranslationId(r.id);setNotice('ترجمه پیش‌نویس است و باید قبل از انتشار توسط اپراتور بررسی شود.')}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
  async function publish(){setBusy(true);setError('');try{await request(`/communications/translation-drafts/${translationId}/review`,{method:'POST',body:JSON.stringify({approved_text:translation,action:'approve'})});setTranslationId('');setNotice('ترجمه تأیید و فقط در گفت‌وگوی امن وب ثبت شد.')}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
  return <Shell title="ارتباطات و ترجمه"><div className="infoBanner">پیام واتساپ صرفاً با قالب عمومی تأییدشده و رضایت ارتباطی ارسال می‌شود. اتصال رسمی پیش‌فرض غیرفعال است. ترجمه هوش مصنوعی مستقل از ارسال واتساپ و نیازمند رضایت و تأیید انسانی است.</div>{error&&<p className="errorBox" role="alert">{error}</p>}{notice&&<p className="infoBanner">{notice}</p>}
+ <section className="panel" aria-label="کانال تلگرام"><div className="panelHeader"><h2>تلگرام — شروع گفت‌وگو با ربات</h2></div>
+ <div style={{padding:18}}>
+ <p>وضعیت: <strong>{telegramStatus}</strong></p>
+ <p>این کانال فعلاً فقط پنج زبان و اطلاع‌رسانی عمومی را پشتیبانی می‌کند. برای دریافت اسناد و اطلاعات پزشکی از پرتال امن با رضایت بیمار استفاده کنید؛ اطلاعات حساس را در ربات ارسال نکنید.</p>
+ <p>برای ساخت ربات از <a href="https://t.me/BotFather" target="_blank" rel="noopener noreferrer">BotFather رسمی تلگرام</a> استفاده کنید. Token و Webhook Secret فقط در تنظیمات سرور قرار می‌گیرند، نه در این پنل.</p>
+ </div></section>
  <div className="dashboardLower"><section className="panel"><div className="panelHeader"><h2>درخواست پیام واتساپ</h2></div><form className="formGrid" onSubmit={queue}>
  <label>شناسه مکالمه واتساپ<input required value={conversationId} onChange={e=>setConversationId(e.target.value)}/></label>
  <label>زبان قالب<select value={locale} onChange={e=>setLocale(e.target.value)}>{languages.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></label>
