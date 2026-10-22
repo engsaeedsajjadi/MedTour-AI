@@ -495,3 +495,6 @@ app.include_router(admin_control_router)
 
 from .human_inbox import router as human_inbox_router
 app.include_router(human_inbox_router)
+
+from .physician_management import router as physician_management_router
+app.include_router(physician_management_router)
