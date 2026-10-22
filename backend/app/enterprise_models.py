@@ -240,3 +240,16 @@ class IntakeReviewerAssignment(TenantEntity,Base):
     assigned_by:Mapped[str]=mapped_column(ForeignKey('users.id'),nullable=False)
     active:Mapped[bool]=mapped_column(Boolean,default=True,nullable=False)
     __table_args__=(UniqueConstraint('tenant_id','intake_id','reviewer_user_id'),)
+
+
+class MedicalDocumentEvent(TenantEntity,Base):
+    """PHI-free access trail; patient portal access is not impersonated as a staff user."""
+    __tablename__ = 'medical_document_events'
+    document_id:Mapped[str]=mapped_column(ForeignKey('documents.id'),nullable=False,index=True)
+    case_id:Mapped[str]=mapped_column(ForeignKey('cases.id'),nullable=False,index=True)
+    patient_id:Mapped[str]=mapped_column(ForeignKey('patients.id'),nullable=False)
+    actor_type:Mapped[str]=mapped_column(String(20),nullable=False)
+    staff_user_id:Mapped[str|None]=mapped_column(ForeignKey('users.id'),nullable=True)
+    portal_access_id:Mapped[str|None]=mapped_column(ForeignKey('portal_access.id'),nullable=True)
+    action:Mapped[str]=mapped_column(String(40),nullable=False)
+    __table_args__=(Index('idx_medical_document_events_tenant_case','tenant_id','case_id'),)
