@@ -9,6 +9,9 @@ from fastapi import FastAPI
 from fastapi.routing import APIRoute
 
 from .whatsapp import router as whatsapp_router
+from .safety_rules import assert_safe_runtime
+
+assert_safe_runtime()
 
 app = FastAPI(
     title="MedTour WhatsApp Public Gateway",
