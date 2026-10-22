@@ -231,3 +231,12 @@ class IntakeReviewRecord(TenantEntity,Base):
     # Never infer provider or emergency-service contact success from this row.
     external_confirmation:Mapped[bool]=mapped_column(Boolean,default=False,nullable=False)
     __table_args__=(UniqueConstraint('tenant_id','intake_id','action','reference'),)
+
+class IntakeReviewerAssignment(TenantEntity,Base):
+    __tablename__='intake_reviewer_assignments'
+    case_id:Mapped[str]=mapped_column(ForeignKey('cases.id'),index=True,nullable=False)
+    intake_id:Mapped[str]=mapped_column(ForeignKey('patient_intakes.id'),index=True,nullable=False)
+    reviewer_user_id:Mapped[str]=mapped_column(ForeignKey('users.id'),nullable=False,index=True)
+    assigned_by:Mapped[str]=mapped_column(ForeignKey('users.id'),nullable=False)
+    active:Mapped[bool]=mapped_column(Boolean,default=True,nullable=False)
+    __table_args__=(UniqueConstraint('tenant_id','intake_id','reviewer_user_id'),)
