@@ -23,6 +23,10 @@ Patient-first medical tourism **coordination** system for international patients
 
 A new staff-only `/journey` workspace and `GET /api/v1/cases/{case_id}/mission` show evidence-based administrative readiness. Case transitions block missing intake/referral/quote/appointment/travel/follow-up prerequisites, require supervisor references at high-stakes stages, and record scoped case timelines. See [Section 01 acceptance guide](docs/SECTION_01_ROLE_MISSION_FA.md). **This is synthetic-development coordination, not proof of real appointments, treatment, visa issuance or production readiness.**
 
+## Section 02 safety principles (local)
+
+The alpha API rejects `APP_ENV=production` until independently reviewed production security and regulatory gates are delivered. Consent withdrawal through staff or patient links cancels pending outbound templates, revokes portal access, and scrubs pending AI translation drafts; translation publication must re-check AI consent. External AI use requires an approved HTTPS host in `AI_APPROVED_HOSTS`. This does not certify clinical safety, professional approvals, or legal compliance. See [Section 02 report](docs/SECTION_02_NON_NEGOTIABLE_PRINCIPLES_FA.md).
+
 ## What is NOT finished
 
 The 45-section enterprise master specification **has not yet reached full acceptance**. Critical remaining work includes PostgreSQL Row-Level Security and migration of existing pre-Alembic databases; full patient identity assurance and MFA; doctor/hospital independently scoped portals; real compliant WhatsApp outbound communication; five-language human-validated AI/voice; operational/independently verified S3/KMS storage and ClamAV scanning; approved external visa/hotel/provider APIs; payment gateways; subscription billing; load tests; frontend E2E and independent clinical/privacy/security review.
