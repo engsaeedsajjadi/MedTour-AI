@@ -55,6 +55,10 @@ Staff can now record time-limited **locally attested** physician credential evid
 
 Tenant- and patient/case-scoped document uploads, lists and authenticated private downloads now enforce latest document consent; withdrawal permanently blocks previously uploaded blobs without falsely asserting physical erasure. Hardened AES-GCM test storage, metadata-only patient access records, S3/ClamAV readiness truthfulness and retention-review metadata APIs are documented in [Section 08](docs/SECTION_08_MEDICAL_DOCUMENTS_FA.md). **Real PHI, actual S3/KMS/ClamAV acceptance, legal retention processing, strong patient identity and production RLS are not certified.**
 
+## Section 09 — Patient CRM (development only)
+
+The `/crm` workspace integrates administrative case ownership, tenant-scoped follow-up scheduling, due queues, manually recorded outcomes and a human-only review of exact-contact duplicate candidates. Communication-consent withdrawal blocks pending follow-ups without reactivation on renewed consent. The `c9d093e78a21` migration and synthetic tests cover these workflows. No patient identities or medical data are automatically merged, and no external messages are sent. See [Section 09 scope](docs/SECTION_09_PATIENT_CRM_FA.md).
+
 ## What is NOT finished
 
 The 45-section enterprise master specification **has not yet reached full acceptance**. Critical remaining work includes PostgreSQL Row-Level Security and migration of existing pre-Alembic databases; full patient identity assurance and MFA; doctor/hospital independently scoped portals; real compliant WhatsApp outbound communication; five-language human-validated AI/voice; operational/independently verified S3/KMS storage and ClamAV scanning; approved external visa/hotel/provider APIs; payment gateways; subscription billing; load tests; frontend E2E and independent clinical/privacy/security review.

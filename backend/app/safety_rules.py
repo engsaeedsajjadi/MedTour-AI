@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .models import Case, Consent, Conversation, Task, Document
-from .enterprise_models import OutboundMessage, PortalAccess, TranslationDraft
+from .enterprise_models import OutboundMessage, PortalAccess, TranslationDraft, CRMFollowUp
 
 
 SAFETY_POLICY_VERSION = "section-02-2026-10-22"
@@ -73,6 +73,18 @@ def revoke_patient_access(db: Session, tenant_id: str, patient_id: str, purpose:
     for item in outbox:
         item.status = "blocked"
 
+    # Withdrawing communication permission blocks pending CRM outreach tasks.
+    # This is metadata-only; no external message is dispatched here.
+    blocked_followups = []
+    if purpose == "communication":
+        blocked_followups = db.scalars(select(CRMFollowUp).where(
+            CRMFollowUp.tenant_id == tenant_id,
+            CRMFollowUp.patient_id == patient_id,
+            CRMFollowUp.status == "open",
+        )).all()
+        for task in blocked_followups:
+            task.status = "blocked"
+
     # An unfulfilled portal-invitation handoff is cancelled on withdrawal.
     if purpose == "communication":
         case_ids = select(Case.id).where(
@@ -119,6 +131,7 @@ def revoke_patient_access(db: Session, tenant_id: str, patient_id: str, purpose:
         "outbound_blocked": len(outbox),
         "ai_translation_drafts_blocked": len(drafts),
         "documents_access_revoked": len(revoked_documents),
+        "crm_followups_blocked": len(blocked_followups),
     }
 
 

@@ -253,3 +253,34 @@ class MedicalDocumentEvent(TenantEntity,Base):
     portal_access_id:Mapped[str|None]=mapped_column(ForeignKey('portal_access.id'),nullable=True)
     action:Mapped[str]=mapped_column(String(40),nullable=False)
     __table_args__=(Index('idx_medical_document_events_tenant_case','tenant_id','case_id'),)
+
+
+# Section 09: tenant-scoped, metadata-only patient CRM coordination.
+# These entities never approve clinical treatment or transmit messages.
+class CRMFollowUp(TenantEntity, Base):
+    __tablename__ = 'crm_followups'
+    case_id:Mapped[str]=mapped_column(ForeignKey('cases.id'),nullable=False,index=True)
+    patient_id:Mapped[str]=mapped_column(ForeignKey('patients.id'),nullable=False,index=True)
+    assigned_user_id:Mapped[str]=mapped_column(ForeignKey('users.id'),nullable=False)
+    created_by:Mapped[str]=mapped_column(ForeignKey('users.id'),nullable=False)
+    idempotency_key:Mapped[str]=mapped_column(String(100),nullable=False)
+    due_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),nullable=False)
+    reason_code:Mapped[str]=mapped_column(String(40),nullable=False)
+    status:Mapped[str]=mapped_column(String(35),default='open',nullable=False)
+    outcome_code:Mapped[str|None]=mapped_column(String(40),nullable=True)
+    completion_reference:Mapped[str|None]=mapped_column(String(100),nullable=True)
+    resolved_at:Mapped[datetime|None]=mapped_column(DateTime(timezone=True),nullable=True)
+    __table_args__=(
+        UniqueConstraint('tenant_id','case_id','idempotency_key'),
+        Index('idx_crm_followups_queue','tenant_id','status','due_at'),
+    )
+
+class CRMDuplicateReview(TenantEntity, Base):
+    __tablename__ = 'crm_duplicate_reviews'
+    left_patient_id:Mapped[str]=mapped_column(ForeignKey('patients.id'),nullable=False)
+    right_patient_id:Mapped[str]=mapped_column(ForeignKey('patients.id'),nullable=False)
+    decision:Mapped[str]=mapped_column(String(32),nullable=False)
+    reviewer_user_id:Mapped[str]=mapped_column(ForeignKey('users.id'),nullable=False)
+    evidence_reference:Mapped[str]=mapped_column(String(100),nullable=False)
+    # Relationship is a non-destructive review record, NEVER a data/consent merge.
+    __table_args__=(UniqueConstraint('tenant_id','left_patient_id','right_patient_id'),)
