@@ -461,3 +461,6 @@ app.include_router(intake_clinical_review_router)
 
 from .patient_crm import router as patient_crm_router
 app.include_router(patient_crm_router)
+
+from .admin_control import router as admin_control_router
+app.include_router(admin_control_router)
