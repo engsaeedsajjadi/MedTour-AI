@@ -9,11 +9,12 @@ import os
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .models import Consent, Conversation
+from .models import Case, Consent, Conversation, Task
 from .enterprise_models import OutboundMessage, PortalAccess, TranslationDraft
 
 
 SAFETY_POLICY_VERSION = "section-02-2026-10-22"
+INVITATION_TASK_TITLE = "Prepare secure portal invitation via an approved private channel"
 CONSENT_PURPOSES = frozenset({
     "intake", "medical_documents", "communication", "ai_processing"
 })
@@ -71,6 +72,20 @@ def revoke_patient_access(db: Session, tenant_id: str, patient_id: str, purpose:
     )).all()
     for item in outbox:
         item.status = "blocked"
+
+    # An unfulfilled portal-invitation handoff is cancelled on withdrawal.
+    if purpose == "communication":
+        case_ids = select(Case.id).where(
+            Case.tenant_id == tenant_id, Case.patient_id == patient_id,
+        )
+        handoffs = db.scalars(select(Task).where(
+            Task.tenant_id == tenant_id,
+            Task.case_id.in_(case_ids),
+            Task.title == INVITATION_TASK_TITLE,
+            Task.status == "open",
+        )).all()
+        for task in handoffs:
+            task.status = "cancelled"
 
     drafts = []
     if purpose in ("communication", "ai_processing"):
