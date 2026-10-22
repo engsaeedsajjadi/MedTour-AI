@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from .models import User,Case,Patient,Consent,Document,Audit
+from .enterprise_models import MedicalDocumentEvent
 from .database import get_db
 from .security import roles
 from .patient_portal import portal_session
@@ -155,7 +156,9 @@ async def patient_upload(case_id:str,file:UploadFile=File(...),
         else:
             encrypt_local(raw,grant.tenant_id,row.id,cipher())
             row.storage_key=row.id+'.enc'
-        db.add(Audit(tenant_id=grant.tenant_id,user_id=p.id,event='portal_document_uploaded',entity_type='Document',entity_id=row.id))
+        db.add(MedicalDocumentEvent(tenant_id=grant.tenant_id,document_id=row.id,
+            case_id=c.id,patient_id=p.id,actor_type='portal',portal_access_id=grant.id,
+            action='document_uploaded'))
         db.commit()
     except Exception:
         db.rollback()
@@ -199,7 +202,30 @@ def patient_download(case_id:str,document_id:str,
     if not row:raise HTTPException(404,'Document not available')
     raw,mime=load_document(row,grant.tenant_id,
         local_enabled=local_enabled(),cipher_factory=cipher)
-    db.add(Audit(tenant_id=grant.tenant_id,user_id=grant.issued_by,
-        event='portal_medical_document_accessed',entity_type='Document',entity_id=row.id))
+    db.add(MedicalDocumentEvent(tenant_id=grant.tenant_id,document_id=row.id,
+        case_id=case.id,patient_id=patient.id,actor_type='portal',
+        portal_access_id=grant.id,action='document_downloaded'))
     db.commit()
     return private_download_response(raw,mime)
+
+@router.get('/cases/{case_id}/activity')
+def document_activity(case_id:str,db:Session=Depends(get_db),
+    user:User=Depends(roles('admin'))):
+    case=db.scalar(select(Case).where(
+        Case.id==case_id,Case.tenant_id==user.tenant_id
+    ))
+    if not case:raise HTTPException(404,'Case not found')
+    patient=db.scalar(select(Patient).where(
+        Patient.tenant_id==user.tenant_id,Patient.id==case.patient_id
+    ))
+    if not patient:raise HTTPException(404,'Patient not found')
+    # Security administrators may inspect metadata even following withdrawal,
+    # without any access to the underlying clinical file.
+    rows=db.scalars(select(MedicalDocumentEvent).where(
+        MedicalDocumentEvent.tenant_id==user.tenant_id,
+        MedicalDocumentEvent.case_id==case.id,
+        MedicalDocumentEvent.patient_id==patient.id,
+    ).order_by(MedicalDocumentEvent.created_at.desc()).limit(100)).all()
+    return {'items':[{'document_id':x.document_id,'actor_type':x.actor_type,
+        'action':x.action,'created_at':x.created_at} for x in rows],
+        'raw_file_contents_included':False,'metadata_only':True}
