@@ -455,3 +455,6 @@ app.include_router(receptionist_router)
 
 from .intake_coordination import router as intake_coordination_router
 app.include_router(intake_coordination_router)
+
+from .intake_clinical_review import router as intake_clinical_review_router
+app.include_router(intake_clinical_review_router)
