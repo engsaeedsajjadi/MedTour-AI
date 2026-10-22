@@ -15,3 +15,57 @@ jobs:
       - name: Run API tests with synthetic data
         working-directory: backend
         run: python -m pytest -q
+
+  stack-integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: medtour_ci
+          POSTGRES_PASSWORD: synthetic_ci_password
+          POSTGRES_DB: medtour_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U medtour_ci -d medtour_ci"
+          --health-interval 5s --health-timeout 5s --health-retries 15
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 15
+    env:
+      APP_ENV: development
+      DATABASE_URL: postgresql+psycopg://medtour_ci:synthetic_ci_password@127.0.0.1:5432/medtour_ci
+      REDIS_URL: redis://127.0.0.1:6379/0
+      JWT_SECRET: ci_synthetic_secret_at_least_32_characters
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install runtime
+        run: pip install -r backend/requirements.txt
+      - name: Upgrade real PostgreSQL schema with Alembic
+        working-directory: backend
+        run: python -m alembic upgrade head
+      - name: Probe real PostgreSQL migration and Redis
+        working-directory: backend
+        run: |
+          python - <<'PY'
+          from app.database import SessionLocal
+          from app.stack_health import probe_stack, required_revision
+          from app.main import app
+          from fastapi.testclient import TestClient
+          with SessionLocal() as db:
+              status = probe_stack(db)
+          assert status["schema_migration"] == "current", status
+          assert status["redis"] == "reachable", status
+          assert status["production_ready"] is False
+          response = TestClient(app).get("/api/v1/health/ready")
+          assert response.status_code == 200, response.text
+          print("PostgreSQL 17 + Alembic", required_revision(), "+ Redis 7 integration PASS")
+          PY
