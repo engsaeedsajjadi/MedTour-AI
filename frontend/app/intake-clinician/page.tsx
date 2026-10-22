@@ -102,6 +102,16 @@ export default function ReviewerWorkspace(){
      <p>شناسه حساب انتخاب‌شده: <code>{reviewer.slice(0,12)}</code></p>
      <button className="button" disabled={busy||!reviewer||!session}>ثبت انتساب محدود</button>
     </form>
+    <div style={{display:'flex',flexWrap:'wrap',gap:8,marginTop:14}}>
+     <button type="button" disabled={busy||!reviewer} onClick={()=>{
+      if(!window.confirm('آیا بررسی محلی مدرک این پزشک لغو شود؟'))return;
+      void run(()=>request('/intake-review/reviewers/'+encodeURIComponent(reviewer)+'/revoke',{method:'POST'}),'اعتبارسنجی محلی غیرفعال شد.');
+     }}>لغو صلاحیت محلی ثبت‌شده</button>
+     <button type="button" disabled={busy||!reviewer||!session} onClick={()=>{
+      if(!window.confirm('آیا دسترسی پزشک به این پذیرش لغو شود؟'))return;
+      void run(()=>request('/intake-review/sessions/'+encodeURIComponent(session)+'/assignment/'+encodeURIComponent(reviewer)+'/revoke',{method:'POST'}),'انتساب پزشک به پذیرش لغو شد.');
+     }}>لغو انتساب بازبین</button>
+    </div>
     <p>تنها پس از ثبت شواهد معتبر محلی، امکان انتساب بازبین وجود دارد. انتساب به معنی مجوز تأیید درمان نیست.</p>
    </section>
   </div>}
