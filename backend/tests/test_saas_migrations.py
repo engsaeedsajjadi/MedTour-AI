@@ -42,6 +42,12 @@ def test_alembic_head_includes_tenant_subscription_and_reversible_delta(tmp_path
         }
         assert {'tenant_id', 'plan_code', 'status', 'activated_by',
                 'created_at', 'expires_at'}.issubset(cols)
+        appointment_cols = {
+            row[1] for row in connection.execute('PRAGMA table_info(appointments)')
+        }
+        assert {'cancellation_reference', 'cancelled_at'} <= appointment_cols
+        indexes = {row[1] for row in connection.execute('PRAGMA index_list(appointments)')}
+        assert 'uq_appointments_confirmed_physician_instant' in indexes
 
     alembic('downgrade', '71dcbcd5f22b')
     with sqlite3.connect(database) as connection:
