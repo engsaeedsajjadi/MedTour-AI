@@ -304,3 +304,43 @@ class InboxAction(TenantEntity, Base):
     from_status: Mapped[str] = mapped_column(String(24), nullable=False)
     to_status: Mapped[str] = mapped_column(String(24), nullable=False)
     target_user_id: Mapped[str|None] = mapped_column(ForeignKey('users.id'),nullable=True)
+
+
+# Section 12 — directory management and access to a physician-specific portal.
+# "locally_attested" is administrative evidence, NOT external licensure validation.
+class PhysicianAccount(TenantEntity, Base):
+    __tablename__ = "physician_accounts"
+    physician_id: Mapped[str] = mapped_column(ForeignKey("physicians.id"), nullable=False, index=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    linked_by: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    __table_args__ = (UniqueConstraint("tenant_id", "physician_id"), UniqueConstraint("tenant_id", "user_id"))
+
+class PhysicianCredential(TenantEntity, Base):
+    __tablename__ = "physician_credentials"
+    physician_id: Mapped[str] = mapped_column(ForeignKey("physicians.id"), nullable=False, index=True)
+    issuing_country: Mapped[str] = mapped_column(String(2), nullable=False)
+    issuing_authority: Mapped[str] = mapped_column(String(120), nullable=False)
+    license_reference: Mapped[str] = mapped_column(String(100), nullable=False)
+    status: Mapped[str] = mapped_column(String(24), default="locally_attested", nullable=False)
+    reviewed_by: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
+    reviewed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    __table_args__ = (UniqueConstraint("tenant_id", "physician_id"),)
+
+class PhysicianAffiliation(TenantEntity, Base):
+    __tablename__ = "physician_affiliations"
+    physician_id: Mapped[str] = mapped_column(ForeignKey("physicians.id"), nullable=False, index=True)
+    hospital_id: Mapped[str] = mapped_column(ForeignKey("hospitals.id"), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(20), default="locally_recorded", nullable=False)
+    recorded_by: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
+    __table_args__ = (UniqueConstraint("tenant_id", "physician_id", "hospital_id"),)
+
+class PhysicianAvailability(TenantEntity, Base):
+    __tablename__ = "physician_availability"
+    physician_id: Mapped[str] = mapped_column(ForeignKey("physicians.id"), nullable=False, index=True)
+    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="proposed", nullable=False)
+    recorded_by: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
+    __table_args__ = (Index("idx_physician_availability_tenant_window", "tenant_id", "physician_id", "starts_at"),)
