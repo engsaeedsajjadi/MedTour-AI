@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from . import enterprise_models  # register enterprise tables
+from .subscriptions import router as subscriptions_router, enforce_create_quota
 from .database import get_db
 from .models import (User,Tenant,Patient,Case,Consent,Document,Physician,Hospital,Referral,
                      Appointment,Quote,TravelRequest,Conversation,Message,Task,Audit)
@@ -202,6 +203,7 @@ def create_patient(body:PatientIn,db:Session=Depends(get_db),user:User=Depends(M
     if re.fullmatch(r'\+?[\d ()-]{8,25}',cleaned):
         cleaned=''.join(c for c in cleaned if c.isdigit())
     supplied['contact']=cleaned
+    enforce_create_quota(db,user.tenant_id,'patients')
     return save(db,user,Patient(tenant_id=user.tenant_id,**supplied),'patient_created')
 
 @app.get('/api/v1/patients/{patient_id}')
@@ -233,6 +235,7 @@ def cases(limit:int=Query(50,ge=1,le=200),db:Session=Depends(get_db),user:User=D
 def create_case(body:CaseIn,db:Session=Depends(get_db),user:User=Depends(MODERATOR)):
     require_owned(db,Patient,body.patient_id,user)
     need_consent(db,user,body.patient_id,'intake')
+    enforce_create_quota(db,user.tenant_id,'cases')
     return save(db,user,Case(tenant_id=user.tenant_id,**body.model_dump()),'case_created')
 @app.get('/api/v1/cases/{case_id}')
 def case_detail(case_id:str,db:Session=Depends(get_db),user:User=Depends(MODERATOR)):
@@ -432,3 +435,4 @@ app.include_router(portal_intake_router)
 
 from .consent_links import router as consent_links_router
 app.include_router(consent_links_router)
+app.include_router(subscriptions_router)
