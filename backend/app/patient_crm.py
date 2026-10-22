@@ -39,6 +39,11 @@ def as_utc(value: datetime) -> datetime:
     return value.astimezone(timezone.utc)
 
 
+def stored_utc(value: datetime) -> datetime:
+    # SQLite synthetic tests drop timezone metadata; PostgreSQL stores UTC.
+    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
+
+
 def patient_case(db: Session, user: User, case_id: str) -> tuple[Case, Patient]:
     case = db.scalar(select(Case).where(
         Case.id == case_id, Case.tenant_id == user.tenant_id,
@@ -185,7 +190,7 @@ def schedule_followup(
         if (existing.patient_id != patient.id or
             existing.assigned_user_id != body.assigned_user_id or
             existing.reason_code != body.reason_code or
-            as_utc(existing.due_at) != body.due_at):
+            stored_utc(existing.due_at) != body.due_at):
             raise HTTPException(409, "Idempotency key already used for different follow-up")
         return {**followup_view(existing), "reused": True, "automated_send": False}
     entry = CRMFollowUp(
