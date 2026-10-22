@@ -44,6 +44,23 @@ services:
       interval: 10s
       timeout: 4s
       retries: 12
+  outbound-worker:
+    profiles: ["messaging"]
+    build: ./backend
+    env_file: .env
+    command: ["python", "-m", "app.outbound_worker"]
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "python", "-m", "app.worker_healthcheck"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
   web:
     build: ./frontend
     environment:
