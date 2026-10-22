@@ -235,3 +235,28 @@ def document_activity(case_id:str,db:Session=Depends(get_db),
     return {'items':[{'document_id':x.document_id,'actor_type':x.actor_type,
         'action':x.action,'created_at':x.created_at} for x in rows],
         'raw_file_contents_included':False,'metadata_only':True}
+
+@router.get('/cases/{case_id}/retention-review')
+def retention_review(case_id:str,db:Session=Depends(get_db),
+    user:User=Depends(roles('admin'))):
+    case=db.scalar(select(Case).where(
+        Case.id==case_id,Case.tenant_id==user.tenant_id))
+    if not case:raise HTTPException(404,'Case not found')
+    rows=db.scalars(select(Document).where(
+        Document.tenant_id==user.tenant_id,
+        Document.case_id==case.id,
+        Document.patient_id==case.patient_id,
+        Document.status=='access_revoked'
+    ).order_by(Document.created_at.desc()).limit(100)).all()
+    # Access revocation != cryptographic erasure and != retention clearance.
+    # Do not implement deletion while independent legal retention requirements
+    # and S3 versioning/lifecycle semantics are still unaudited.
+    return {
+        'documents':[{'id':x.id,'status':x.status,'created_at':x.created_at}
+            for x in rows],
+        'metadata_only':True,
+        'access_revoked':True,
+        'physical_erasure_performed':False,
+        'legal_retention_policy_verified':False,
+        'requires_independent_retention_review':True,
+    }
