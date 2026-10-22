@@ -14,6 +14,7 @@ from .enterprise_models import (Operation,OperationEvent,ServicePrice,QuoteItem,
     TenantSetting,KnowledgeArticle,AILog,PatientIntake,Notification,AgentProfile,
     LeadSource,MoneyEntry,CaseTimeline)
 from .security import roles,current_user,password_hash
+from .subscriptions import enforce_create_quota
 from .intake import LANGUAGES,PROMPTS,intake_response
 
 router=APIRouter(prefix='/api/v1',tags=['enterprise'])
@@ -307,6 +308,7 @@ class StaffIn(BaseModel):
 def staff_create(body:StaffIn,db:Session=Depends(get_db),user:User=Depends(ADMIN)):
     email=body.email.strip().lower()
     if '@' not in email:raise HTTPException(422,'Invalid email')
+    enforce_create_quota(db,user.tenant_id,'users')
     staff=User(tenant_id=user.tenant_id,email=email,password_hash=password_hash(body.password),role=body.role)
     try:write(db,user,staff,'staff_created')
     except IntegrityError:
