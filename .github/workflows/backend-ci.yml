@@ -2,9 +2,24 @@ name: Backend verification
 on:
   push:
   pull_request:
+
 jobs:
   tests:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: medtour_ci
+          POSTGRES_PASSWORD: ci_synthetic_not_production
+          POSTGRES_DB: medtour_ci
+        ports:
+          - 5544:5432
+        options: >-
+          --health-cmd "pg_isready -U medtour_ci -d medtour_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -15,3 +30,34 @@ jobs:
       - name: Run API tests with synthetic data
         working-directory: backend
         run: python -m pytest -q
+      - name: PostgreSQL 17 migration smoke (disposable CI database)
+        working-directory: backend
+        env:
+          APP_ENV: test
+          DATABASE_URL: postgresql+psycopg://medtour_ci:ci_synthetic_not_production@127.0.0.1:5544/medtour_ci
+        run: |
+          python -m alembic upgrade head
+          python - <<'PY'
+          import os
+          import psycopg
+          url=os.environ['DATABASE_URL'].replace('postgresql+psycopg://','postgresql://',1)
+          with psycopg.connect(url) as connection:
+              index=connection.execute(
+                  "SELECT indexdef FROM pg_indexes "
+                  "WHERE tablename='appointments' "
+                  "AND indexname='uq_appointments_confirmed_physician_instant'"
+              ).fetchone()
+              assert index and 'UNIQUE INDEX' in index[0], 'Confirmed-slot unique partial index missing'
+              assert 'WHERE' in index[0], 'Index must be partial and confirmed-only'
+              columns={row[0] for row in connection.execute(
+                  "SELECT column_name FROM information_schema.columns "
+                  "WHERE table_name='appointments'"
+              ).fetchall()}
+              assert {'cancellation_reference','cancelled_at'} <= columns
+              table=connection.execute(
+                  "SELECT count(*) FROM information_schema.tables "
+                  "WHERE table_name='tenant_subscriptions'"
+              ).fetchone()[0]
+              assert table == 1, 'Subscription migration missing'
+          print('PASS: synthetic PostgreSQL 17 Alembic and conflict schema smoke')
+          PY
