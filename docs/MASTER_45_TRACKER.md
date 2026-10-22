@@ -42,7 +42,7 @@ Legend: **implemented (local)** = code + synthetic API tests; **partial** = some
 | 34 | UI/UX | Partial | Functional Persian-first admin pages; responsive accessibility and complete language coverage not verified. |
 | 35 | DevOps/production | Partial | Docker Compose includes Postgres+Redis, migration startup, health endpoint, dev bootstrap and CI API tests; actual Docker startup/deployment and security gates pending. |
 | 36 | Testing | Partial | Earlier 44-test baseline plus newer security-clone suites and Telegram onboarding tests (19 passed in standalone local environment). Full backend synthetic suite and PostgreSQL migration pilot previously PASS; live Telegram E2E, browser E2E/pentest/load and production evidence missing. |
-| 37 | SaaS subscription | Not delivered | Plan definitions/quotas/entitlements/billing/subscription lifecycle. |
+| 37 | SaaS subscription | Partial (development) | Technical plan catalogue, one-time audited FREE tenant provisioning, admin usage dashboard, PostgreSQL-serialized create quotas for patients/cases/staff and Alembic migration added on the feature branch; payment gateway, billing ledger, renewals, paid-plan activation, usage metering and production hardening still absent. |
 | 38 | Configuration controls | Partial | Tenant setting allowlist, CMS/knowledge/price/vendor/staff pages; full feature policy needs work. |
 | 39 | Implementation phases | Partial | Expanded security, document, language and messaging core delivered at development level; many other phases remain. |
 | 40 | End-to-end scenarios | Partial | API-level synthetic flows (including patient consent, intake, document and template queue) tested; no real provider journey, web UI E2E or external booking. |
