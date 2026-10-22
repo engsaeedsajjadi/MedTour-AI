@@ -1,6 +1,6 @@
 """Tenant-scoped SaaS plan foundation; no payment or paid activation is performed here.
 
-Only patients and cases creation quotas are enforced by the API integration.
+Patient, case, and staff creation quotas are enforced by the API integration.
 Production requests without an explicit subscription fail closed for these actions.
 """
 from __future__ import annotations
@@ -76,7 +76,7 @@ def enforce_create_quota(db: Session, tenant_id: str, metric: str) -> None:
     The tenant row lock serializes concurrent PostgreSQL writers across tables.
     SQLite is for isolated synthetic tests, not concurrent production use.
     """
-    if metric not in ('patients', 'cases'):
+    if metric not in ('patients', 'cases', 'users'):
         raise ValueError('Unsupported create quota')
     tenant = db.scalar(select(Tenant).where(Tenant.id == tenant_id).with_for_update())
     if tenant is None:
@@ -164,6 +164,6 @@ def usage(db: Session = Depends(get_db), user: User = Depends(ADMIN)):
         'active': _active(subscription) if subscription else False,
         'counts': counts,
         'limits': limits,
-        'quota_enforcement': ['patients', 'cases'] if subscription else [],
+        'quota_enforcement': ['patients', 'cases', 'users'] if subscription else [],
         'billing_integrated': False,
     }
