@@ -39,13 +39,11 @@ def start(body:Start,x_patient_access:str|None=Header(None,alias='X-Patient-Acce
     if not c:raise HTTPException(404,'Case not found')
     lang=body.language or p.language
     if lang not in LANGUAGES:raise HTTPException(422,'Unsupported language')
-    last=db.scalar(select(PatientIntake).where(PatientIntake.tenant_id==grant.tenant_id,
-        PatientIntake.case_id==c.id).order_by(PatientIntake.created_at.desc(),PatientIntake.id.desc()).limit(1))
-    if last and last.status=='in_progress':return public_state(last)
-    if last and last.status=='requires_urgent_human_review':raise HTTPException(409,'Awaiting urgent human review')
-    if last and last.status=='awaiting_clinician_review':raise HTTPException(409,'Already submitted for review')
-    row=PatientIntake(tenant_id=grant.tenant_id,case_id=c.id,language=lang)
-    db.add(row);db.commit();db.refresh(row)
+    from .intake_coordination import prepare_intake_start
+    row,created=prepare_intake_start(db,c,lang)
+    if created:
+        db.commit()
+        db.refresh(row)
     return public_state(row)
 
 class Answer(BaseModel):
@@ -55,9 +53,12 @@ class Answer(BaseModel):
 def answer(session_id:str,body:Answer,x_patient_access:str|None=Header(None,alias='X-Patient-Access'),db:Session=Depends(get_db)):
     grant,p=patient_session(x_patient_access,db)
     row=db.scalar(select(PatientIntake).join(Case,PatientIntake.case_id==Case.id).where(
-        PatientIntake.tenant_id==grant.tenant_id,PatientIntake.id==session_id,Case.tenant_id==grant.tenant_id,Case.patient_id==p.id))
+        PatientIntake.tenant_id==grant.tenant_id,PatientIntake.id==session_id,
+        Case.tenant_id==grant.tenant_id,Case.patient_id==p.id).with_for_update())
     if not row:raise HTTPException(404,'Intake session not found')
     if row.status!='in_progress':raise HTTPException(409,'Intake session already completed')
+    if not body.answer.strip():raise HTTPException(422,'Nonblank answer required')
+
     safety=intake_response(row.language,body.answer)
     if safety['emergency_keyword_detected']:
         row.status='requires_urgent_human_review';db.commit()

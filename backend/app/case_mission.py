@@ -67,9 +67,14 @@ def mission_evidence(db: Session, case: Case) -> dict:
     consent = _consented(db, t, case.patient_id, "intake")
     communication = _consented(db, t, case.patient_id, "communication")
     intakes = _rows(db, PatientIntake, t, PatientIntake.case_id == case.id)
+    # A historical completed questionnaire cannot authorize a new, incomplete
+    # resubmission. Past urgent flags remain blocking until a future
+    # independently reviewed clinical escalation workflow is implemented.
+    newest = max(intakes, key=lambda x: (x.created_at, x.id), default=None)
     emergency = any(x.status == "requires_urgent_human_review" for x in intakes)
-    intake_submitted = consent and any(
-        x.status == "awaiting_clinician_review" for x in intakes
+    intake_submitted = bool(
+        consent and newest and newest.status in
+        ("awaiting_clinician_review", "handoff_recorded")
     )
     referrals = _rows(db, Referral, t, Referral.case_id == case.id)
     providers = {
