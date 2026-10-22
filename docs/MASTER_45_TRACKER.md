@@ -20,7 +20,7 @@ Legend: **implemented (local)** = code + synthetic API tests; **partial** = some
 | 12 | Physician management | Partial | Verified-directory control + referrals; physician-bound login/workspace and credential verification evidence missing. |
 | 13 | Hospital management | Partial | Hospital CRUD/approval; own scoped portal and external hospital scheduling missing. |
 | 14 | Provider matching | Partial | Nonclinical verified-specialty directory search; qualified clinician review mandatory. |
-| 15 | Appointment management | Partial | Manual request/confirmation reference; conflict-safe availability and calendars missing. |
+| 15 | Appointment management | Partial (development) | Manual independent provider reference, exact-instant tenant/physician confirmed-slot uniqueness and cancellation evidence/index migration delivered on feature branch; authoritative calendars, duration overlap checks, external confirmations, real multi-worker load and clinical review missing. |
 | 16 | Quotations | Partial | Draft, line items, verified provenance, admin approval; PDF, FX, versioning and financial validation pending. |
 | 17 | Medical visa coordination | Partial / external gate | Tracked manual requests with external confirmation reference, no visa issuance/integration. |
 | 18 | Accommodation | Partial / external gate | Hotel requests and vendor records; actual provider reservation/stock missing. |
