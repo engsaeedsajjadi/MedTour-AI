@@ -118,7 +118,7 @@ export default function AdminCenter(){
   {role==='admin'&&<>
    <div className="statsGrid">
     {tiles.map(([key,label,url])=><Link key={key} href={url} className="statCard">
-     <small>{label}</small><strong>{summary?.[key] ?? '—'}</strong><span>نمایش گردش‌کار ←</span>
+     <small>{label}</small><strong>{typeof summary?.[key]==='number'?summary[key]:'—'}</strong><span>نمایش گردش‌کار ←</span>
     </Link>)}
    </div>
    <section className="panel" style={{padding:18,marginTop:18}}>
