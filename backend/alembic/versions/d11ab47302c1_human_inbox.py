@@ -36,6 +36,7 @@ def upgrade():
         sa.Column("conversation_id",sa.String(36),sa.ForeignKey("conversations.id"),nullable=False),
         sa.Column("actor_user_id",sa.String(36),sa.ForeignKey("users.id"),nullable=True),
         sa.Column("action",sa.String(40),nullable=False),
+        sa.Column("reference",sa.String(100),nullable=True),
         sa.Column("from_status",sa.String(24),nullable=False),
         sa.Column("to_status",sa.String(24),nullable=False),
         sa.Column("target_user_id",sa.String(36),sa.ForeignKey("users.id"),nullable=True),
