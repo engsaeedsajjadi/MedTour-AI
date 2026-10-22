@@ -132,7 +132,7 @@ def test_webhook_routed_only_with_consent_and_signature(seeded,monkeypatch):
     payload={'object':'whatsapp_business_account','entry':[{'changes':[{'field':'messages','value':{
        'metadata':{'phone_number_id':'number-001'},'messages':[{'id':'wamid.test-example-12345','from':'9990000000','type':'text','text':{'body':'synthetic greeting'}}]}}]}]}
     raw=json.dumps(payload).encode();sig='sha256='+hmac.new(b'synthetic-app-secret',raw,hashlib.sha256).hexdigest()
-    r=client.post('/api/v1/webhooks/whatsapp',content=raw,headers={'X-Hub-Signature-256':sig})
+    r=client.post('/api/v1/webhooks/whatsapp',content=raw,headers={'X-Hub-Signature-256':sig,'Content-Type':'application/json'})
     assert r.status_code==200 and r.json()['quarantined']==1
     assert client.post('/api/v1/webhooks/whatsapp',content=raw,headers={'X-Hub-Signature-256':sig}).json()['duplicates']==1
     assert client.get('/api/v1/conversations',headers=admin).json()==[]
@@ -185,7 +185,7 @@ def test_webhook_consent_based_routing_to_existing_patient(seeded,monkeypatch):
     payload={'object':'whatsapp_business_account','entry':[{'changes':[{'field':'messages','value':{'metadata':{'phone_number_id':'test-phone-001'},
         'messages':[{'id':'wamid.consent.test','from':'1234567890','type':'text','text':{'body':'Hello care coordination'}}]}}]}]}
     raw=json.dumps(payload).encode();signature='sha256='+hmac.new(b'test-app-secret',raw,hashlib.sha256).hexdigest()
-    out=client.post('/api/v1/webhooks/whatsapp',headers={'X-Hub-Signature-256':signature},content=raw)
+    out=client.post('/api/v1/webhooks/whatsapp',headers={'X-Hub-Signature-256':signature,'Content-Type':'application/json'},content=raw)
     assert out.status_code==200 and out.json()['routed_to_human']==1
     conversations=client.get('/api/v1/conversations',headers=admin).json()
     assert len(conversations)==1 and conversations[0]['human_handoff'] is True
