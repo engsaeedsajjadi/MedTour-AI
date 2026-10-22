@@ -124,11 +124,38 @@ def test_review_requires_fresh_ai_processing_consent_not_only_chat_consent(seede
     # Simulate a legacy direct-write revocation which bypassed the endpoint's
     # cancellation handler. Publication MUST STILL check the latest consent.
     with Session() as db:
-        db.add(Consent(tenant_id=patient["id"] if False else patient["tenant_id"]
-            if "tenant_id" in patient else db.get(TranslationDraft, draft).tenant_id,
+        tenant_id = db.get(TranslationDraft, draft).tenant_id
+        db.add(Consent(tenant_id=tenant_id,
             patient_id=patient["id"], purpose="ai_processing",
             accepted=False, notice_version="legacy-test"))
         db.commit()
     refused = review(client, admin, draft)
     assert refused.status_code == 409, refused.text
     assert "AI processing consent" in str(refused.json()["detail"])
+
+def test_ai_endpoint_must_be_exact_preapproved_public_https_host(monkeypatch):
+    from app.ai import approved_provider_base_url, provider_available
+    monkeypatch.setenv("AI_PROVIDER_APPROVED", "true")
+    monkeypatch.setenv("AI_API_KEY", "synthetic-unit-test-key")
+    monkeypatch.setenv("AI_MODEL", "synthetic-model")
+    monkeypatch.setenv("AI_APPROVED_HOSTS", "api.example.com")
+    allowed = "https://api.example.com/v1"
+    monkeypatch.setenv("AI_BASE_URL", allowed)
+    assert approved_provider_base_url() == allowed
+    assert provider_available()
+    for endpoint in (
+        "http://api.example.com/v1",
+        "https://api.example.com.evil.net/v1",
+        "https://127.0.0.1/v1",
+        "https://localhost/v1",
+        "https://api.example.com:8443/v1",
+        "https://user:pass@api.example.com/v1",
+        "https://api.example.com/v1?token=secret",
+        "https://api.example.com/v1#fragment",
+    ):
+        monkeypatch.setenv("AI_BASE_URL", endpoint)
+        assert approved_provider_base_url() is None, endpoint
+        assert not provider_available(), endpoint
+    monkeypatch.setenv("AI_BASE_URL", allowed)
+    monkeypatch.delenv("AI_APPROVED_HOSTS")
+    assert not provider_available()
