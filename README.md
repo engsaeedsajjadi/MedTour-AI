@@ -17,6 +17,7 @@ Patient-first medical tourism **coordination** system for international patients
 - **Patient-facing:** one-use purpose-specific patient consent links, revocable time-limited portal access links; journey status, approved quotes, confirmed appointments, controlled webchat.
 - **Administration:** Persian RTL Next.js dashboard and CRUD/operations pages; approved CMS, approved knowledge base, price provenance, reports, service tracking, configurable safe tenant settings.
 - **Finance:** deduplicated, admin-verified manual monetary records, **not payment collection or a regulated financial ledger**.
+- **Operational visibility (feature-branch development):** synthetic-testable HTTP correlation IDs and route-template duration logs without raw URLs or request bodies; external SLO alerting and production log aggregation remain missing.
 - **SaaS plans (feature-branch development):** admin-only free tenant provisioning, technical plan limits, tenant-scoped patient/case/staff create quotas, live usage counts and Persian dashboard. **No paid activation or subscription billing.** See [docs/SAAS_SUBSCRIPTIONS_FOUNDATION_FA.md](docs/SAAS_SUBSCRIPTIONS_FOUNDATION_FA.md).
 - **Verification:** **44 passing synthetic-data backend tests** (in the development environment), TypeScript syntax parsing for 31 source files. **Full Next.js dependency installation, typecheck and browser E2E were not completed in the current environment.**
 
