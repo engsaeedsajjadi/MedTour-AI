@@ -77,7 +77,8 @@ class PatientMessageIn(BaseModel):
 @router.post('/chat',status_code=201)
 def patient_chat(body:PatientMessageIn,x_patient_access:str|None=Header(None,alias='X-Patient-Access'),db:Session=Depends(get_db)):
     from .models import Conversation,Message
-    from .intake import LANGUAGES,intake_response
+    from .intake import LANGUAGES
+    from .receptionist import receptionist_response
     grant=portal_session(x_patient_access,db)
     p=db.scalar(select(Patient).where(Patient.id==grant.patient_id,Patient.tenant_id==grant.tenant_id))
     lang=body.language or p.language
@@ -90,9 +91,9 @@ def patient_chat(body:PatientMessageIn,x_patient_access:str|None=Header(None,ali
     if not x:
         x=Conversation(tenant_id=grant.tenant_id,patient_id=p.id,channel='webchat')
         db.add(x);db.flush()
-    safety=intake_response(lang,body.message)
+    safety=receptionist_response(lang,body.message)
     db.add(Message(tenant_id=grant.tenant_id,conversation_id=x.id,sender='patient',body=body.message,language=lang))
-    if safety['emergency_keyword_detected']:
+    if safety['human_handoff_required']:
         x.human_handoff=True
     # A deterministic safety response is issued; LLM is never trusted to make a medical decision.
     if not x.human_handoff:
@@ -100,7 +101,10 @@ def patient_chat(body:PatientMessageIn,x_patient_access:str|None=Header(None,ali
     db.commit()
     return {'conversation_id':x.id,'automated_response':None if x.human_handoff else safety['message'],
             'warning':safety['message'] if safety['emergency_keyword_detected'] else None,
-            'human_handoff':x.human_handoff,'requires_human_review':True}
+            'handoff_notice':safety['message'] if safety['human_handoff_required'] else None,
+            'language':lang,'intent':safety['intent'],
+            'human_handoff':x.human_handoff,'requires_human_review':True,
+            'automated_clinical_decision':False}
 
 @router.get('/chat')
 def patient_chat_history(x_patient_access:str|None=Header(None,alias='X-Patient-Access'),db:Session=Depends(get_db)):
