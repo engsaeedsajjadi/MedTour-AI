@@ -31,6 +31,12 @@ def owned(db,model,id,user):
     if result is None:raise HTTPException(404,'Resource not found')
     return result
 
+def ensure_operator_ownership(conversation:Conversation,user:User):
+    # Old communications endpoints must not bypass the unified inbox.
+    if user.role!='admin' and conversation.assigned_user_id!=user.id:
+        raise HTTPException(403,'Claim this conversation in the human inbox first')
+
+
 def accepted(db,patient):
     c=db.scalar(select(Consent).where(Consent.tenant_id==patient.tenant_id,
         Consent.patient_id==patient.id,Consent.purpose=='communication').order_by(Consent.created_at.desc(),Consent.id.desc()).limit(1))
@@ -45,6 +51,7 @@ class TranslateInput(BaseModel):
 @router.post('/translation-drafts',status_code=201)
 def draft_translation(body:TranslateInput,db:Session=Depends(get_db),user:User=Depends(STAFF)):
     c=owned(db,Conversation,body.conversation_id,user)
+    ensure_operator_ownership(c,user)
     patient=owned(db,Patient,c.patient_id,user)
     if not accepted(db,patient):raise HTTPException(409,'Communication consent required')
     if body.source_language not in LANGUAGES or body.target_language not in LANGUAGES:
@@ -70,6 +77,7 @@ def review_translation(draft_id:str,body:ReviewTranslation,db:Session=Depends(ge
     row=owned(db,TranslationDraft,draft_id,user)
     if row.status!='pending_review':raise HTTPException(409,'Translation already reviewed')
     c=owned(db,Conversation,row.conversation_id,user)
+    ensure_operator_ownership(c,user)
     patient=owned(db,Patient,c.patient_id,user)
     if not accepted(db,patient):raise HTTPException(409,'Communication consent required')
     if body.action=='approve' and not active_consent(db,user.tenant_id,patient.id,'ai_processing'):
