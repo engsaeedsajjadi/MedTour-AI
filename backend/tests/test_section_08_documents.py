@@ -135,7 +135,7 @@ def test_withdrawn_document_consent_blocks_metadata_and_old_blob_permanently(see
     assert client.get(f"/api/v1/secure-documents/cases/{case['id']}/list",
                       headers=admin).status_code == 409
     assert client.get("/api/v1/secure-documents/" + doc_id,
-                      headers=admin).status_code == 404
+                      headers=admin).status_code == 409
     # Even new purpose consent must never implicitly resurrect a withdrawn blob.
     _consent(client, admin, patient["id"])
     assert client.get(f"/api/v1/secure-documents/cases/{case['id']}/list",
