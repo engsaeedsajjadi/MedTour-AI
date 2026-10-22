@@ -6,6 +6,7 @@ from fastapi import FastAPI, Depends, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sqlalchemy import select, func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from . import enterprise_models  # register enterprise tables
 from .subscriptions import router as subscriptions_router, enforce_create_quota
@@ -337,8 +338,23 @@ def appointment_status(id:str,body:StatusIn,db:Session=Depends(get_db),user:User
     a=require_owned(db,Appointment,id,user)
     if a.status!='requested' or body.status not in ('confirmed','cancelled'):raise HTTPException(409,'Invalid appointment state')
     if body.status=='confirmed' and not body.reference:raise HTTPException(422,'Independent provider confirmation reference required')
+    if body.status=='confirmed':
+        duplicate=db.scalar(select(Appointment.id).where(
+            Appointment.tenant_id==user.tenant_id,
+            Appointment.physician_id==a.physician_id,
+            Appointment.requested_at==a.requested_at,
+            Appointment.status=='confirmed',
+            Appointment.id!=a.id
+        ))
+        if duplicate:raise HTTPException(409,'Physician already confirmed for this instant')
     a.status=body.status;a.confirmation_reference=body.reference
-    return save(db,user,a,'appointment_status_changed')
+    try:
+        return save(db,user,a,'appointment_status_changed')
+    except IntegrityError:
+        db.rollback()
+        if body.status=='confirmed':
+            raise HTTPException(409,'Physician already confirmed for this instant')
+        raise
 
 @app.get('/api/v1/travel')
 def travels(db:Session=Depends(get_db),user:User=Depends(MODERATOR)):
