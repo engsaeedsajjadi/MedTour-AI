@@ -19,6 +19,7 @@ export default function IntakeCoordination(){
  const [selected,setSelected]=useState('');
  const [action,setAction]=useState<'record_handoff'|'request_more_information'>('request_more_information');
  const [reference,setReference]=useState('');
+ const [escalationAction,setEscalationAction]=useState<'urgent_alert_acknowledged'|'external_contact_attempt_recorded'>('urgent_alert_acknowledged');
  const [busy,setBusy]=useState(false);
  const [error,setError]=useState('');
  const [notice,setNotice]=useState('');
@@ -49,6 +50,18 @@ export default function IntakeCoordination(){
    setReference('');await refresh();
   }catch(e){setError((e as Error).message);}finally{setBusy(false);}
  }
+ async function escalate(e:React.FormEvent){
+  e.preventDefault();if(!selected)return;
+  setBusy(true);setError('');setNotice('');
+  try{
+   const result=await request<{urgent_alert_active:boolean}>(
+    '/intake-review/sessions/'+encodeURIComponent(selected)+'/escalation',{
+     method:'POST',body:JSON.stringify({action:escalationAction,reference:reference.trim()})
+    });
+   setNotice(result.urgent_alert_active?'رویداد اداری ثبت شد. هشدار همچنان فعال است و نیاز به پیگیری اورژانسی انسانی دارد.':'وضعیت هشدار را دوباره بررسی کنید.');
+   setReference('');await refresh();
+  }catch(e){setError((e as Error).message);}finally{setBusy(false);}
+ }
  return <Shell title="پذیرش اولیه پزشکی">
   <div className="infoBanner">
    این پنل صرفاً هماهنگی اداری پذیرش را مدیریت می‌کند و نباید برای تریاژ یا تشخیص استفاده شود. اطلاعات واقعی بیمار و متن بالینی را در فیلد مرجع وارد نکنید.
@@ -69,8 +82,21 @@ export default function IntakeCoordination(){
     {active&&<div style={{marginTop:18,borderTop:'1px solid #cbd5df',paddingTop:18}}>
      <p>وضعیت: <strong>{statusLabels[active.status]||active.status}</strong></p>
      <p>اعتبارسنجی بالینی: <strong>انجام نشده</strong></p>
-     {active.urgency_keyword_alert?<div className="errorBox" role="alert">
-      هشدار احتمالی اورژانس: با خدمات اورژانس محلی و متخصص واجد صلاحیت هماهنگ شود. رفع این هشدار از مسیر اداری مجاز نیست.
+     {active.urgency_keyword_alert?<div>
+      <div className="errorBox" role="alert">هشدار احتمالی اورژانس: ارجاع به خدمات اورژانس محلی و تیم واجد صلاحیت خارج از این نسخه آزمایشی الزامی است. ثبت تماس، به معنی موفق بودن تماس یا رفع هشدار نیست.</div>
+      <form onSubmit={escalate} style={{maxWidth:580,display:'grid',gap:12,marginTop:14}}>
+       <label>ثبت پیگیری انسانی هشدار
+        <select value={escalationAction} onChange={e=>setEscalationAction(e.target.value as typeof escalationAction)} style={{width:'100%',padding:10}}>
+         <option value="urgent_alert_acknowledged">تأیید دریافت هشدار توسط اپراتور</option>
+         <option value="external_contact_attempt_recorded">ثبت تلاش تماس با خدمات خارجی</option>
+        </select>
+       </label>
+       <label>مرجع اداری بدون اطلاعات پزشکی
+        <input value={reference} onChange={e=>setReference(e.target.value)} required minLength={6} maxLength={100}
+          pattern="[A-Za-z0-9][A-Za-z0-9._:/-]{5,99}" style={{width:'100%',padding:10}}/>
+       </label>
+       <button className="button" disabled={busy}>ثبت رویداد بدون رفع هشدار</button>
+      </form>
      </div>:<form onSubmit={submit} style={{maxWidth:580,display:'grid',gap:12}}>
       <label>اقدام اداری
        <select style={{width:'100%',padding:10}} value={action} onChange={e=>setAction(e.target.value as typeof action)}>

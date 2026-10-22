@@ -206,3 +206,37 @@ class PatientConsentChallenge(TenantEntity,Base):
     expires_at:Mapped[datetime]=mapped_column(DateTime(timezone=True))
     used_at:Mapped[datetime|None]=mapped_column(DateTime(timezone=True),nullable=True)
     issued_by:Mapped[str]=mapped_column(ForeignKey('users.id'))
+
+# Section 07 records hold only metadata and non-PHI references. A credential
+# attested by a local administrator is NOT independent medical accreditation.
+class ReviewerCredential(TenantEntity,Base):
+    __tablename__='reviewer_credentials'
+    user_id:Mapped[str]=mapped_column(ForeignKey('users.id'),nullable=False,index=True)
+    issuing_country:Mapped[str]=mapped_column(String(2),nullable=False)
+    issuing_authority:Mapped[str]=mapped_column(String(120),nullable=False)
+    verification_reference:Mapped[str]=mapped_column(String(100),nullable=False)
+    checked_by:Mapped[str]=mapped_column(ForeignKey('users.id'),nullable=False)
+    checked_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),default=utcnow)
+    expires_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),nullable=False)
+    status:Mapped[str]=mapped_column(String(32),default='locally_attested',nullable=False)
+    __table_args__=(UniqueConstraint('tenant_id','user_id'),)
+
+class IntakeReviewRecord(TenantEntity,Base):
+    __tablename__='intake_review_records'
+    case_id:Mapped[str]=mapped_column(ForeignKey('cases.id'),index=True,nullable=False)
+    intake_id:Mapped[str]=mapped_column(ForeignKey('patient_intakes.id'),index=True,nullable=False)
+    actor_id:Mapped[str]=mapped_column(ForeignKey('users.id'),nullable=False)
+    action:Mapped[str]=mapped_column(String(55),nullable=False)
+    reference:Mapped[str]=mapped_column(String(100),nullable=False)
+    # Never infer provider or emergency-service contact success from this row.
+    external_confirmation:Mapped[bool]=mapped_column(Boolean,default=False,nullable=False)
+    __table_args__=(UniqueConstraint('tenant_id','intake_id','action','reference'),)
+
+class IntakeReviewerAssignment(TenantEntity,Base):
+    __tablename__='intake_reviewer_assignments'
+    case_id:Mapped[str]=mapped_column(ForeignKey('cases.id'),index=True,nullable=False)
+    intake_id:Mapped[str]=mapped_column(ForeignKey('patient_intakes.id'),index=True,nullable=False)
+    reviewer_user_id:Mapped[str]=mapped_column(ForeignKey('users.id'),nullable=False,index=True)
+    assigned_by:Mapped[str]=mapped_column(ForeignKey('users.id'),nullable=False)
+    active:Mapped[bool]=mapped_column(Boolean,default=True,nullable=False)
+    __table_args__=(UniqueConstraint('tenant_id','intake_id','reviewer_user_id'),)

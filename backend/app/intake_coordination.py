@@ -125,17 +125,22 @@ def case_intake_status(
         raise HTTPException(404, "Case not found")
     consent = active_consent(db, user.tenant_id, case.patient_id, "intake")
     row = latest_intake(db, user.tenant_id, case.id)
+    urgent_ever = db.scalar(select(PatientIntake.id).where(
+        PatientIntake.tenant_id == user.tenant_id,
+        PatientIntake.case_id == case.id,
+        PatientIntake.status == "requires_urgent_human_review",
+    ).limit(1)) is not None
     return {
         "case_id": case.id,
         "consent_active": consent,
         "current": intake_snapshot(row) if row else None,
-        "urgency_keyword_alert": bool(row and row.status in BLOCKED),
+        "urgency_keyword_alert": urgent_ever,
         "ready_for_administrative_handoff": bool(
             consent and row and row.status == "awaiting_clinician_review"
         ),
         "clinical_validation": "not_performed",
         "next_action": (
-            "urgent_external_care" if row and row.status in BLOCKED
+            "urgent_external_care" if urgent_ever
             else "obtain_intake_consent" if not consent
             else "record_administrative_handoff" if row and row.status == "awaiting_clinician_review"
             else "resume_or_start_intake"

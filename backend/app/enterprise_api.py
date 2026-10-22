@@ -301,7 +301,7 @@ def reports(db:Session=Depends(get_db),user:User=Depends(ADMIN)):
 class StaffIn(BaseModel):
     email:str=Field(min_length=6,max_length=250)
     password:str=Field(min_length=12,max_length=250)
-    role:Literal['operator','auditor','admin']
+    role:Literal['operator','auditor','admin','physician']
 
 @router.post('/staff',status_code=201)
 def staff_create(body:StaffIn,db:Session=Depends(get_db),user:User=Depends(ADMIN)):

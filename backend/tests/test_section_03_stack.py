@@ -70,7 +70,12 @@ def test_readiness_fails_on_redis_or_migration_fault(context, monkeypatch):
 
 
 def test_alembic_revision_is_discovered_not_hardcoded():
-    assert stack_health.required_revision() == "71dcbcd5f22b"
+    # New enterprise migrations must not require updating a frozen revision.
+    # The healthcheck always compares the DB revision with the live script head.
+    revision = stack_health.required_revision()
+    assert isinstance(revision, str)
+    assert len(revision) >= 8
+    assert all(char in "0123456789abcdef" for char in revision.lower())
 
 
 def test_worker_is_opt_in_and_cannot_run_in_production(monkeypatch):

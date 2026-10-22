@@ -47,6 +47,10 @@ A deterministic, non-diagnostic text receptionist now supports fa/ar/en/ps/prs a
 
 Shared patient/staff intake sessions, non-bypassable urgent warning state, renewed purpose-specific intake consent checks, audited request-more-information and admin handoff, and a PHI-minimized `/intake-review` staff queue are now implemented for development. This is **not clinical review or triage**. See [Section 07 scope and acceptance blockers](docs/SECTION_07_MEDICAL_INTAKE_FA.md).
 
+## Section 07 continuation — clinician coordination metadata and urgent records
+
+Staff can now record time-limited **locally attested** physician credential evidence, assign each reviewer to a specific submitted intake, track metadata-only non-diagnostic reviewer recommendations, and register emergency contact attempts without clearing the urgent flag. The `/intake-clinician` and `/intake-review` interfaces expose this administrative workflow. A new Alembic migration adds scoped audit tables. These controls **do not** independently verify licensure or authorize treatment, real patient data, emergency operation or production. See [Section 07 report](docs/SECTION_07_MEDICAL_INTAKE_FA.md).
+
 ## What is NOT finished
 
 The 45-section enterprise master specification **has not yet reached full acceptance**. Critical remaining work includes PostgreSQL Row-Level Security and migration of existing pre-Alembic databases; full patient identity assurance and MFA; doctor/hospital independently scoped portals; real compliant WhatsApp outbound communication; five-language human-validated AI/voice; operational/independently verified S3/KMS storage and ClamAV scanning; approved external visa/hotel/provider APIs; payment gateways; subscription billing; load tests; frontend E2E and independent clinical/privacy/security review.
