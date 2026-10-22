@@ -15,7 +15,7 @@ from .models import (
     Appointment, Case, Consent, Conversation, Document, Physician,
     Quote, Referral, TravelRequest, User,
 )
-from .enterprise_models import Operation, PatientIntake
+from .enterprise_models import CaseTimeline, Operation, PatientIntake
 from .security import roles
 
 router = APIRouter(prefix="/api/v1/cases", tags=["case mission"])
@@ -173,3 +173,35 @@ def read_case_mission(
     if case is None:
         raise HTTPException(404, "Record not found")
     return mission_evidence(db, case)
+
+
+@router.get("/{case_id}/mission/history")
+def read_case_mission_history(
+    case_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(staff),
+):
+    case = db.scalar(
+        select(Case.id).where(
+            Case.id == case_id, Case.tenant_id == user.tenant_id
+        )
+    )
+    if not case:
+        raise HTTPException(404, "Record not found")
+    timeline = db.scalars(
+        select(CaseTimeline).where(
+            CaseTimeline.tenant_id == user.tenant_id,
+            CaseTimeline.case_id == case_id,
+            CaseTimeline.event == "case_status_transition",
+        ).order_by(CaseTimeline.created_at, CaseTimeline.id)
+    ).all()
+    return [
+        {
+            "id": x.id,
+            "actor_id": x.actor_id,
+            "created_at": x.created_at,
+            "current_status": x.details.split(";")[0].split("->")[-1],
+            "evidence_reference": x.details.partition(";evidence=")[-1],
+        }
+        for x in timeline
+    ]
