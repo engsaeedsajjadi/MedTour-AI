@@ -24,7 +24,14 @@ MAX_BYTES=8*1024*1024
 MIMES={'application/pdf':b'%PDF-', 'image/png':b'\x89PNG\r\n\x1a\n', 'image/jpeg':b'\xff\xd8\xff'}
 
 def local_enabled():
-    return os.getenv('APP_ENV','development') in ('development','test') and os.getenv('ALLOW_DEV_ENCRYPTED_UPLOADS','false').lower()=='true'
+    if (os.getenv('APP_ENV','development') not in ('development','test') or
+            os.getenv('ALLOW_DEV_ENCRYPTED_UPLOADS','false').lower()!='true'):
+        return False
+    try:
+        cipher()  # Check that the local AES-256-GCM key is really configured.
+    except HTTPException:
+        return False
+    return True
 
 def cipher():
     raw=os.getenv('DOCUMENT_ENCRYPTION_KEY','')
@@ -98,7 +105,6 @@ def download(document_id:str,db:Session=Depends(get_db),user:User=Depends(roles(
         raise HTTPException(503,'Approved medical document storage is disabled')
     row=db.scalar(select(Document).where(
         Document.tenant_id==user.tenant_id, Document.id==document_id,
-        Document.status.in_(ACTIVE_STATUSES),
     ))
     if not row:raise HTTPException(404,'Document unavailable')
     patient=db.scalar(select(Patient).where(
