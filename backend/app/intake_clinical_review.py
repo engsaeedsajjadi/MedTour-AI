@@ -159,6 +159,7 @@ def locally_attest_reviewer(
     row.checked_at = _now()
     row.expires_at = _utc(body.expires_at)
     row.status = "locally_attested"
+    db.flush()
     db.add(Audit(
         tenant_id=user.tenant_id, user_id=user.id,
         event="reviewer_credential_locally_attested",
