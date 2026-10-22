@@ -17,6 +17,8 @@ from .ai import draft as ai_draft, provider_available
 from .whatsapp import router as whatsapp_router
 from .telegram import router as telegram_router, enabled as telegram_enabled
 from .rate_limit import throttle
+from .safety_rules import assert_safe_runtime, public_safety_contract, revoke_patient_access
+assert_safe_runtime()
 
 app=FastAPI(title='MedTour AI Coordination API',version='0.5.0-alpha',description='Development foundation. Not approved for production PHI or clinical care.')
 app.include_router(whatsapp_router)
@@ -159,6 +161,10 @@ async def security_headers(request:Request,call_next):
         response.headers['Strict-Transport-Security']='max-age=31536000; includeSubDomains'
     return response
 
+@app.get('/api/v1/safety/contract')
+def safety_contract():
+    return public_safety_contract()
+
 @app.get('/api/v1/health/live')
 def health(): return {'status':'live','phase':'development','production_ready':False}
 
@@ -215,14 +221,7 @@ def consent(body:ConsentIn,db:Session=Depends(get_db),user:User=Depends(MODERATO
     row=Consent(tenant_id=user.tenant_id,**body.model_dump())
     db.add(row);db.flush()
     if not body.accepted:
-        # Withdrawals invalidate patient access; old approval must not stay effective.
-        from .enterprise_models import PortalAccess,OutboundMessage,TranslationDraft
-        grants=db.scalars(select(PortalAccess).where(PortalAccess.tenant_id==user.tenant_id,
-               PortalAccess.patient_id==body.patient_id,PortalAccess.revoked==False)).all()
-        for g in grants:g.revoked=True
-        outgoing=db.scalars(select(OutboundMessage).where(OutboundMessage.tenant_id==user.tenant_id,
-            OutboundMessage.patient_id==body.patient_id,OutboundMessage.status.in_(['pending_approval','approved']))).all()
-        for message in outgoing:message.status='blocked'
+        revoke_patient_access(db,user.tenant_id,body.patient_id,body.purpose)
     audit(db,user,'consent_recorded' if body.accepted else 'consent_withdrawn',row)
     db.commit();db.refresh(row)
     return public(row)
