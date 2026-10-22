@@ -452,3 +452,6 @@ app.include_router(channel_gateway_router)
 
 from .receptionist import router as receptionist_router
 app.include_router(receptionist_router)
+
+from .intake_coordination import router as intake_coordination_router
+app.include_router(intake_coordination_router)
