@@ -92,6 +92,8 @@ class Appointment(TenantEntity, Base):
     requested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     status: Mapped[str] = mapped_column(String(40), default='requested')
     confirmation_reference: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    cancellation_reference: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     __table_args__ = (Index('uq_appointments_confirmed_physician_instant',
         'tenant_id', 'physician_id', 'requested_at', unique=True,
         postgresql_where=text("status = 'confirmed'"),
