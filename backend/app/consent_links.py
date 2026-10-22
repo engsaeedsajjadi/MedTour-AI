@@ -10,6 +10,7 @@ from .database import get_db
 from .security import roles
 from .models import Patient,Consent,Audit,User
 from .enterprise_models import PatientConsentChallenge,PortalAccess,OutboundMessage
+from .safety_rules import revoke_patient_access
 
 router=APIRouter(prefix='/api/v1/consent-links',tags=['patient attested consent'])
 PURPOSES={'intake','medical_documents','communication','ai_processing'}
@@ -64,12 +65,7 @@ def respond(body:Response,db:Session=Depends(get_db)):
          notice_version=body.notice_version,source='patient_link')
     db.add(result);db.flush()
     if not body.accepted:
-        grants=db.scalars(select(PortalAccess).where(PortalAccess.tenant_id==c.tenant_id,
-            PortalAccess.patient_id==c.patient_id,PortalAccess.revoked==False)).all()
-        for g in grants:g.revoked=True
-        msgs=db.scalars(select(OutboundMessage).where(OutboundMessage.tenant_id==c.tenant_id,
-            OutboundMessage.patient_id==c.patient_id,OutboundMessage.status.in_(['pending_approval','approved']))).all()
-        for m in msgs:m.status='blocked'
+        revoke_patient_access(db,c.tenant_id,c.patient_id,c.purpose)
     db.add(Audit(tenant_id=c.tenant_id,user_id=c.patient_id,event='patient_attested_consent' if body.accepted else 'patient_withdrew_consent',
          entity_type='Consent',entity_id=result.id))
     db.commit()
