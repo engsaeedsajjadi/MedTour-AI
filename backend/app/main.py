@@ -442,3 +442,6 @@ app.include_router(consent_links_router)
 
 from .case_mission import router as case_mission_router
 app.include_router(case_mission_router)
+
+from .module_hub import router as module_hub_router
+app.include_router(module_hub_router)
