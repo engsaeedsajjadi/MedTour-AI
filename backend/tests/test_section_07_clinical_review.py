@@ -18,19 +18,12 @@ def setup_reviewer(seeded):
         reviewer = User(
             tenant_id=tids[0],
             email="reviewer07@example.test",
-            password_hash=password_hash("synthetic_reviewer_password123"),
+            password_hash=password_hash("test_password_12345"),
             role="physician",
         )
         db.add(reviewer)
         db.commit()
         reviewer_id = reviewer.id
-    access = auth("a", "reviewer07@example.test") if False else None
-    # The fixture authenticates a fixed test password, so update the
-    # synthetic physician's credentials to that password.
-    with Session() as db:
-        p = db.get(User, reviewer_id)
-        p.password_hash = password_hash("test_password_12345")
-        db.commit()
     physician = auth("a", "reviewer07@example.test")
     return client, auth, tids, Session, admin, patient, case, reviewer_id, physician
 
