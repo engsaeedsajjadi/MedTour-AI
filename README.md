@@ -51,6 +51,10 @@ Shared patient/staff intake sessions, non-bypassable urgent warning state, renew
 
 Staff can now record time-limited **locally attested** physician credential evidence, assign each reviewer to a specific submitted intake, track metadata-only non-diagnostic reviewer recommendations, and register emergency contact attempts without clearing the urgent flag. The `/intake-clinician` and `/intake-review` interfaces expose this administrative workflow. A new Alembic migration adds scoped audit tables. These controls **do not** independently verify licensure or authorize treatment, real patient data, emergency operation or production. See [Section 07 report](docs/SECTION_07_MEDICAL_INTAKE_FA.md).
 
+## Section 08 — medical documents (synthetic development)
+
+Tenant- and patient/case-scoped document uploads, lists and authenticated private downloads now enforce latest document consent; withdrawal permanently blocks previously uploaded blobs without falsely asserting physical erasure. Hardened AES-GCM test storage, metadata-only patient access records, S3/ClamAV readiness truthfulness and retention-review metadata APIs are documented in [Section 08](docs/SECTION_08_MEDICAL_DOCUMENTS_FA.md). **Real PHI, actual S3/KMS/ClamAV acceptance, legal retention processing, strong patient identity and production RLS are not certified.**
+
 ## What is NOT finished
 
 The 45-section enterprise master specification **has not yet reached full acceptance**. Critical remaining work includes PostgreSQL Row-Level Security and migration of existing pre-Alembic databases; full patient identity assurance and MFA; doctor/hospital independently scoped portals; real compliant WhatsApp outbound communication; five-language human-validated AI/voice; operational/independently verified S3/KMS storage and ClamAV scanning; approved external visa/hotel/provider APIs; payment gateways; subscription billing; load tests; frontend E2E and independent clinical/privacy/security review.
