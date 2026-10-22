@@ -69,7 +69,7 @@ class HospitalIn(BaseModel):
     city:str=Field(default='',max_length=100)
 class StatusIn(BaseModel):
     status:str
-    reference:str|None=None
+    reference:str|None=Field(default=None,max_length=120)
 class ReferralIn(BaseModel):
     case_id:str
     physician_id:str
@@ -130,7 +130,7 @@ def public(obj):
         Hospital:['id','name','city','license_status','created_at'],
         Referral:['id','case_id','physician_id','status','reviewer_note','created_at'],
         Quote:['id','case_id','currency','amount_minor','details','status','approved_by','created_at'],
-        Appointment:['id','case_id','physician_id','requested_at','status','confirmation_reference','created_at'],
+        Appointment:['id','case_id','physician_id','requested_at','status','confirmation_reference','cancellation_reference','cancelled_at','created_at'],
         TravelRequest:['id','case_id','service_type','status','notes','external_reference','created_at'],
         Conversation:['id','patient_id','channel','human_handoff','assigned_user_id','created_at'],
         Message:['id','conversation_id','sender','language','body','created_at'],
@@ -336,7 +336,10 @@ def appointment(body:AppointmentIn,db:Session=Depends(get_db),user:User=Depends(
 @app.patch('/api/v1/appointments/{id}/status')
 def appointment_status(id:str,body:StatusIn,db:Session=Depends(get_db),user:User=Depends(MANAGER)):
     a=require_owned(db,Appointment,id,user)
-    if a.status!='requested' or body.status not in ('confirmed','cancelled'):raise HTTPException(409,'Invalid appointment state')
+    if (a.status,body.status) not in {('requested','confirmed'),('requested','cancelled'),('confirmed','cancelled')}:
+        raise HTTPException(409,'Invalid appointment state')
+    if a.status=='confirmed' and body.status=='cancelled' and not body.reference:
+        raise HTTPException(422,'Independent cancellation reference required')
     if body.status=='confirmed' and not body.reference:raise HTTPException(422,'Independent provider confirmation reference required')
     if body.status=='confirmed':
         duplicate=db.scalar(select(Appointment.id).where(
@@ -347,7 +350,11 @@ def appointment_status(id:str,body:StatusIn,db:Session=Depends(get_db),user:User
             Appointment.id!=a.id
         ))
         if duplicate:raise HTTPException(409,'Physician already confirmed for this instant')
-    a.status=body.status;a.confirmation_reference=body.reference
+    a.status=body.status
+    if body.status=='confirmed':a.confirmation_reference=body.reference
+    if body.status=='cancelled':
+        a.cancellation_reference=body.reference
+        a.cancelled_at=datetime.now(timezone.utc)
     try:
         return save(db,user,a,'appointment_status_changed')
     except IntegrityError:
