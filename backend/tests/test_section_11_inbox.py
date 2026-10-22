@@ -36,6 +36,9 @@ def test_inbox_staff_only_privacy_and_tenant_isolation(seeded):
     assert client.get(BASE+"/threads").status_code == 401
     assert client.get(BASE+"/threads",headers=auth("b")).json()["items"] == []
     assert client.get(BASE+"/threads",headers=operator).status_code == 200
+    assert client.get(BASE+f"/threads/{cid}/messages",headers=operator).status_code == 403
+    assert client.get(BASE+f"/threads/{cid}/events",headers=operator).status_code == 403
+    assert client.get("/api/v1/conversations/"+cid+"/messages",headers=operator).status_code == 403
     listing = client.get(BASE+"/threads",headers=admin)
     assert listing.status_code == 200,listing.text
     assert listing.json()["items"][0]["conversation_id"] == cid
