@@ -20,7 +20,7 @@ Legend: **implemented (local)** = code + synthetic API tests; **partial** = some
 | 12 | Physician management | Partial | Verified-directory control + referrals; physician-bound login/workspace and credential verification evidence missing. |
 | 13 | Hospital management | Partial | Hospital CRUD/approval; own scoped portal and external hospital scheduling missing. |
 | 14 | Provider matching | Partial | Nonclinical verified-specialty directory search; qualified clinician review mandatory. |
-| 15 | Appointment management | Partial | Manual request/confirmation reference; conflict-safe availability and calendars missing. |
+| 15 | Appointment management | Partial (development) | Manual independent provider reference, exact-instant tenant/physician confirmed-slot uniqueness and cancellation evidence/index migration delivered on feature branch; authoritative calendars, duration overlap checks, external confirmations, real multi-worker load and clinical review missing. |
 | 16 | Quotations | Partial | Draft, line items, verified provenance, admin approval; PDF, FX, versioning and financial validation pending. |
 | 17 | Medical visa coordination | Partial / external gate | Tracked manual requests with external confirmation reference, no visa issuance/integration. |
 | 18 | Accommodation | Partial / external gate | Hotel requests and vendor records; actual provider reservation/stock missing. |
@@ -42,11 +42,11 @@ Legend: **implemented (local)** = code + synthetic API tests; **partial** = some
 | 34 | UI/UX | Partial | Functional Persian-first admin pages; responsive accessibility and complete language coverage not verified. |
 | 35 | DevOps/production | Partial | Docker Compose includes Postgres+Redis, migration startup, health endpoint, dev bootstrap and CI API tests; actual Docker startup/deployment and security gates pending. |
 | 36 | Testing | Partial | Earlier 44-test baseline plus newer security-clone suites and Telegram onboarding tests (19 passed in standalone local environment). Full backend synthetic suite and PostgreSQL migration pilot previously PASS; live Telegram E2E, browser E2E/pentest/load and production evidence missing. |
-| 37 | SaaS subscription | Not delivered | Plan definitions/quotas/entitlements/billing/subscription lifecycle. |
+| 37 | SaaS subscription | Partial (development) | Technical plan catalogue, one-time audited FREE tenant provisioning, admin usage dashboard, PostgreSQL-serialized create quotas for patients/cases/staff and Alembic migration added on the feature branch; payment gateway, billing ledger, renewals, paid-plan activation, usage metering and production hardening still absent. |
 | 38 | Configuration controls | Partial | Tenant setting allowlist, CMS/knowledge/price/vendor/staff pages; full feature policy needs work. |
 | 39 | Implementation phases | Partial | Expanded security, document, language and messaging core delivered at development level; many other phases remain. |
 | 40 | End-to-end scenarios | Partial | API-level synthetic flows (including patient consent, intake, document and template queue) tested; no real provider journey, web UI E2E or external booking. |
-| 41 | Performance & operations | Not delivered | No measured service-level objective, worker queue metrics or benchmark results. |
+| 41 | Performance & operations | Partial (development) | Synthetic-testable privacy-preserving route-template request latency and request-ID logging added on feature branch. Production SLOs, tracing storage, dashboards, queue metrics, load tests and on-call alerting still absent. |
 | 42 | Deliverables | Partial | Source, docs and tests delivered, not a complete 30-artifact certified package. |
 | 43 | Execution discipline | Implemented (process) | Workflows are auditable and tests execute; blockers are explicitly documented. |
 | 44 | Final acceptance | **NOT MET** | No real patient/clinical/security/regulatory acceptance. |

@@ -6,8 +6,10 @@ from fastapi import FastAPI, Depends, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sqlalchemy import select, func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from . import enterprise_models  # register enterprise tables
+from .subscriptions import router as subscriptions_router, enforce_create_quota
 from .database import get_db
 from .models import (User,Tenant,Patient,Case,Consent,Document,Physician,Hospital,Referral,
                      Appointment,Quote,TravelRequest,Conversation,Message,Task,Audit)
@@ -17,10 +19,12 @@ from .ai import draft as ai_draft, provider_available
 from .whatsapp import router as whatsapp_router
 from .telegram import router as telegram_router, enabled as telegram_enabled
 from .rate_limit import throttle
+from .observability import SafeRequestTraceMiddleware
 
 app=FastAPI(title='MedTour AI Coordination API',version='0.5.0-alpha',description='Development foundation. Not approved for production PHI or clinical care.')
 app.include_router(whatsapp_router)
 app.include_router(telegram_router)
+app.add_middleware(SafeRequestTraceMiddleware)
 origins=[p.strip() for p in os.getenv('CORS_ORIGINS','http://localhost:3000').split(',') if p.strip()]
 app.add_middleware(CORSMiddleware,allow_origins=origins,allow_credentials=True,allow_methods=['GET','POST','PATCH'],allow_headers=['Authorization','Content-Type','X-Patient-Access'])
 
@@ -65,7 +69,7 @@ class HospitalIn(BaseModel):
     city:str=Field(default='',max_length=100)
 class StatusIn(BaseModel):
     status:str
-    reference:str|None=None
+    reference:str|None=Field(default=None,max_length=120)
 class ReferralIn(BaseModel):
     case_id:str
     physician_id:str
@@ -126,7 +130,7 @@ def public(obj):
         Hospital:['id','name','city','license_status','created_at'],
         Referral:['id','case_id','physician_id','status','reviewer_note','created_at'],
         Quote:['id','case_id','currency','amount_minor','details','status','approved_by','created_at'],
-        Appointment:['id','case_id','physician_id','requested_at','status','confirmation_reference','created_at'],
+        Appointment:['id','case_id','physician_id','requested_at','status','confirmation_reference','cancellation_reference','cancelled_at','created_at'],
         TravelRequest:['id','case_id','service_type','status','notes','external_reference','created_at'],
         Conversation:['id','patient_id','channel','human_handoff','assigned_user_id','created_at'],
         Message:['id','conversation_id','sender','language','body','created_at'],
@@ -202,6 +206,7 @@ def create_patient(body:PatientIn,db:Session=Depends(get_db),user:User=Depends(M
     if re.fullmatch(r'\+?[\d ()-]{8,25}',cleaned):
         cleaned=''.join(c for c in cleaned if c.isdigit())
     supplied['contact']=cleaned
+    enforce_create_quota(db,user.tenant_id,'patients')
     return save(db,user,Patient(tenant_id=user.tenant_id,**supplied),'patient_created')
 
 @app.get('/api/v1/patients/{patient_id}')
@@ -233,6 +238,7 @@ def cases(limit:int=Query(50,ge=1,le=200),db:Session=Depends(get_db),user:User=D
 def create_case(body:CaseIn,db:Session=Depends(get_db),user:User=Depends(MODERATOR)):
     require_owned(db,Patient,body.patient_id,user)
     need_consent(db,user,body.patient_id,'intake')
+    enforce_create_quota(db,user.tenant_id,'cases')
     return save(db,user,Case(tenant_id=user.tenant_id,**body.model_dump()),'case_created')
 @app.get('/api/v1/cases/{case_id}')
 def case_detail(case_id:str,db:Session=Depends(get_db),user:User=Depends(MODERATOR)):
@@ -330,10 +336,33 @@ def appointment(body:AppointmentIn,db:Session=Depends(get_db),user:User=Depends(
 @app.patch('/api/v1/appointments/{id}/status')
 def appointment_status(id:str,body:StatusIn,db:Session=Depends(get_db),user:User=Depends(MANAGER)):
     a=require_owned(db,Appointment,id,user)
-    if a.status!='requested' or body.status not in ('confirmed','cancelled'):raise HTTPException(409,'Invalid appointment state')
-    if body.status=='confirmed' and not body.reference:raise HTTPException(422,'Independent provider confirmation reference required')
-    a.status=body.status;a.confirmation_reference=body.reference
-    return save(db,user,a,'appointment_status_changed')
+    if (a.status,body.status) not in {('requested','confirmed'),('requested','cancelled'),('confirmed','cancelled')}:
+        raise HTTPException(409,'Invalid appointment state')
+    if a.status=='confirmed' and body.status=='cancelled' and not reference:
+        raise HTTPException(422,'Independent cancellation reference required')
+    reference=body.reference.strip() if body.reference else ''
+    if body.status=='confirmed' and not reference:raise HTTPException(422,'Independent provider confirmation reference required')
+    if body.status=='confirmed':
+        duplicate=db.scalar(select(Appointment.id).where(
+            Appointment.tenant_id==user.tenant_id,
+            Appointment.physician_id==a.physician_id,
+            Appointment.requested_at==a.requested_at,
+            Appointment.status=='confirmed',
+            Appointment.id!=a.id
+        ))
+        if duplicate:raise HTTPException(409,'Physician already confirmed for this instant')
+    a.status=body.status
+    if body.status=='confirmed':a.confirmation_reference=reference
+    if body.status=='cancelled':
+        a.cancellation_reference=reference or None
+        a.cancelled_at=datetime.now(timezone.utc)
+    try:
+        return save(db,user,a,'appointment_status_changed')
+    except IntegrityError:
+        db.rollback()
+        if body.status=='confirmed':
+            raise HTTPException(409,'Physician already confirmed for this instant')
+        raise
 
 @app.get('/api/v1/travel')
 def travels(db:Session=Depends(get_db),user:User=Depends(MODERATOR)):
@@ -432,3 +461,4 @@ app.include_router(portal_intake_router)
 
 from .consent_links import router as consent_links_router
 app.include_router(consent_links_router)
+app.include_router(subscriptions_router)
