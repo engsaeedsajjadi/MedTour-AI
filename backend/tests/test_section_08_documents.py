@@ -7,6 +7,7 @@ import pytest
 from fastapi import HTTPException
 
 from app.models import Audit, Document
+from app.enterprise_models import MedicalDocumentEvent
 from app.medical_document_policy import cleaned_name, document_path, LOCAL_BLOB_MAX
 from app.secure_media import MAX_BYTES
 
@@ -82,8 +83,22 @@ def test_private_staff_upload_and_patient_download_with_no_cache(seeded, monkeyp
         audit_events = [x.event for x in db.query(Audit).filter(
             Audit.tenant_id == tids[0], Audit.entity_id == doc_id
         ).all()]
-        assert "portal_medical_document_accessed" in audit_events
         assert "medical_document_accessed" in audit_events
+        portal_events = db.query(MedicalDocumentEvent).filter(
+            MedicalDocumentEvent.tenant_id == tids[0],
+            MedicalDocumentEvent.document_id == doc_id
+        ).all()
+        assert len(portal_events) == 1
+        assert portal_events[0].actor_type == "portal"
+        assert portal_events[0].portal_access_id
+        assert portal_events[0].staff_user_id is None
+    log = client.get(f"/api/v1/secure-documents/cases/{case['id']}/activity",
+                     headers=admin)
+    assert log.status_code == 200
+    assert log.json()["items"][0]["action"] == "document_downloaded"
+    assert "portal_access_id" not in str(log.json())
+    assert client.get(f"/api/v1/secure-documents/cases/{case['id']}/activity",
+                      headers=auth("b")).status_code == 404
 
 
 def test_patient_cannot_read_a_different_patient_case_even_same_tenant(seeded, monkeypatch, tmp_path):
@@ -191,3 +206,25 @@ def test_invalid_file_signatures_and_oversize_not_persisted(seeded, monkeypatch,
         assert result.status_code == expected
     with Session() as db:
         assert db.query(Document).count() == 0
+
+
+def test_patient_upload_writes_portal_actor_metadata_not_invalid_staff_fk(seeded, monkeypatch, tmp_path):
+    (client, auth, tids, Session), admin, patient, case = seeded
+    _config(monkeypatch, tmp_path)
+    _consent(client, admin, patient["id"])
+    portal = _portal(client, admin, patient["id"])
+    response = client.post(
+        "/api/v1/secure-documents/portal/cases/" + case["id"],
+        headers=portal, files={"file": ("synthetic.pdf", RAW, "application/pdf")},
+    )
+    assert response.status_code == 201, response.text
+    with Session() as db:
+        rows = db.query(MedicalDocumentEvent).filter(
+            MedicalDocumentEvent.document_id == response.json()["id"]
+        ).all()
+        assert len(rows) == 1
+        assert rows[0].actor_type == "portal"
+        assert rows[0].staff_user_id is None
+        assert rows[0].portal_access_id is not None
+        assert rows[0].action == "document_uploaded"
+        assert db.get(Document, response.json()["id"]).status == "encrypted_dev_unscanned"
