@@ -170,11 +170,11 @@ def health(): return {'status':'live','phase':'development','production_ready':F
 
 @app.get('/api/v1/health/ready')
 def ready(db:Session=Depends(get_db)):
+    from .stack_health import probe_stack
     try:
-        db.execute(select(func.count()).select_from(Tenant)).scalar_one()
+        return probe_stack(db)
     except Exception as exc:
-        raise HTTPException(503,'Database unavailable') from exc
-    return {'status':'ready','database':'reachable','production_ready':False}
+        raise HTTPException(503,'Required stack dependency unavailable') from exc
 
 
 @app.post('/api/v1/auth/login')
