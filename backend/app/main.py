@@ -338,9 +338,10 @@ def appointment_status(id:str,body:StatusIn,db:Session=Depends(get_db),user:User
     a=require_owned(db,Appointment,id,user)
     if (a.status,body.status) not in {('requested','confirmed'),('requested','cancelled'),('confirmed','cancelled')}:
         raise HTTPException(409,'Invalid appointment state')
-    if a.status=='confirmed' and body.status=='cancelled' and not body.reference:
+    if a.status=='confirmed' and body.status=='cancelled' and not reference:
         raise HTTPException(422,'Independent cancellation reference required')
-    if body.status=='confirmed' and not body.reference:raise HTTPException(422,'Independent provider confirmation reference required')
+    reference=body.reference.strip() if body.reference else ''
+    if body.status=='confirmed' and not reference:raise HTTPException(422,'Independent provider confirmation reference required')
     if body.status=='confirmed':
         duplicate=db.scalar(select(Appointment.id).where(
             Appointment.tenant_id==user.tenant_id,
@@ -351,9 +352,9 @@ def appointment_status(id:str,body:StatusIn,db:Session=Depends(get_db),user:User
         ))
         if duplicate:raise HTTPException(409,'Physician already confirmed for this instant')
     a.status=body.status
-    if body.status=='confirmed':a.confirmation_reference=body.reference
+    if body.status=='confirmed':a.confirmation_reference=reference
     if body.status=='cancelled':
-        a.cancellation_reference=body.reference
+        a.cancellation_reference=reference or None
         a.cancelled_at=datetime.now(timezone.utc)
     try:
         return save(db,user,a,'appointment_status_changed')
