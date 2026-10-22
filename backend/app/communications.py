@@ -18,6 +18,7 @@ from .enterprise_models import OutboundMessage, TranslationDraft
 from .security import roles
 from .intake import LANGUAGES
 from .ai import translate
+from .safety_rules import active_consent
 
 router=APIRouter(prefix='/api/v1/communications',tags=['human-reviewed communications'])
 STAFF=roles('admin','operator')
@@ -49,9 +50,8 @@ def draft_translation(body:TranslateInput,db:Session=Depends(get_db),user:User=D
     if body.source_language not in LANGUAGES or body.target_language not in LANGUAGES:
         raise HTTPException(422,'Unsupported language')
     # Translation provider usage may involve sensitive text. Separate consent + approved processor.
-    ai_consent=db.scalar(select(Consent).where(Consent.tenant_id==user.tenant_id,
-        Consent.patient_id==patient.id,Consent.purpose=='ai_processing').order_by(Consent.created_at.desc(),Consent.id.desc()).limit(1))
-    if not ai_consent or not ai_consent.accepted:raise HTTPException(409,'AI processing consent required')
+    if not active_consent(db,user.tenant_id,patient.id,'ai_processing'):
+        raise HTTPException(409,'AI processing consent required')
     result=translate(body.source_text,body.source_language,body.target_language)
     row=TranslationDraft(tenant_id=user.tenant_id,conversation_id=c.id,source_language=body.source_language,
          target_language=body.target_language,source_text=body.source_text,draft_text=result)
@@ -72,6 +72,8 @@ def review_translation(draft_id:str,body:ReviewTranslation,db:Session=Depends(ge
     c=owned(db,Conversation,row.conversation_id,user)
     patient=owned(db,Patient,c.patient_id,user)
     if not accepted(db,patient):raise HTTPException(409,'Communication consent required')
+    if body.action=='approve' and not active_consent(db,user.tenant_id,patient.id,'ai_processing'):
+        raise HTTPException(409,'Current AI processing consent required for translation publication')
     row.status='approved' if body.action=='approve' else 'rejected'
     row.reviewer_id=user.id;row.reviewed_at=datetime.now(timezone.utc)
     if row.status=='approved':
