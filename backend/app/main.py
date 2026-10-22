@@ -394,6 +394,8 @@ def handoff(id:str,db:Session=Depends(get_db),user:User=Depends(MODERATOR)):
     # clinical and message content still require active consent.
     from .human_inbox import require_thread,ensure_thread,assign
     c,thread=require_thread(db,user,id,lock=True,consent=False)
+    if user.role!='admin':
+        need_consent(db,user,c.patient_id,'communication')
     if c.assigned_user_id not in (None,user.id):
         raise HTTPException(403,'Conversation belongs to a different operator')
     t=thread or ensure_thread(db,c)
@@ -403,7 +405,10 @@ def handoff(id:str,db:Session=Depends(get_db),user:User=Depends(MODERATOR)):
         assign(db,c,t,user,user,'legacy_handoff_claimed')
     else:
         c.human_handoff=True
-        db.commit()
+    # Preserve legacy audit event expected by existing operational audit logs.
+    db.add(Audit(tenant_id=user.tenant_id,user_id=user.id,
+                 event='conversation_handoff',entity_type='Conversation',entity_id=c.id))
+    db.commit()
     return public(c)
 
 @app.post('/api/v1/documents/upload-ticket')
