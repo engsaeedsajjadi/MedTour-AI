@@ -63,14 +63,6 @@ def test_standalone_whatsapp_public_gateway_routes_and_alpha_gate(context):
 def test_gateway_signed_receipts_are_deduped_and_monotonic(seeded, monkeypatch):
     (client, auth, ids, Session), admin, patient, case = seeded
     _configure_whatsapp(monkeypatch)
-    with Session() as db:
-        outgoing = OutboundMessage(
-            tenant_id=ids[0], patient_id=patient["id"],
-            conversation_id=client.post(
-                "/api/v1/conversations", headers=admin,
-                json={"patient_id": patient["id"]}
-            ).json()["id"] if False else None,
-        )
     # Build with a real tenant-owned conversation, no provider network.
     conv = client.post(
         "/api/v1/conversations", headers=admin,
@@ -83,8 +75,7 @@ def test_gateway_signed_receipts_are_deduped_and_monotonic(seeded, monkeypatch):
             idempotency_key="synthetic-receipt-123456",
             locale="en", status="sent",
             provider_message_id="wamid.synthetic.section05",
-            approved_by=db.scalar(select(Audit.user_id).where(
-                Audit.tenant_id == ids[0]).limit(1)),
+
         )
         db.add(outgoing)
         db.commit()
