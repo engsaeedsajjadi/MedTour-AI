@@ -92,9 +92,11 @@ def patient_chat(body:PatientMessageIn,x_patient_access:str|None=Header(None,ali
         x=Conversation(tenant_id=grant.tenant_id,patient_id=p.id,channel='webchat')
         db.add(x);db.flush()
     safety=receptionist_response(lang,body.message)
+    from .human_inbox import inbound_webchat
     db.add(Message(tenant_id=grant.tenant_id,conversation_id=x.id,sender='patient',body=body.message,language=lang))
     if safety['human_handoff_required']:
         x.human_handoff=True
+    inbound_webchat(db,x,urgent=safety['emergency_keyword_detected'])
     # A deterministic safety response is issued; LLM is never trusted to make a medical decision.
     if not x.human_handoff:
         db.add(Message(tenant_id=grant.tenant_id,conversation_id=x.id,sender='assistant',body=safety['message'],language=lang))
