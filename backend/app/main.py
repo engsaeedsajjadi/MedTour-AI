@@ -376,8 +376,9 @@ def conversation(body:ConversationIn,db:Session=Depends(get_db),user:User=Depend
     return save(db,user,Conversation(tenant_id=user.tenant_id,patient_id=body.patient_id,channel='webchat'),'conversation_created')
 @app.get('/api/v1/conversations/{id}/messages')
 def messages(id:str,db:Session=Depends(get_db),user:User=Depends(MODERATOR)):
-    from .human_inbox import require_thread
+    from .human_inbox import require_thread,require_message_access
     c,_=require_thread(db,user,id)
+    require_message_access(c,user)
     xs=db.scalars(select(Message).where(
         Message.tenant_id==user.tenant_id,Message.conversation_id==c.id
     ).order_by(Message.created_at.desc(),Message.id.desc()).limit(200)).all()
