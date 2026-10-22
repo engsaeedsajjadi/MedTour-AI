@@ -78,6 +78,19 @@ async def upload(case_id:str,file:UploadFile=File(...),db:Session=Depends(get_db
         raise
     return {'id':row.id,'status':row.status,'mime_type':mime,'byte_length':len(raw),'production_approved':False}
 
+@router.get('/readiness')
+def document_readiness(user:User=Depends(roles('admin','operator'))):
+    return {
+        'storage_mode': 'local_encrypted_unscanned_test' if local_enabled() else
+            's3_kms_configured_unverified' if s3_ready() else 'disabled',
+        'configured':bool(local_enabled() or s3_ready()),
+        'actual_s3_kms_scanner_verified':False,
+        'production_ready':False,
+        'real_patient_documents_allowed':False,
+        'patient_portal_identity_assurance_complete':False,
+    }
+
+
 @router.get('/{document_id}')
 def download(document_id:str,db:Session=Depends(get_db),user:User=Depends(roles('admin','operator'))):
     if not local_enabled() and not s3_ready():
@@ -100,19 +113,6 @@ def download(document_id:str,db:Session=Depends(get_db),user:User=Depends(roles(
         event='medical_document_accessed',entity_type='Document',entity_id=row.id))
     db.commit()
     return private_download_response(raw,mime)
-
-
-@router.get('/readiness')
-def document_readiness(user:User=Depends(roles('admin','operator'))):
-    return {
-        'storage_mode': 'local_encrypted_unscanned_test' if local_enabled() else
-            's3_kms_configured_unverified' if s3_ready() else 'disabled',
-        'configured':bool(local_enabled() or s3_ready()),
-        'actual_s3_kms_scanner_verified':False,
-        'production_ready':False,
-        'real_patient_documents_allowed':False,
-        'patient_portal_identity_assurance_complete':False,
-    }
 
 
 @router.get('/cases/{case_id}/list')
