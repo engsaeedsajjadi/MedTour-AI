@@ -326,21 +326,35 @@ class IntakeStart(BaseModel):
 
 @router.post('/intake/sessions',status_code=201)
 def intake_start(body:IntakeStart,db:Session=Depends(get_db),user:User=Depends(OPERATOR)):
+    from .intake_coordination import prepare_intake_start
+    from .safety_rules import active_consent
     c=check_case(db,body.case_id,user)
-    if body.language not in LANGUAGES:raise HTTPException(422,'Unsupported language')
-    consent=db.scalar(select(Consent).where(Consent.tenant_id==user.tenant_id,Consent.patient_id==c.patient_id,Consent.purpose=='intake').order_by(Consent.created_at.desc()).limit(1))
-    if not consent or not consent.accepted:raise HTTPException(409,'Intake consent required')
-    x=PatientIntake(tenant_id=user.tenant_id,case_id=c.id,language=body.language)
-    write(db,user,x,'intake_session_started')
-    return {'id':x.id,'stage':x.stage,'question_key':QUESTION_KEYS[0],'prompt':next_question(x.language,0)}
+    if not active_consent(db,user.tenant_id,c.patient_id,'intake'):
+        raise HTTPException(409,'Active intake consent required')
+    row,created=prepare_intake_start(db,c,body.language)
+    if created:log(db,user,'intake_session_started',row)
+    db.commit()
+    return {'id':row.id,'stage':row.stage,
+            'question_key':QUESTION_KEYS[row.stage] if row.stage<len(QUESTION_KEYS) else None,
+            'prompt':next_question(row.language,row.stage) if row.stage<len(QUESTION_KEYS) else None,
+            'reused':not created}
 
 class AnswerIn(BaseModel):
     answer:str=Field(min_length=1,max_length=3000)
 
 @router.post('/intake/sessions/{pk}/answer')
 def intake_answer(pk:str,body:AnswerIn,db:Session=Depends(get_db),user:User=Depends(OPERATOR)):
-    x=owns(db,PatientIntake,pk,user)
+    from .safety_rules import active_consent
+    x=db.scalar(select(PatientIntake).where(
+        PatientIntake.id==pk,PatientIntake.tenant_id==user.tenant_id
+    ).with_for_update())
+    if not x:raise HTTPException(404,'Intake not found')
+    case=check_case(db,x.case_id,user)
+    if not active_consent(db,user.tenant_id,case.patient_id,'intake'):
+        raise HTTPException(409,'Active intake consent required')
     if x.status!='in_progress':raise HTTPException(409,'Intake session finished')
+    if not body.answer.strip():raise HTTPException(422,'Nonblank intake answer required')
+    if x.stage>=len(QUESTION_KEYS):raise HTTPException(409,'Intake already complete')
     safety=intake_response(x.language,body.answer)
     if safety['emergency_keyword_detected']:
         x.status='requires_urgent_human_review'
@@ -356,8 +370,14 @@ def intake_answer(pk:str,body:AnswerIn,db:Session=Depends(get_db),user:User=Depe
 
 @router.get('/intake/sessions/{pk}')
 def intake_read(pk:str,db:Session=Depends(get_db),user:User=Depends(OPERATOR)):
+    from .safety_rules import active_consent
     x=owns(db,PatientIntake,pk,user)
-    return {'id':x.id,'case_id':x.case_id,'language':x.language,'stage':x.stage,'status':x.status,'answers':json.loads(x.answers_json)}
+    case=check_case(db,x.case_id,user)
+    if not active_consent(db,user.tenant_id,case.patient_id,'intake'):
+        raise HTTPException(409,'Active intake consent required')
+    return {'id':x.id,'case_id':x.case_id,'language':x.language,'stage':x.stage,
+            'status':x.status,'answers':json.loads(x.answers_json),
+            'clinical_validation':'not_performed'}
 
 @router.get('/notifications')
 def notifications(db:Session=Depends(get_db),user:User=Depends(current_user)):
