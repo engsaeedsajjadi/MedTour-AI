@@ -27,7 +27,7 @@ def enabled() -> bool:
         and os.getenv('WHATSAPP_OUTBOUND_APPROVED', '').lower() == 'true'
         and os.getenv('META_ACCESS_TOKEN')
         and re.fullmatch(r'[0-9]{4,32}', os.getenv('WHATSAPP_PHONE_NUMBER_ID',''))
-        and re.fullmatch(r'v[0-9]{1,2}\\.[0-9]{1,2}', os.getenv('META_API_VERSION','v23.0'))
+        and re.fullmatch(r'v[0-9]{1,2}\.[0-9]{1,2}', os.getenv('META_API_VERSION','v23.0'))
     )
 
 
