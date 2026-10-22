@@ -71,10 +71,12 @@ def ensure_thread(db: Session, c: Conversation) -> InboxThread:
 
 
 def record(db: Session, c: Conversation, actor: User | None,
-           action: str, old: str, new: str, target_id: str | None = None):
+           action: str, old: str, new: str, target_id: str | None = None,
+           reference: str | None = None):
     db.add(InboxAction(
         tenant_id=c.tenant_id, conversation_id=c.id,
         actor_user_id=actor.id if actor else None, action=action,
+        reference=reference,
         from_status=old, to_status=new, target_user_id=target_id,
     ))
     if actor:
@@ -269,7 +271,7 @@ def resolve(conversation_id: str, body: StateChangeIn,
     before = thread.status
     thread.status = "resolved"
     c.human_handoff = True  # Never auto-reactivate bot after staff closure.
-    record(db, c, user, "resolved", before, thread.status)
+    record(db, c, user, "resolved", before, thread.status, reference=body.reference)
     db.commit()
     return {"conversation_id": c.id, "status": thread.status,
             "resolution_reference_recorded": True,
@@ -288,7 +290,7 @@ def reopen(conversation_id: str, body: StateChangeIn,
     before = thread.status
     thread.status = "assigned" if c.assigned_user_id else "open"
     c.human_handoff = True
-    record(db, c, user, "reopened", before, thread.status)
+    record(db, c, user, "reopened", before, thread.status, reference=body.reference)
     db.commit()
     return {"conversation_id": c.id, "status": thread.status, "bot_reactivated": False}
 
@@ -302,7 +304,7 @@ def events(conversation_id: str, db: Session = Depends(get_db),
         InboxAction.conversation_id == c.id,
     ).order_by(InboxAction.created_at.desc()).limit(100)).all()
     return {
-        "items": [{"action": r.action, "from_status": r.from_status,
+        "items": [{"action": r.action, "reference": r.reference, "from_status": r.from_status,
                    "to_status": r.to_status, "created_at": r.created_at,
                    "actor_user_id": r.actor_user_id}
                   for r in rows],
@@ -357,3 +359,20 @@ def reply(conversation_id: str, body: ReplyIn,
     db.commit()
     return {"id": row.id, "channel": c.channel, "stored_in_portal": True,
             "external_provider_sent": False, "clinical_validation": False}
+
+@router.post("/threads/{conversation_id}/wait")
+def mark_waiting(conversation_id: str, body: StateChangeIn,
+                 db: Session = Depends(get_db),
+                 user: User = Depends(staff)):
+    c, thread = require_thread(db, user, conversation_id, lock=True)
+    thread = thread or ensure_thread(db, c)
+    if thread.status in ("waiting", "resolved"):
+        raise HTTPException(409, "Conversation is already waiting or resolved")
+    if user.role != "admin" and c.assigned_user_id != user.id:
+        raise HTTPException(403, "Only assigned operator may defer")
+    old = thread.status
+    thread.status = "waiting"
+    c.human_handoff = True
+    record(db, c, user, "waiting", old, thread.status, reference=body.reference)
+    db.commit()
+    return {"conversation_id": c.id, "status": thread.status, "bot_reactivated": False}
