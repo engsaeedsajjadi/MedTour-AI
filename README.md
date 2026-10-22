@@ -59,6 +59,10 @@ Tenant- and patient/case-scoped document uploads, lists and authenticated privat
 
 The `/crm` workspace integrates administrative case ownership, tenant-scoped follow-up scheduling, due queues, manually recorded outcomes and a human-only review of exact-contact duplicate candidates. Communication-consent withdrawal blocks pending follow-ups without reactivation on renewed consent. The `c9d093e78a21` migration and synthetic tests cover these workflows. No patient identities or medical data are automatically merged, and no external messages are sent. See [Section 09 scope](docs/SECTION_09_PATIENT_CRM_FA.md).
 
+## Section 10 — administrative control center (development)
+
+The administrator-only `/admin-center` provides tenant-scoped database metrics, a safety-prioritized and explicitly bounded operational action queue, redacted search across patients/cases/operations, non-clinical case snapshots and staff deactivation guarded by active assignments and audited identity controls. No automatic medical approval, data disclosure, messaging or live provider assertions are introduced. See [Section 10 scope](docs/SECTION_10_ADMIN_CONTROL_FA.md).
+
 ## What is NOT finished
 
 The 45-section enterprise master specification **has not yet reached full acceptance**. Critical remaining work includes PostgreSQL Row-Level Security and migration of existing pre-Alembic databases; full patient identity assurance and MFA; doctor/hospital independently scoped portals; real compliant WhatsApp outbound communication; five-language human-validated AI/voice; operational/independently verified S3/KMS storage and ClamAV scanning; approved external visa/hotel/provider APIs; payment gateways; subscription billing; load tests; frontend E2E and independent clinical/privacy/security review.
