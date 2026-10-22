@@ -19,6 +19,10 @@ Patient-first medical tourism **coordination** system for international patients
 - **Finance:** deduplicated, admin-verified manual monetary records, **not payment collection or a regulated financial ledger**.
 - **Verification:** **44 passing synthetic-data backend tests** (in the development environment), TypeScript syntax parsing for 31 source files. **Full Next.js dependency installation, typecheck and browser E2E were not completed in the current environment.**
 
+## Case-centered mission coordination (Section 01)
+
+A new staff-only `/journey` workspace and `GET /api/v1/cases/{case_id}/mission` show evidence-based administrative readiness. Case transitions block missing intake/referral/quote/appointment/travel/follow-up prerequisites, require supervisor references at high-stakes stages, and record scoped case timelines. See [Section 01 acceptance guide](docs/SECTION_01_ROLE_MISSION_FA.md). **This is synthetic-development coordination, not proof of real appointments, treatment, visa issuance or production readiness.**
+
 ## What is NOT finished
 
 The 45-section enterprise master specification **has not yet reached full acceptance**. Critical remaining work includes PostgreSQL Row-Level Security and migration of existing pre-Alembic databases; full patient identity assurance and MFA; doctor/hospital independently scoped portals; real compliant WhatsApp outbound communication; five-language human-validated AI/voice; operational/independently verified S3/KMS storage and ClamAV scanning; approved external visa/hotel/provider APIs; payment gateways; subscription billing; load tests; frontend E2E and independent clinical/privacy/security review.
