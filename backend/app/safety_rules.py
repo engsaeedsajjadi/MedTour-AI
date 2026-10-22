@@ -9,7 +9,7 @@ import os
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .models import Case, Consent, Conversation, Task
+from .models import Case, Consent, Conversation, Task, Document
 from .enterprise_models import OutboundMessage, PortalAccess, TranslationDraft
 
 
@@ -87,6 +87,18 @@ def revoke_patient_access(db: Session, tenant_id: str, patient_id: str, purpose:
         for task in handoffs:
             task.status = "cancelled"
 
+    revoked_documents = []
+    if purpose == "medical_documents":
+        revoked_documents = db.scalars(select(Document).where(
+            Document.tenant_id == tenant_id,
+            Document.patient_id == patient_id,
+            Document.status.in_(("encrypted_dev_unscanned", "scanned_private_s3")),
+        )).all()
+        for document in revoked_documents:
+            # Never make an earlier document accessible again after re-consent.
+            # Physical erasure requires separately reviewed retention policy.
+            document.status = "access_revoked"
+
     drafts = []
     if purpose in ("communication", "ai_processing"):
         conversations = select(Conversation.id).where(
@@ -106,6 +118,7 @@ def revoke_patient_access(db: Session, tenant_id: str, patient_id: str, purpose:
         "portal_grants_revoked": len(grants),
         "outbound_blocked": len(outbox),
         "ai_translation_drafts_blocked": len(drafts),
+        "documents_access_revoked": len(revoked_documents),
     }
 
 

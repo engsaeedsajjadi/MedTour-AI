@@ -19,6 +19,7 @@ export default function PatientPortal(){
  const [intakeAnswer,setIntakeAnswer]=useState('');
  const [documentFile,setDocumentFile]=useState<File|null>(null);
  const [documentStatus,setDocumentStatus]=useState('');
+ const [documentsByCase,setDocumentsByCase]=useState<Record<string,Array<{id:string;filename:string;status:string}>>>({});
  const [chatLocale,setChatLocale]=useState('en');
  const copy=CHAT_UI[chatLocale]||CHAT_UI.en;
  const [messages,setMessages]=useState<ChatMessage[]>([]),[input,setInput]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false);
@@ -32,15 +33,43 @@ export default function PatientPortal(){
  async function send(e:React.FormEvent){e.preventDefault();setBusy(true);setError('');try{const result=await call<{warning:string|null,human_handoff:boolean,handoff_notice?:string|null}>('/chat',{method:'POST',body:JSON.stringify({message:input,language:chatLocale})});setMessages(await call<ChatMessage[]>('/chat'));setInput('');if(result.warning)setError(result.warning);else if(result.human_handoff)setError(result.handoff_notice||copy.handoff)}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
  async function startIntake(caseId:string){setBusy(true);setError('');try{setIntake(await call<NonNullable<typeof intake>>('/intake/sessions',{method:'POST',body:JSON.stringify({case_id:caseId,language:chatLocale})}));}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
  async function answerIntake(e:React.FormEvent){e.preventDefault();if(!intake)return;setBusy(true);setError('');try{const out=await call<typeof intake&{warning?:string}>(`/intake/sessions/${intake.id}/answer`,{method:'POST',body:JSON.stringify({answer:intakeAnswer})});setIntake(out);setIntakeAnswer('');if(out.warning)setError(out.warning);}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
- async function uploadDocument(caseId:string){if(!documentFile)return;setBusy(true);setDocumentStatus('');setError('');try{const body=new FormData();body.append('file',documentFile);const r=await fetch(`${API_BASE}/api/v1/secure-documents/portal/cases/${caseId}`,{method:'POST',headers:{'X-Patient-Access':token},body,cache:'no-store'});const result=await r.json();if(!r.ok)throw new Error(String(result.detail||'Upload unavailable'));setDocumentStatus(`Uploaded to authorized storage. File reference: ${result.id}`);setDocumentFile(null);}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
- const logout=()=>{sessionStorage.removeItem('medtour_patient_access');setToken('');setPatient(null);setJourney([]);setMessages([])};
+ async function loadDocuments(caseId:string){
+  try{
+   const r=await fetch(API_BASE+'/api/v1/secure-documents/portal/cases/'+encodeURIComponent(caseId)+'/list',{
+    headers:{'X-Patient-Access':token},cache:'no-store'
+   });
+   if(!r.ok)throw new Error('Document list unavailable ('+r.status+').');
+   const docs=await r.json() as Array<{id:string;filename:string;status:string}>;
+   setDocumentsByCase(prev=>({...prev,[caseId]:docs}));
+  }catch(e){setError((e as Error).message)}
+ }
+ async function downloadDocument(caseId:string,id:string){
+  setBusy(true);setError('');
+  try{
+   const r=await fetch(API_BASE+'/api/v1/secure-documents/portal/cases/'+encodeURIComponent(caseId)+'/documents/'+encodeURIComponent(id),{
+    headers:{'X-Patient-Access':token},cache:'no-store'
+   });
+   if(!r.ok)throw new Error('File access denied ('+r.status+').');
+   const obj=URL.createObjectURL(await r.blob());
+   const link=document.createElement('a');link.href=obj;link.download='synthetic-medical-document';
+   document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(obj);
+  }catch(e){setError((e as Error).message)}finally{setBusy(false)}
+ }
+ async function uploadDocument(caseId:string){if(!documentFile)return;setBusy(true);setDocumentStatus('');setError('');try{const body=new FormData();body.append('file',documentFile);const r=await fetch(`${API_BASE}/api/v1/secure-documents/portal/cases/${caseId}`,{method:'POST',headers:{'X-Patient-Access':token},body,cache:'no-store'});const result=await r.json();if(!r.ok)throw new Error(String(result.detail||'Upload unavailable'));setDocumentStatus('Synthetic file stored: '+result.status+'. Real patient documents are not permitted.');setDocumentFile(null);await loadDocuments(caseId);}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
+ const logout=()=>{sessionStorage.removeItem('medtour_patient_access');setToken('');setPatient(null);setJourney([]);setMessages([]);setDocumentsByCase({})};
  return <main style={{maxWidth:900,margin:'32px auto',padding:24,fontFamily:'system-ui',color:'#142b3c'}}>
  <header style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12}}><h1>✚ MedTour AI | Patient Portal</h1><button onClick={logout}>Clear access</button></header>
  <p>Secure coordination portal · بوابة المريض · پورتال بیمار</p><p>Information shown here is for administrative coordination; emergency care and clinical decisions require qualified local services.</p>
  {error&&<div role="alert" style={{background:'#ffefdd',padding:16,borderRadius:10}}>{error}</div>}
  {!patient?<p>Open the short-lived private link provided by your coordinator. Do not share it.</p>:<><h2 dir="auto">{patient.name}</h2>
  {journey.map(c=><section key={c.case_id} style={{border:'1px solid #cedae0',padding:20,margin:'16px 0',borderRadius:12}}><h3>Medical case · {c.specialty||'Medical service'} — {c.status}</h3>
- <small>Reference: {c.case_id}</small><p><button disabled={busy} onClick={()=>startIntake(c.case_id)}>Start / resume structured intake</button></p><div style={{border:'1px solid #d2e5e0',padding:12,borderRadius:8,margin:'10px 0'}}><h4>Secure medical document upload</h4><p>PDF/JPG/PNG up to 8 MiB; only after your explicit document consent and secure storage setup.</p><input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e=>setDocumentFile(e.target.files?.[0]||null)}/><button disabled={busy||!documentFile} onClick={()=>uploadDocument(c.case_id)}>Upload securely</button>{documentStatus&&<p>{documentStatus}</p>}</div><h4>Travel and care coordination</h4>{c.services.length===0?<p>No active services.</p>:c.services.map((s,i)=><p key={i}>{s.service} — {s.status}</p>)}
+ <small>Reference: {c.case_id}</small><p><button disabled={busy} onClick={()=>startIntake(c.case_id)}>Start / resume structured intake</button></p><div style={{border:'1px solid #d2e5e0',padding:12,borderRadius:8,margin:'10px 0'}}><h4>Secure medical document upload</h4><p>PDF/JPG/PNG up to 8 MiB; only after your explicit document consent and secure storage setup.</p><input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e=>setDocumentFile(e.target.files?.[0]||null)}/><button disabled={busy||!documentFile} onClick={()=>uploadDocument(c.case_id)}>Upload securely</button>{documentStatus&&<p>{documentStatus}</p>}
+ <div style={{marginTop:10}}>
+  <button disabled={busy} type="button" onClick={()=>loadDocuments(c.case_id)}>Show available files</button>
+  {(documentsByCase[c.case_id]||[]).map(d=><p key={d.id}>
+   {d.filename} — {d.status} <button disabled={busy} type="button" onClick={()=>downloadDocument(c.case_id,d.id)}>Download privately</button>
+  </p>)}
+ </div></div><h4>Travel and care coordination</h4>{c.services.length===0?<p>No active services.</p>:c.services.map((s,i)=><p key={i}>{s.service} — {s.status}</p>)}
  <h4>Confirmed appointments</h4>{c.confirmed_appointments.map((a,i)=><p key={i}>{a.at} — {a.reference}</p>)}
  <h4>Approved estimates</h4>{c.approved_quotes.map(q=><p key={q.id}>{q.amount_minor} minor units / {q.currency}</p>)}</section>)}
  {intake&&<section style={{border:'2px solid #168f83',padding:20,margin:'16px 0',borderRadius:12}}><h3>{copy.intake} · {intake.status}</h3><small>Step {intake.stage+1} / 5</small>{intake.next_prompt?<form onSubmit={answerIntake}><p dir="auto" style={{fontSize:18}}>{intake.next_prompt}</p><textarea dir="auto" required maxLength={3000} value={intakeAnswer} onChange={e=>setIntakeAnswer(e.target.value)} style={{width:'100%'}}/><p><button disabled={busy}>{copy.answer}</button></p></form>:<p>Submitted for qualified human review. Do not use this service in an emergency.</p>}</section>}
