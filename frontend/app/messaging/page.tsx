@@ -12,8 +12,16 @@ export default function Messaging(){
  const [sourceLang,setSourceLang]=useState('fa'),[targetLang,setTargetLang]=useState('ar');
  const [error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false);
  const [telegramStatus,setTelegramStatus]=useState('در حال بررسی');
+ const [channelOverview,setChannelOverview]=useState<Record<string,{configured:boolean,live_verified:boolean,capability:string}>>({});
+ const [handoffCases,setHandoffCases]=useState<{id:string,status:string}[]>([]);
+ const [handoffCaseId,setHandoffCaseId]=useState('');
+ const [handoffBusy,setHandoffBusy]=useState(false);
  async function refresh(){try{setItems(await request<Row[]>('/communications/outbound'))}catch(e){setError((e as Error).message)}}
  useEffect(()=>{
+    void request<{channels:Record<string,{configured:boolean,live_verified:boolean,capability:string}>}>('/channels/readiness')
+      .then(data=>setChannelOverview(data.channels)).catch(()=>{});
+    void request<{id:string,status:string}[]>('/cases')
+      .then(rows=>{setHandoffCases(rows);setHandoffCaseId(rows[0]?.id||'');}).catch(()=>{});
     void refresh();
     void request<{telegram?:{status:string,live_connected:boolean}}>('/integrations/status')
       .then(data=>setTelegramStatus(data.telegram?.status==='generic_onboarding_configured'?
@@ -27,7 +35,41 @@ export default function Messaging(){
  async function approve(id:string){setError('');try{await request(`/communications/outbound/${id}/approve`,{method:'POST'});setNotice('قالب تأیید شد؛ ارسال فقط توسط پردازشگر رسمی و پس از فعال‌سازی مجوزها انجام می‌شود.');await refresh()}catch(e){setError((e as Error).message)}}
  async function draft(e:React.FormEvent){e.preventDefault();setBusy(true);setError('');setNotice('');try{const r=await request<{id:string,draft_text:string}>('/communications/translation-drafts',{method:'POST',body:JSON.stringify({conversation_id:conversationId,source_language:sourceLang,target_language:targetLang,source_text:source})});setTranslation(r.draft_text);setTranslationId(r.id);setNotice('ترجمه پیش‌نویس است و باید قبل از انتشار توسط اپراتور بررسی شود.')}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
  async function publish(){setBusy(true);setError('');try{await request(`/communications/translation-drafts/${translationId}/review`,{method:'POST',body:JSON.stringify({approved_text:translation,action:'approve'})});setTranslationId('');setNotice('ترجمه تأیید و فقط در گفت‌وگوی امن وب ثبت شد.')}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
+ async function preparePortalHandoff(){
+  if(!handoffCaseId)return;
+  setHandoffBusy(true);setError('');setNotice('');
+  try{
+   const result=await request<{status:string,deduplicated:boolean,sent:boolean}>('/channels/cases/'+encodeURIComponent(handoffCaseId)+'/secure-portal-handoff',{method:'POST'});
+   setNotice(result.deduplicated?'درخواست قبلی دعوت امن هنوز باز است؛ پیام جدیدی ارسال نشد.':'وظیفه دعوت امن برای اپراتور ثبت شد. پیام یا لینک به بیمار ارسال نشده است.');
+  }catch(e){setError((e as Error).message)}
+  finally{setHandoffBusy(false)}
+ }
  return <Shell title="ارتباطات و ترجمه"><div className="infoBanner">پیام واتساپ صرفاً با قالب عمومی تأییدشده و رضایت ارتباطی ارسال می‌شود. اتصال رسمی پیش‌فرض غیرفعال است. ترجمه هوش مصنوعی مستقل از ارسال واتساپ و نیازمند رضایت و تأیید انسانی است.</div>{error&&<p className="errorBox" role="alert">{error}</p>}{notice&&<p className="infoBanner">{notice}</p>}
+ <section className="panel" aria-label="مسیر واتس‌اپ و جایگزین امن">
+ <div className="panelHeader"><h2>مسیر ارتباطی اصلی و جایگزین</h2></div>
+ <div style={{padding:18}}>
+  <p>کانال اصلی: <strong>WhatsApp</strong>. کانال جایگزین برای پرونده بیمار: <strong>دعوت انسانی به پرتال امن</strong>. تلگرام فقط راهنمای عمومی است و برای شناسایی بیمار به کار نمی‌رود.</p>
+  <div style={{display:'flex',flexWrap:'wrap',gap:12,marginBottom:14}}>
+   {Object.entries(channelOverview).map(([key,state])=><span className="badge" key={key}>
+    {key}: {state.configured?'تنظیم‌شده (نه تأیید زنده)':'غیرفعال'} · {state.live_verified?'تأیید زنده':'بدون تأیید زنده'}
+   </span>)}
+  </div>
+  <div className="formGrid">
+   <label>پرونده برای ارجاع انسانی به پرتال امن
+    <select value={handoffCaseId} onChange={e=>setHandoffCaseId(e.target.value)}>
+     <option value="">انتخاب پرونده</option>
+     {handoffCases.map(c=><option key={c.id} value={c.id}>{c.id.slice(0,8)} — {c.status}</option>)}
+    </select>
+   </label>
+   <div className="formActions">
+    <button className="button secondary" type="button" disabled={!handoffCaseId||handoffBusy} onClick={preparePortalHandoff}>
+     {handoffBusy?'در حال ثبت...':'ایجاد وظیفه دعوت امن'}
+    </button>
+   </div>
+  </div>
+  <p>این اقدام تنها یک وظیفه داخلی ایجاد می‌کند؛ اپراتور باید رضایت فعلی و هویت بیمار را بررسی کند. هیچ پیام خودکار یا لینک دسترسی ایجاد نمی‌شود.</p>
+ </div>
+ </section>
  <section className="panel" aria-label="کانال تلگرام"><div className="panelHeader"><h2>تلگرام — شروع گفت‌وگو با ربات</h2></div>
  <div style={{padding:18}}>
  <p>وضعیت: <strong>{telegramStatus}</strong></p>

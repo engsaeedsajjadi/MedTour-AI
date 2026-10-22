@@ -35,6 +35,10 @@ PostgreSQL/Alembic version and configured Redis are checked on API readiness; CI
 
 The staff dashboard now includes a tenant-scoped `/modules` workspace that links existing patient, case, intake, documents, physician, appointment, quote, travel and communication modules. The API provides a truthful module capability registry, case-level status aggregates and an audited administrative task lifecycle with no raw medical information in the read model. See [Section 04 scope](docs/SECTION_04_ENTERPRISE_MODULES_FA.md). **Specialist modules and external provider acceptance remain independently incomplete.**
 
+## Section 05 — WhatsApp-first and safe alternatives
+
+The staff `/messaging` interface now shows channel readiness without claiming a live connection; `/api/v1/channels` provides tenant-scoped options and a human-only secure-portal handoff. A separate `app.whatsapp_entrypoint:app` exposes only signed Meta verification/ingress, and signed delivery receipts update matching approved outbox statuses without auto retries. Existing Telegram is public-onboarding-only. See [Section 05 technical scope](docs/SECTION_05_CHANNELS_FA.md). **External provider authorizations, identity and security gates remain pending.**
+
 ## What is NOT finished
 
 The 45-section enterprise master specification **has not yet reached full acceptance**. Critical remaining work includes PostgreSQL Row-Level Security and migration of existing pre-Alembic databases; full patient identity assurance and MFA; doctor/hospital independently scoped portals; real compliant WhatsApp outbound communication; five-language human-validated AI/voice; operational/independently verified S3/KMS storage and ClamAV scanning; approved external visa/hotel/provider APIs; payment gateways; subscription billing; load tests; frontend E2E and independent clinical/privacy/security review.
