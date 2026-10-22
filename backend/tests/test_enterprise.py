@@ -134,7 +134,7 @@ def test_webhook_routed_only_with_consent_and_signature(seeded,monkeypatch):
     raw=json.dumps(payload).encode();sig='sha256='+hmac.new(b'synthetic-app-secret',raw,hashlib.sha256).hexdigest()
     r=client.post('/api/v1/webhooks/whatsapp',content=raw,headers={'X-Hub-Signature-256':sig,'Content-Type':'application/json'})
     assert r.status_code==200 and r.json()['quarantined']==1
-    assert client.post('/api/v1/webhooks/whatsapp',content=raw,headers={'X-Hub-Signature-256':sig}).json()['duplicates']==1
+    assert client.post('/api/v1/webhooks/whatsapp',content=raw,headers={'X-Hub-Signature-256':sig,'Content-Type':'application/json'}).json()['duplicates']==1
     assert client.get('/api/v1/conversations',headers=admin).json()==[]
 
 def test_patient_chat_is_consent_gated_and_scoped(seeded):
@@ -191,7 +191,7 @@ def test_webhook_consent_based_routing_to_existing_patient(seeded,monkeypatch):
     assert len(conversations)==1 and conversations[0]['human_handoff'] is True
     messages=client.get('/api/v1/conversations/'+conversations[0]['id']+'/messages',headers=admin).json()
     assert messages[0]['body']=='Hello care coordination'
-    retry=client.post('/api/v1/webhooks/whatsapp',headers={'X-Hub-Signature-256':signature},content=raw)
+    retry=client.post('/api/v1/webhooks/whatsapp',headers={'X-Hub-Signature-256':signature,'Content-Type':'application/json'},content=raw)
     assert retry.json()['duplicates']==1
     assert len(client.get('/api/v1/conversations/'+conversations[0]['id']+'/messages',headers=admin).json())==1
 
