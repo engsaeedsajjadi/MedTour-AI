@@ -1,7 +1,7 @@
 from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import uuid4
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, BigInteger, String, Text, Float, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, BigInteger, String, Text, Float, UniqueConstraint, Index, text
 from sqlalchemy.orm import Mapped, mapped_column
 from .database import Base
 
@@ -92,6 +92,10 @@ class Appointment(TenantEntity, Base):
     requested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     status: Mapped[str] = mapped_column(String(40), default='requested')
     confirmation_reference: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    __table_args__ = (Index('uq_appointments_confirmed_physician_instant',
+        'tenant_id', 'physician_id', 'requested_at', unique=True,
+        postgresql_where=text("status = 'confirmed'"),
+        sqlite_where=text("status = 'confirmed'")),)
 
 class Quote(TenantEntity, Base):
     __tablename__ = 'quotes'
