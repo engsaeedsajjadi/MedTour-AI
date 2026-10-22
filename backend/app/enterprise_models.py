@@ -284,3 +284,22 @@ class CRMDuplicateReview(TenantEntity, Base):
     evidence_reference:Mapped[str]=mapped_column(String(100),nullable=False)
     # Relationship is a non-destructive review record, NEVER a data/consent merge.
     __table_args__=(UniqueConstraint('tenant_id','left_patient_id','right_patient_id'),)
+
+# Section 11: administrative inbox state and PHI-free action history.
+class InboxThread(TenantEntity, Base):
+    __tablename__ = 'inbox_threads'
+    conversation_id: Mapped[str] = mapped_column(ForeignKey('conversations.id'), nullable=False, index=True)
+    patient_id: Mapped[str] = mapped_column(ForeignKey('patients.id'), nullable=False)
+    status: Mapped[str] = mapped_column(String(24), default='open', nullable=False)
+    priority: Mapped[str] = mapped_column(String(16), default='normal', nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+    __table_args__=(UniqueConstraint('tenant_id','conversation_id'),Index('idx_inbox_queue','tenant_id','status','priority'),)
+
+class InboxAction(TenantEntity, Base):
+    __tablename__ = 'inbox_actions'
+    conversation_id: Mapped[str] = mapped_column(ForeignKey('conversations.id'), nullable=False, index=True)
+    actor_user_id: Mapped[str|None] = mapped_column(ForeignKey('users.id'), nullable=True)
+    action: Mapped[str] = mapped_column(String(40), nullable=False)
+    from_status: Mapped[str] = mapped_column(String(24), nullable=False)
+    to_status: Mapped[str] = mapped_column(String(24), nullable=False)
+    target_user_id: Mapped[str|None] = mapped_column(ForeignKey('users.id'),nullable=True)
