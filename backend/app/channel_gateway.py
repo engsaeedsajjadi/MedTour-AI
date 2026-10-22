@@ -13,14 +13,14 @@ from sqlalchemy.orm import Session
 from .database import get_db
 from .models import Audit, Case, Patient, Task, User
 from .security import roles
-from .safety_rules import active_consent
+from .safety_rules import active_consent, INVITATION_TASK_TITLE
 from .whatsapp import enabled as whatsapp_configured
 from .telegram import enabled as telegram_configured
 from .delivery import enabled as outbound_configured
 
 router = APIRouter(prefix="/api/v1/channels", tags=["channel orchestration"])
 staff = roles("admin", "operator")
-_INVITATION_TASK = "Prepare secure portal invitation via an approved private channel"
+_INVITATION_TASK = INVITATION_TASK_TITLE
 
 
 def _record(db: Session, case: Case, actor: User):
