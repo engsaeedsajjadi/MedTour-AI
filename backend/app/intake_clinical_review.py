@@ -342,3 +342,55 @@ def escalation_policy(user: User = Depends(staff)):
         "instructions": EMERGENCY_RESPONSE,
         "required_next_step": "Human coordinator requests local emergency services outside this alpha service",
     }
+
+
+@router.post("/reviewers/{reviewer_id}/revoke")
+def revoke_reviewer(
+    reviewer_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(admin),
+):
+    row = db.scalar(select(ReviewerCredential).where(
+        ReviewerCredential.tenant_id == user.tenant_id,
+        ReviewerCredential.user_id == reviewer_id,
+    ).with_for_update())
+    if row is None:
+        raise HTTPException(404, "Reviewer credential not found")
+    if row.status != "revoked":
+        row.status = "revoked"
+        db.add(Audit(
+            tenant_id=user.tenant_id, user_id=user.id,
+            event="reviewer_credential_revoked",
+            entity_type="ReviewerCredential", entity_id=row.id,
+        ))
+        db.commit()
+    return {"reviewer_id": reviewer_id, "credential_active": False,
+            "clinical_authorization": False}
+
+
+@router.post("/sessions/{session_id}/assignment/{reviewer_id}/revoke")
+def revoke_reviewer_assignment(
+    session_id: str,
+    reviewer_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(admin),
+):
+    # Permission removal must work even after consent withdrawal, a
+    # superseding session or an emergency. Do not use _session() here.
+    row = db.scalar(select(IntakeReviewerAssignment).where(
+        IntakeReviewerAssignment.tenant_id == user.tenant_id,
+        IntakeReviewerAssignment.intake_id == session_id,
+        IntakeReviewerAssignment.reviewer_user_id == reviewer_id,
+    ).with_for_update())
+    if row is None:
+        raise HTTPException(404, "Assignment not found")
+    if row.active:
+        row.active = False
+        db.add(Audit(
+            tenant_id=user.tenant_id, user_id=user.id,
+            event="intake_reviewer_assignment_revoked",
+            entity_type="IntakeReviewerAssignment", entity_id=row.id,
+        ))
+        db.commit()
+    return {"assignment_active": False, "session_id": session_id,
+            "reviewer_id": reviewer_id}
