@@ -82,8 +82,9 @@ def patient_channel_options(
     return {
         "communication_consent": consent,
         "primary": "whatsapp",
-        "whatsapp_usable": bool(consent and whatsapp_configured()
-                                and outbound_configured()),
+        "whatsapp_outbound_configured": bool(consent and whatsapp_configured()
+                                             and outbound_configured()),
+        "whatsapp_usable": False,  # Cannot establish real delivery eligibility from env flags.
         "secure_portal_invitation_permitted": consent,
         "telegram_patient_routing_supported": False,
         "automatic_message_sent": False,
