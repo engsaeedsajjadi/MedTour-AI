@@ -43,6 +43,10 @@ The staff `/messaging` interface now shows channel readiness without claiming a 
 
 A deterministic, non-diagnostic text receptionist now supports fa/ar/en/ps/prs administrative question routing, consented portal chat with explicit human handoff, Unicode-normalized precautionary urgency flags, five-language staff replies and a PHI-free `/receptionist` preview. No speech integration or verified translation/clinical approval is claimed; see [Section 06 report](docs/SECTION_06_MULTILINGUAL_RECEPTION_FA.md). The alpha remains unavailable for real patient information.
 
+## Section 07 — medical intake administrative coordination
+
+Shared patient/staff intake sessions, non-bypassable urgent warning state, renewed purpose-specific intake consent checks, audited request-more-information and admin handoff, and a PHI-minimized `/intake-review` staff queue are now implemented for development. This is **not clinical review or triage**. See [Section 07 scope and acceptance blockers](docs/SECTION_07_MEDICAL_INTAKE_FA.md).
+
 ## What is NOT finished
 
 The 45-section enterprise master specification **has not yet reached full acceptance**. Critical remaining work includes PostgreSQL Row-Level Security and migration of existing pre-Alembic databases; full patient identity assurance and MFA; doctor/hospital independently scoped portals; real compliant WhatsApp outbound communication; five-language human-validated AI/voice; operational/independently verified S3/KMS storage and ClamAV scanning; approved external visa/hotel/provider APIs; payment gateways; subscription billing; load tests; frontend E2E and independent clinical/privacy/security review.
