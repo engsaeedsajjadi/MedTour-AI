@@ -300,6 +300,7 @@ class InboxAction(TenantEntity, Base):
     conversation_id: Mapped[str] = mapped_column(ForeignKey('conversations.id'), nullable=False, index=True)
     actor_user_id: Mapped[str|None] = mapped_column(ForeignKey('users.id'), nullable=True)
     action: Mapped[str] = mapped_column(String(40), nullable=False)
+    reference: Mapped[str|None] = mapped_column(String(100), nullable=True)
     from_status: Mapped[str] = mapped_column(String(24), nullable=False)
     to_status: Mapped[str] = mapped_column(String(24), nullable=False)
     target_user_id: Mapped[str|None] = mapped_column(ForeignKey('users.id'),nullable=True)
