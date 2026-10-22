@@ -264,9 +264,10 @@ def intake_ai(body:AIDraftIn,db:Session=Depends(get_db),user:User=Depends(MODERA
     c=require_case(db,user,body.case_id)
     need_consent(db,user,c.patient_id,'ai_processing')
     if body.language not in LANGUAGES:raise HTTPException(422,'Unsupported language')
-    # Never send input containing emergency keywords to an LLM instead of escalation.
-    safety=intake_response(body.language,body.message)
-    if safety['emergency_keyword_detected']:return safety
+    # Neither urgent messages nor explicit human requests may reach the LLM.
+    from .receptionist import receptionist_response
+    safety=receptionist_response(body.language,body.message)
+    if safety['human_handoff_required']:return safety
     return ai_draft(body.message,body.language)
 
 @app.get('/api/v1/physicians')
@@ -448,3 +449,6 @@ app.include_router(module_hub_router)
 
 from .channel_gateway import router as channel_gateway_router
 app.include_router(channel_gateway_router)
+
+from .receptionist import router as receptionist_router
+app.include_router(receptionist_router)

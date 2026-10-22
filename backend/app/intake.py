@@ -1,6 +1,8 @@
 """Non-diagnostic, deterministic initial intake texts. Not a medical decision system."""
 from __future__ import annotations
 from pydantic import BaseModel, Field
+import re
+import unicodedata
 
 LANGUAGES = {'fa','ar','en','ps','prs'}
 PROMPTS = {
@@ -10,10 +12,26 @@ PROMPTS = {
  'ps': ['مهرباني وکړئ د لومړنیو معلوماتو د راټولولو لپاره رضايت ورکړئ.', 'تاسو کومو طبي خدماتو ته اړتیا لرئ؟', 'آیا مخکیني طبي راپورونه لرئ؟ مهرباني وکړئ خوندي پورټل وکاروئ.'],
  'prs': ['لطفاً رضایت خود را برای ثبت معلومات ابتدایی اعلام کنید.', 'به کدام خدمات صحی نیاز دارید؟', 'آیا گزارش‌های طبی قبلی دارید؟ لطفاً از پورتال مصون استفاده کنید.'],
 }
+# Canonicalization handles Arabic/Persian Yeh and Kaf, vowel marks, and
+# visually split zero-width strings. This is only a precautionary flagger:
+# a missed phrase must never be interpreted as a clinical safety clearance.
+_ARABIC_VARIANTS = str.maketrans({
+    'ي':'ی', 'ى':'ی', 'ك':'ک', 'أ':'ا', 'إ':'ا', 'آ':'ا',
+    'ٱ':'ا', 'ة':'ه', 'ؤ':'و', 'ئ':'ی',
+    '\u200c':' ', '\u200d':' ', '\ufeff':' ', '\u2060':' ',
+})
+
+def normalize_safety_text(value: str) -> str:
+    if not isinstance(value, str):
+        return ''
+    normalized = unicodedata.normalize('NFKC', value).translate(_ARABIC_VARIANTS).casefold()
+    normalized = ''.join(ch for ch in normalized if unicodedata.category(ch) not in ('Mn','Me','Cf'))
+    return re.sub(r'\s+', ' ', normalized).strip()
+
 EMERGENCY = {
- 'en': ('chest pain','cannot breathe','severe bleeding','stroke symptoms','unconscious'),
- 'fa': ('درد قفسه سینه','تنگی نفس شدید','خونریزی شدید','بیهوش'),
- 'ar': ('ألم في الصدر','نزيف شديد','ضيق تنفس شديد','فاقد الوعي'),
+ 'en': ('chest pain','cannot breathe', "can't breathe", 'difficulty breathing', 'severe bleeding','stroke symptoms','unconscious'),
+ 'fa': ('درد قفسه سینه','تنگی نفس شدید','خونریزی شدید','بیهوش','نمی‌توانم نفس بکشم'),
+ 'ar': ('ألم في الصدر','نزيف شديد','ضيق تنفس شديد','فاقد الوعي','لا أستطيع التنفس'),
  'ps': ('د سینې درد','سخت ساه لنډي','شدیده وینه بهیدنه'),
  'prs': ('درد قفسه سینه','نفس‌تنگی شدید','خونریزی شدید','بیهوش'),
 }
@@ -30,7 +48,9 @@ class IntakeAnswer(BaseModel):
 
 def intake_response(language: str,message:str)->dict:
     lang=language if language in LANGUAGES else 'en'
-    flagged=any(term.casefold() in message.casefold() for words in EMERGENCY.values() for term in words)
+    normalized = normalize_safety_text(message)
+    flagged=any(normalize_safety_text(term) in normalized
+                for words in EMERGENCY.values() for term in words)
     return {'language':lang,'emergency_keyword_detected':flagged,
         'human_review_required':True,
         'message':EMERGENCY_RESPONSE[lang] if flagged else PROMPTS[lang][1],
