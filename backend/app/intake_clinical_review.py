@@ -99,6 +99,7 @@ def _record(db: Session, session: PatientIntake, actor: User, action: str, refer
         external_confirmation=False,
     )
     db.add(record)
+    db.flush()
     db.add(Audit(
         tenant_id=actor.tenant_id, user_id=actor.id,
         event="intake_review_metadata_recorded",
@@ -290,4 +291,53 @@ def review_event_history(
         ],
         "urgent_alert_active": session.status == "requires_urgent_human_review",
         "clinical_approval": False,
+    }
+
+
+@router.get("/my-assignments")
+def my_review_assignments(
+    db: Session = Depends(get_db),
+    user: User = Depends(physician),
+):
+    _credential(db, user)
+    assignments = db.scalars(select(IntakeReviewerAssignment).where(
+        IntakeReviewerAssignment.tenant_id == user.tenant_id,
+        IntakeReviewerAssignment.reviewer_user_id == user.id,
+        IntakeReviewerAssignment.active.is_(True),
+    ).order_by(IntakeReviewerAssignment.created_at.desc()).limit(100)).all()
+    results = []
+    for row in assignments:
+        intake = db.scalar(select(PatientIntake).where(
+            PatientIntake.id == row.intake_id,
+            PatientIntake.tenant_id == user.tenant_id,
+            PatientIntake.case_id == row.case_id,
+        ))
+        if not intake or latest_intake(db, user.tenant_id, row.case_id).id != intake.id:
+            continue
+        if intake.status not in ("awaiting_clinician_review", "handoff_recorded"):
+            continue
+        case = db.scalar(select(Case).where(
+            Case.id == row.case_id, Case.tenant_id == user.tenant_id
+        ))
+        if case and active_consent(db, user.tenant_id, case.patient_id, "intake"):
+            results.append({
+                "case_id": row.case_id, "session_id": row.intake_id,
+                "status": intake.status, "language": intake.language,
+                "clinical_authorization": False,
+            })
+    return {"items": results, "raw_medical_answers_included": False}
+
+
+@router.get("/escalation-policy")
+def escalation_policy(user: User = Depends(staff)):
+    from .intake import EMERGENCY_RESPONSE
+    return {
+        "signal_type": "precautionary_keyword_only",
+        "clinical_triage_validated": False,
+        "safe_to_ignore_nonmatching_messages": False,
+        "automatic_alert_clearance": False,
+        "automated_emergency_contact": False,
+        "country_specific_contact_numbers_verified": False,
+        "instructions": EMERGENCY_RESPONSE,
+        "required_next_step": "Human coordinator requests local emergency services outside this alpha service",
     }
