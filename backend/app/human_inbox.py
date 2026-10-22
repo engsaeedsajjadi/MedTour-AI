@@ -107,6 +107,13 @@ def inbound_webchat(db: Session, c: Conversation, *, urgent: bool = False) -> No
                before, thread.status)
 
 
+def require_message_access(c: Conversation, user: User) -> None:
+    # Allow triage on redacted thread metadata, but never disclose message
+    # content to an operator before an explicit ownership claim.
+    if user.role != "admin" and c.assigned_user_id != user.id:
+        raise HTTPException(403, "Claim the conversation to read messages")
+
+
 def thread_view(c: Conversation, t: InboxThread | None, patient_language: str) -> dict:
     return {
         "conversation_id": c.id, "patient_id": c.patient_id,
@@ -299,6 +306,7 @@ def reopen(conversation_id: str, body: StateChangeIn,
 def events(conversation_id: str, db: Session = Depends(get_db),
            user: User = Depends(staff)):
     c, _ = require_thread(db, user, conversation_id)
+    require_message_access(c, user)
     rows = db.scalars(select(InboxAction).where(
         InboxAction.tenant_id == user.tenant_id,
         InboxAction.conversation_id == c.id,
@@ -318,6 +326,7 @@ def messages(conversation_id: str,
              db: Session = Depends(get_db),
              user: User = Depends(staff)):
     c, _ = require_thread(db, user, conversation_id)
+    require_message_access(c, user)
     rows = db.scalars(select(Message).where(
         Message.tenant_id == user.tenant_id,
         Message.conversation_id == c.id,
