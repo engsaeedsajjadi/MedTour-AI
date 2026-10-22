@@ -28,6 +28,10 @@ def test_free_plan_activation_is_admin_only_tenant_isolated(context):
     assert client.get('/api/v1/saas/subscription', headers=other).json()['status'] == 'unprovisioned'
     assert client.get('/api/v1/saas/usage', headers=other).json()['counts']['patients'] == 0
     assert client.get('/api/v1/saas/usage', headers=admin).json()['counts']['users'] == 2
+    assert client.post('/api/v1/staff', headers=admin, json={
+        'email': 'third@example.test', 'password': 'synthetic_staff_pass_123',
+        'role': 'operator'
+    }).status_code == 409
 
     with Session() as db:
         from app.models import Audit
