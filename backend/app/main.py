@@ -445,3 +445,6 @@ app.include_router(case_mission_router)
 
 from .module_hub import router as module_hub_router
 app.include_router(module_hub_router)
+
+from .channel_gateway import router as channel_gateway_router
+app.include_router(channel_gateway_router)
