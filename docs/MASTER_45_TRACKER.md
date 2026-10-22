@@ -46,7 +46,7 @@ Legend: **implemented (local)** = code + synthetic API tests; **partial** = some
 | 38 | Configuration controls | Partial | Tenant setting allowlist, CMS/knowledge/price/vendor/staff pages; full feature policy needs work. |
 | 39 | Implementation phases | Partial | Expanded security, document, language and messaging core delivered at development level; many other phases remain. |
 | 40 | End-to-end scenarios | Partial | API-level synthetic flows (including patient consent, intake, document and template queue) tested; no real provider journey, web UI E2E or external booking. |
-| 41 | Performance & operations | Not delivered | No measured service-level objective, worker queue metrics or benchmark results. |
+| 41 | Performance & operations | Partial (development) | Synthetic-testable privacy-preserving route-template request latency and request-ID logging added on feature branch. Production SLOs, tracing storage, dashboards, queue metrics, load tests and on-call alerting still absent. |
 | 42 | Deliverables | Partial | Source, docs and tests delivered, not a complete 30-artifact certified package. |
 | 43 | Execution discipline | Implemented (process) | Workflows are auditable and tests execute; blockers are explicitly documented. |
 | 44 | Final acceptance | **NOT MET** | No real patient/clinical/security/regulatory acceptance. |
