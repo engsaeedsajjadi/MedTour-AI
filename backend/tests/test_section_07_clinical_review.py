@@ -212,3 +212,57 @@ def test_metadata_validation_blocks_unverified_credentials_and_diagnosis(seeded)
         headers=physician,
         json={"action": "additional_information_requested", "reference": "PHI patient name"}
     ).status_code == 422
+
+
+def test_admin_can_revoke_reviewer_credential_even_when_assigned(seeded):
+    client, auth, tids, Session, admin, patient, case, rid, physician = setup_reviewer(seeded)
+    sid = submitted(client, admin, case["id"])
+    register(client, admin, rid)
+    assert client.post(
+        f"/api/v1/intake-review/sessions/{sid}/assignment",
+        headers=admin, json={"reviewer_user_id": rid},
+    ).status_code == 200
+    assert client.post(
+        f"/api/v1/intake-review/reviewers/{rid}/revoke",
+        headers=physician,
+    ).status_code == 403
+    revoked = client.post(
+        f"/api/v1/intake-review/reviewers/{rid}/revoke",
+        headers=admin,
+    )
+    assert revoked.status_code == 200
+    assert revoked.json()["credential_active"] is False
+    assert client.get(
+        "/api/v1/intake-review/my-assignments", headers=physician
+    ).status_code == 403
+    assert client.post(
+        f"/api/v1/intake-review/sessions/{sid}/recommendation",
+        headers=physician,
+        json={"action": "additional_information_requested",
+              "reference": "REVOKED-CREDENTIAL-07"},
+    ).status_code == 403
+
+
+def test_assignment_revocation_works_after_intake_consent_withdrawal(seeded):
+    client, auth, tids, Session, admin, patient, case, rid, physician = setup_reviewer(seeded)
+    sid = submitted(client, admin, case["id"])
+    register(client, admin, rid)
+    assert client.post(
+        f"/api/v1/intake-review/sessions/{sid}/assignment",
+        headers=admin, json={"reviewer_user_id": rid},
+    ).status_code == 200
+    assert client.post(
+        "/api/v1/consents", headers=admin,
+        json={"patient_id": patient["id"], "purpose": "intake",
+              "accepted": False, "notice_version": "v-revoke"},
+    ).status_code == 201
+    url = f"/api/v1/intake-review/sessions/{sid}/assignment/{rid}/revoke"
+    assert client.post(url, headers=physician).status_code == 403
+    done = client.post(url, headers=admin)
+    assert done.status_code == 200, done.text
+    assert done.json()["assignment_active"] is False
+    assert client.post(url, headers=admin).status_code == 200
+    assert client.post(url, headers=auth("b")).status_code == 404
+    with Session() as db:
+        row = db.query(IntakeReviewerAssignment).first()
+        assert row.active is False
