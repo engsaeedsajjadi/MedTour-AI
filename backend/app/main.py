@@ -51,6 +51,7 @@ class CaseIn(BaseModel):
     specialty:str=Field(default='',max_length=100)
 class CaseStatusIn(BaseModel):
     status:str
+    reference:str|None=Field(default=None,min_length=6,max_length=100,pattern=r'^[A-Za-z0-9][A-Za-z0-9._:/-]{5,99}$')
 class ConsentIn(BaseModel):
     patient_id:str
     purpose:Literal['intake','medical_documents','communication','ai_processing']
@@ -241,7 +242,14 @@ def case_detail(case_id:str,db:Session=Depends(get_db),user:User=Depends(MODERAT
 def case_status(case_id:str,body:CaseStatusIn,db:Session=Depends(get_db),user:User=Depends(MODERATOR)):
     c=require_case(db,user,case_id)
     if body.status not in TRANSITIONS.get(c.status,set()):raise HTTPException(409,'Invalid case workflow transition')
+    from .case_mission import check_mission_transition
+    from .enterprise_models import CaseTimeline
+    check_mission_transition(db,c,body.status,user.role,body.reference)
+    previous=c.status
     c.status=body.status
+    db.add(CaseTimeline(tenant_id=user.tenant_id,case_id=c.id,actor_id=user.id,
+                        event='case_status_transition',
+                        details=f'{previous}->{body.status};evidence={body.reference or "not-required"}'))
     return save(db,user,c,'case_status_changed')
 
 @app.get('/api/v1/intake/prompts/{language}')
@@ -432,3 +440,6 @@ app.include_router(portal_intake_router)
 
 from .consent_links import router as consent_links_router
 app.include_router(consent_links_router)
+
+from .case_mission import router as case_mission_router
+app.include_router(case_mission_router)

@@ -1,12 +1,12 @@
 # Master enterprise scope — audited delivery matrix
 
-Status date: 2026-10-21. This document tracks delivery evidence, not production certification. Update: Telegram onboarding-only public gateway and synthetic regression suite delivered. The master prompt contains **45 sections**. This is a source-code progress matrix, **not a claim of production readiness**. External WhatsApp/AI provider integrations, clinical approvals, hospital booking, visa approvals, payment capture, and production authorization are unavailable without contracts, credentials, infrastructure, and regulatory approval.
+Status date: 2026-10-22. This document tracks delivery evidence, not production certification. Update: Telegram onboarding-only public gateway and synthetic regression suite delivered. The master prompt contains **45 sections**. This is a source-code progress matrix, **not a claim of production readiness**. External WhatsApp/AI provider integrations, clinical approvals, hospital booking, visa approvals, payment capture, and production authorization are unavailable without contracts, credentials, infrastructure, and regulatory approval.
 
 Legend: **implemented (local)** = code + synthetic API tests; **partial** = some code/routes exist but critical pieces missing; **not delivered** = no finished subsystem; **external gate** = activation depends on approvals/providers.
 
 | # | Master-prompt section | State | Concrete delivery / missing evidence |
 |---|---|---|---|
-| 1 | Role and mission | Partial | Operations coordination foundation, not end-to-end real-world fulfillment. |
+| 1 | Role and mission | Implemented (local) / external acceptance gate | Tenant-scoped mission/readiness API, guarded administrative progression, supervisor evidence, timeline, operator UI and synthetic lifecycle regression delivered (backend 180 passed and frontend CI success, 2026-10-22). See [Section 01](SECTION_01_ROLE_MISSION_FA.md). Real provider/clinical/privacy and production E2E remain NOT accepted. |
 | 2 | Non-negotiable principles | Partial | Human-gated prices, appointment status, visas; no clinical-autonomy claim. External security and compliance review pending. |
 | 3 | Technology stack | Partial | Next.js/FastAPI/SQLAlchemy/Postgres, Redis service, Alembic baseline migration, gated S3/KMS adapter; production RLS and running workers incomplete. |
 | 4 | Enterprise product modules | Partial | Multi-domain operational API and staff UI added; distinct completed submodules incomplete. |
