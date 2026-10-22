@@ -31,6 +31,10 @@ The alpha API rejects `APP_ENV=production` until independently reviewed producti
 
 PostgreSQL/Alembic version and configured Redis are checked on API readiness; CI now tests real PostgreSQL 17 and Redis 7. A dedicated, disabled-by-default Docker `messaging` profile can consume the SQL-backed outbox once service-provider, customer-consent and operator approvals are configured. Claiming a message is atomic; unknown delivery outcomes are left for manual reconciliation and are not retried automatically. See [Section 03 architecture and runbook](docs/SECTION_03_TECH_STACK_FA.md). **No production PHI is permitted; PostgreSQL RLS production migration and external approvals remain open.**
 
+## Section 04 — cross-module enterprise workspace
+
+The staff dashboard now includes a tenant-scoped `/modules` workspace that links existing patient, case, intake, documents, physician, appointment, quote, travel and communication modules. The API provides a truthful module capability registry, case-level status aggregates and an audited administrative task lifecycle with no raw medical information in the read model. See [Section 04 scope](docs/SECTION_04_ENTERPRISE_MODULES_FA.md). **Specialist modules and external provider acceptance remain independently incomplete.**
+
 ## What is NOT finished
 
 The 45-section enterprise master specification **has not yet reached full acceptance**. Critical remaining work includes PostgreSQL Row-Level Security and migration of existing pre-Alembic databases; full patient identity assurance and MFA; doctor/hospital independently scoped portals; real compliant WhatsApp outbound communication; five-language human-validated AI/voice; operational/independently verified S3/KMS storage and ClamAV scanning; approved external visa/hotel/provider APIs; payment gateways; subscription billing; load tests; frontend E2E and independent clinical/privacy/security review.
