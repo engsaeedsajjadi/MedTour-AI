@@ -361,28 +361,50 @@ def travel_status(id:str,body:StatusIn,db:Session=Depends(get_db),user:User=Depe
 
 @app.get('/api/v1/conversations')
 def conversations(db:Session=Depends(get_db),user:User=Depends(MODERATOR)):
-    return [public(x) for x in listed(db,Conversation,user,200)]
+    # Keep legacy list compatible while hiding other operators' assignments.
+    from .safety_rules import active_consent
+    stmt=select(Conversation).where(Conversation.tenant_id==user.tenant_id)
+    if user.role!='admin':
+        stmt=stmt.where((Conversation.assigned_user_id==user.id)|
+                        Conversation.assigned_user_id.is_(None))
+    rows=db.scalars(stmt.order_by(Conversation.created_at.desc()).limit(200)).all()
+    return [public(x) for x in rows
+            if active_consent(db,user.tenant_id,x.patient_id,'communication')]
 @app.post('/api/v1/conversations',status_code=201)
 def conversation(body:ConversationIn,db:Session=Depends(get_db),user:User=Depends(MODERATOR)):
     require_owned(db,Patient,body.patient_id,user)
     return save(db,user,Conversation(tenant_id=user.tenant_id,patient_id=body.patient_id,channel='webchat'),'conversation_created')
 @app.get('/api/v1/conversations/{id}/messages')
 def messages(id:str,db:Session=Depends(get_db),user:User=Depends(MODERATOR)):
-    require_owned(db,Conversation,id,user)
-    xs=db.scalars(select(Message).where(Message.tenant_id==user.tenant_id,Message.conversation_id==id).order_by(Message.created_at.asc())).all()
-    return [public(x) for x in xs]
+    from .human_inbox import require_thread
+    c,_=require_thread(db,user,id)
+    xs=db.scalars(select(Message).where(
+        Message.tenant_id==user.tenant_id,Message.conversation_id==c.id
+    ).order_by(Message.created_at.desc(),Message.id.desc()).limit(200)).all()
+    return [public(x) for x in reversed(xs)]
 @app.post('/api/v1/conversations/{id}/messages',status_code=201)
 def message(id:str,body:MessageIn,db:Session=Depends(get_db),user:User=Depends(MODERATOR)):
-    c=require_owned(db,Conversation,id,user)
-    if c.channel!='webchat':raise HTTPException(409,'Use approved template workflow for WhatsApp')
-    need_consent(db,user,c.patient_id,'communication')
+    from .human_inbox import reply,ReplyIn
     if body.language not in LANGUAGES:raise HTTPException(422,'Unsupported language')
-    return save(db,user,Message(tenant_id=user.tenant_id,conversation_id=c.id,sender='operator',**body.model_dump()),'message_sent_webchat')
+    if len(body.body)>4000:raise HTTPException(422,'Reply exceeds secure inbox limit')
+    return reply(id,ReplyIn(body=body.body,language=body.language),db,user)
 @app.post('/api/v1/conversations/{id}/handoff')
 def handoff(id:str,db:Session=Depends(get_db),user:User=Depends(MODERATOR)):
-    c=require_owned(db,Conversation,id,user)
-    c.human_handoff=True;c.assigned_user_id=user.id
-    return save(db,user,c,'conversation_handoff')
+    # Legacy API remains usable for pre-consent administrative handoff;
+    # clinical and message content still require active consent.
+    from .human_inbox import require_thread,ensure_thread,assign
+    c,thread=require_thread(db,user,id,lock=True,consent=False)
+    if c.assigned_user_id not in (None,user.id):
+        raise HTTPException(403,'Conversation belongs to a different operator')
+    t=thread or ensure_thread(db,c)
+    if t.status=='resolved':
+        raise HTTPException(409,'Reopen conversation first')
+    if c.assigned_user_id!=user.id:
+        assign(db,c,t,user,user,'legacy_handoff_claimed')
+    else:
+        c.human_handoff=True
+        db.commit()
+    return public(c)
 
 @app.post('/api/v1/documents/upload-ticket')
 def document_ticket(body:DocumentIn,db:Session=Depends(get_db),user:User=Depends(MODERATOR)):
@@ -464,3 +486,6 @@ app.include_router(patient_crm_router)
 
 from .admin_control import router as admin_control_router
 app.include_router(admin_control_router)
+
+from .human_inbox import router as human_inbox_router
+app.include_router(human_inbox_router)
