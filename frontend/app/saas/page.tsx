@@ -86,7 +86,7 @@ export default function SaaSPage() {
       <td>{limit == null ? 'تعریف‌نشده' : count >= limit ? 'سقف تکمیل' : 'در محدوده'}</td>
      </tr>;
     })}</tbody></table></div>
-   <div className="infoBanner">در این نسخه تنها ایجاد بیمار و پرونده کنترل سهمیه دارد؛ محدودیت کاربران هنوز به همه مسیرهای ایجاد حساب متصل نیست.</div>
+   <div className="infoBanner">در این نسخه سهمیه ایجاد بیمار، پرونده و حساب کارکنان اعمال می‌شود؛ مصرف AI، فایل و پیام‌رسانی هنوز سهمیه‌گذاری نشده است.</div>
   </section>}
   <section className="panel">
    <div className="panelHeader"><h2>پلن‌های فنی قابل تعریف</h2></div>
