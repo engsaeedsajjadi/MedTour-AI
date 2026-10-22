@@ -7,7 +7,7 @@ All clinically significant communication needs qualified human review.
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Literal
 
 from .intake import LANGUAGES, intake_response, normalize_safety_text
@@ -149,6 +149,7 @@ def receptionist_response(locale: str, message: str) -> dict:
 
 
 class PreviewIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     language: Locale
     intent: Intent
 
