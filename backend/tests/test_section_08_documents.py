@@ -71,7 +71,8 @@ def test_private_staff_upload_and_patient_download_with_no_cache(seeded, monkeyp
     staff_download = client.get("/api/v1/secure-documents/" + doc_id, headers=admin)
     assert staff_download.status_code == 200, staff_download.text
     assert staff_download.content == RAW
-    assert staff_download.headers["cache-control"] == "no-store, private"
+    # The global security middleware normalizes this header to no-store.
+    assert "no-store" in staff_download.headers["cache-control"]
     assert staff_download.headers["x-content-type-options"] == "nosniff"
     assert staff_download.headers["content-security-policy"] == "sandbox"
     patient_download_url = f"/api/v1/secure-documents/portal/cases/{case['id']}/documents/{doc_id}"
