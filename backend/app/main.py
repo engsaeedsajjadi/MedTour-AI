@@ -498,3 +498,6 @@ app.include_router(human_inbox_router)
 
 from .physician_management import router as physician_management_router
 app.include_router(physician_management_router)
+
+from .hospital_management import router as hospital_management_router
+app.include_router(hospital_management_router)
