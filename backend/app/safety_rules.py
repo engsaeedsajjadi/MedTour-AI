@@ -16,7 +16,8 @@ from .enterprise_models import OutboundMessage, PortalAccess, TranslationDraft, 
 SAFETY_POLICY_VERSION = "section-02-2026-10-22"
 INVITATION_TASK_TITLE = "Prepare secure portal invitation via an approved private channel"
 CONSENT_PURPOSES = frozenset({
-    "intake", "medical_documents", "communication", "ai_processing"
+    "intake", "medical_documents", "communication", "ai_processing",
+    "hospital_coordination"
 })
 
 
@@ -100,7 +101,7 @@ def revoke_patient_access(db: Session, tenant_id: str, patient_id: str, purpose:
             task.status = "cancelled"
 
     blocked_hospital_requests = []
-    if purpose == "intake":
+    if purpose in ("intake", "hospital_coordination"):
         blocked_hospital_requests = db.scalars(select(HospitalCoordination).where(
             HospitalCoordination.tenant_id == tenant_id,
             HospitalCoordination.patient_id == patient_id,
