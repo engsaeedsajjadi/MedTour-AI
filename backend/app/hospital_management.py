@@ -449,7 +449,8 @@ def my_coordinations(limit:int=Query(50,ge=1,le=100),
         HospitalCoordination.hospital_id == hospital.id,
     ).order_by(HospitalCoordination.created_at.desc()).limit(limit)).all()
     return {"items":[coordination_view(r) for r in rows
-            if active_consent(db,user.tenant_id,r.patient_id,"intake")],
+            if r.status in ("requested","received")
+            and active_consent(db,user.tenant_id,r.patient_id,"intake")],
             "raw_medical_data_included":False,"externally_delivered":False}
 
 
