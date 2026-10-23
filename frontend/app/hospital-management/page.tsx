@@ -127,7 +127,7 @@ export default function HospitalManagement(){
    </div>
    <section className="panel" style={{padding:20,marginTop:16}}>
     <h2>درخواست هماهنگی با مرکز</h2>
-    <p>فقط پس از رضایت فعلی بیمار برای پذیرش، با مرجع اداری فاقد داده پزشکی.</p>
+    <p>ثبت این درخواست به دو رضایت فعال intake و hospital_coordination نیاز دارد. مرجع اداری نباید داده پزشکی داشته باشد.</p>
     <form onSubmit={e=>{e.preventDefault();void doAction(ROOT+'/hospitals/'+hospital+'/coordinations','POST',{
      case_id:caseId,service_code:service,reference})}} style={{display:'grid',gap:9,maxWidth:610}}>
      <label>پرونده<select required value={caseId} onChange={e=>setCaseId(e.target.value)} style={{width:'100%',padding:10}}>
