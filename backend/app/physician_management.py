@@ -20,6 +20,7 @@ from .enterprise_models import (
     PhysicianAvailability,
 )
 from .security import roles
+from .safety_rules import active_consent
 
 router = APIRouter(prefix="/api/v1/physician-management", tags=["physician management"])
 staff = roles("admin", "operator")
@@ -387,6 +388,20 @@ def my_profile(
             "physician_user_id": user.id, "patient_identifiers_included": False}
 
 
+def consented_case_ids(db: Session, user: User, doctor_id: str,
+                       ids: list[str]) -> set[str]:
+    # A past referral/appointment does not override a patient's later
+    # withdrawal of intake consent.
+    if not ids:
+        return set()
+    rows = db.scalars(select(Case).where(
+        Case.tenant_id == user.tenant_id,
+        Case.id.in_(ids),
+    )).all()
+    return {row.id for row in rows
+            if active_consent(db, user.tenant_id, row.patient_id, "intake")}
+
+
 @router.get("/portal/referrals")
 def my_referrals(
     db: Session = Depends(get_db), user: User = Depends(physician),
@@ -396,9 +411,10 @@ def my_referrals(
     rows = db.scalars(select(Referral).where(
         Referral.tenant_id == user.tenant_id, Referral.physician_id == doctor.id,
     ).order_by(Referral.created_at.desc()).limit(limit)).all()
+    allowed = consented_case_ids(db, user, doctor.id, [x.case_id for x in rows])
     return {
         "items": [{"id": x.id, "case_reference": x.case_id, "status": x.status,
-                   "created_at": x.created_at} for x in rows],
+                   "created_at": x.created_at} for x in rows if x.case_id in allowed],
         "raw_patient_data_included": False,
         "clinical_approval_possible": False,
     }
@@ -413,10 +429,11 @@ def my_appointments(
     rows = db.scalars(select(Appointment).where(
         Appointment.tenant_id == user.tenant_id, Appointment.physician_id == doctor.id,
     ).order_by(Appointment.requested_at.desc()).limit(limit)).all()
+    allowed = consented_case_ids(db, user, doctor.id, [x.case_id for x in rows])
     return {
         "items": [{"id": x.id, "case_reference": x.case_id,
                    "requested_at": x.requested_at, "status": x.status}
-                  for x in rows],
+                  for x in rows if x.case_id in allowed],
         "external_booking_verified": False,
         "medical_details_included": False,
     }
