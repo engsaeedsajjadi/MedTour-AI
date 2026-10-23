@@ -88,6 +88,7 @@ def test_hospital_portal_requires_role_local_evidence_and_revoke(seeded):
     assert profile.json()["hospital_id"]==hid
     assert profile.json()["regulator_license_verified"] is False
     assert "registration_reference" not in profile.text
+    assert "linked_user_ids" not in profile.text
     assert client.get(ROOT+"/directory",headers=tok).status_code==403
     assert client.put(ROOT+f"/hospitals/{hid}/credential",
                       headers=tok,json={}).status_code==403
