@@ -220,3 +220,26 @@ def test_legacy_directory_verified_flag_does_not_grant_portal_or_claim_licensure
     assert result.json()["independent_licensure_verified"] is False
     assert "independent license NOT verified" in result.json()["results"][0]["matching_reason"]
     assert client.get(ROOT+"/directory",headers=admin).json()["externally_verified"] is False
+
+
+def test_revoked_intake_consent_hides_physician_case_references(seeded):
+    (client,auth,tids,Session),admin,patient,case=seeded
+    pid=_doctor(client,admin)
+    uid=_account(client,admin)
+    tok=_login(client)
+    assert _link(client,admin,pid,uid).status_code==200
+    assert _attest(client,admin,pid).status_code==200
+    assert client.patch(f"/api/v1/physicians/{pid}/verification",
+        headers=admin,json={"status":"verified"}).status_code==200
+    referral=client.post("/api/v1/referrals",headers=admin,json={
+        "case_id":case["id"],"physician_id":pid
+    })
+    assert referral.status_code==201
+    assert len(client.get(ROOT+"/portal/referrals",headers=tok).json()["items"])==1
+    withdrawn=client.post("/api/v1/consents",headers=admin,json={
+        "patient_id":patient["id"],"purpose":"intake",
+        "accepted":False,"notice_version":"synthetic-withdrawal-12"
+    })
+    assert withdrawn.status_code==201
+    assert client.get(ROOT+"/portal/referrals",headers=tok).json()["items"]==[]
+    assert client.get(ROOT+"/portal/appointments",headers=tok).json()["items"]==[]
