@@ -56,7 +56,7 @@ class CaseStatusIn(BaseModel):
     reference:str|None=Field(default=None,min_length=6,max_length=100,pattern=r'^[A-Za-z0-9][A-Za-z0-9._:/-]{5,99}$')
 class ConsentIn(BaseModel):
     patient_id:str
-    purpose:Literal['intake','medical_documents','communication','ai_processing']
+    purpose:Literal['intake','medical_documents','communication','ai_processing','hospital_coordination']
     accepted:bool
     notice_version:str=Field(min_length=1,max_length=40)
 class PhysicianIn(BaseModel):
