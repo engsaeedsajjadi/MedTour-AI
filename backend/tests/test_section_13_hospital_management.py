@@ -48,6 +48,15 @@ def service(client,admin,hid,code="cardiology"):
                        json={"service_code":code})
 
 
+
+def allow_hospital_coordination(client,admin,patient_id,accepted=True):
+    result=client.post("/api/v1/consents",headers=admin,json={
+        "patient_id":patient_id,"purpose":"hospital_coordination",
+        "accepted":accepted,"notice_version":"synthetic-hospital-13",
+    })
+    assert result.status_code==201,result.text
+
+
 def linked_setup(client,admin):
     hid=create_hospital(client,admin)
     uid=create_account(client,admin)
@@ -171,6 +180,9 @@ def test_coordination_receipt_requires_tenant_consent_and_no_external_confirmati
     url=ROOT+f"/hospitals/{hid}/coordinations"
     data={"case_id":case["id"],"service_code":"cardiology",
           "reference":"TEST-HOSP-REQ-0013"}
+    # Intake alone is NOT permission to expose coordination metadata to a hospital.
+    assert client.post(url,headers=admin,json=data).status_code==409
+    allow_hospital_coordination(client,admin,p["id"])
     assert client.post(url,headers=auth("a","operator@example.test"),json=data).status_code==403
     assert client.post(url,headers=auth("b"),json=data).status_code==404
     req=client.post(url,headers=admin,json=data)
@@ -209,6 +221,7 @@ def test_consent_withdrawal_blocks_requests_permanently_and_other_hospitals(seed
     assert service(client,admin,hid).status_code==200
     data={"case_id":case["id"],"service_code":"cardiology",
           "reference":"CONSENT-REQ-0013"}
+    allow_hospital_coordination(client,admin,p["id"])
     cid=client.post(ROOT+f"/hospitals/{hid}/coordinations",
                     headers=admin,json=data).json()["id"]
     assert client.get(ROOT+"/portal/coordinations",headers=tok2).json()["items"]==[]
@@ -243,3 +256,24 @@ def test_user_deactivation_requires_unlink_first(seeded):
     assert client.post(f"/api/v1/admin-center/staff/{uid}/deactivate",
                        headers=admin).status_code==200
     assert client.get(ROOT+"/portal/me",headers=tok).status_code==401
+
+
+def test_specific_hospital_consent_withdrawal_blocks_metadata_even_if_intake_remains(seeded):
+    (client,auth,tids,Session),admin,p,case=seeded
+    hid,uid,tok=linked_setup(client,admin)
+    assert service(client,admin,hid).status_code==200
+    allow_hospital_coordination(client,admin,p["id"])
+    request=client.post(ROOT+f"/hospitals/{hid}/coordinations",headers=admin,json={
+        "case_id":case["id"],"service_code":"cardiology",
+        "reference":"SCOPE-CONSENT-0013"
+    })
+    assert request.status_code==201,request.text
+    identifier=request.json()["id"]
+    allow_hospital_coordination(client,admin,p["id"],accepted=False)
+    assert client.get(ROOT+"/portal/coordinations",headers=tok).json()["items"]==[]
+    assert client.post(ROOT+f"/portal/coordinations/{identifier}/acknowledge",
+                       headers=tok).status_code==409
+    with Session() as db:
+        assert db.get(HospitalCoordination,identifier).status=="blocked"
+    allow_hospital_coordination(client,admin,p["id"])
+    assert client.get(ROOT+"/portal/coordinations",headers=tok).json()["items"]==[]
