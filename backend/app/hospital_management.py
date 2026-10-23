@@ -399,6 +399,8 @@ def create_coordination(hospital_id: str, body: CoordinationIn,
     if patient is None: raise HTTPException(404, "Patient not found")
     if not active_consent(db, user.tenant_id, patient.id, "intake"):
         raise HTTPException(409, "Current intake consent required")
+    if not active_consent(db, user.tenant_id, patient.id, "hospital_coordination"):
+        raise HTTPException(409, "Explicit hospital coordination consent required")
     if evidence_state(credential(db, user.tenant_id, hospital.id)) != "locally_attested":
         raise HTTPException(409, "Local hospital credential evidence is not current")
     service = db.scalar(select(HospitalService).where(
@@ -450,7 +452,8 @@ def my_coordinations(limit:int=Query(50,ge=1,le=100),
     ).order_by(HospitalCoordination.created_at.desc()).limit(limit)).all()
     return {"items":[coordination_view(r) for r in rows
             if r.status in ("requested","received")
-            and active_consent(db,user.tenant_id,r.patient_id,"intake")],
+            and active_consent(db,user.tenant_id,r.patient_id,"intake")
+            and active_consent(db,user.tenant_id,r.patient_id,"hospital_coordination")],
             "raw_medical_data_included":False,"externally_delivered":False}
 
 
@@ -468,6 +471,8 @@ def acknowledge(coordination_id:str,db:Session=Depends(get_db),
         raise HTTPException(409,"Request cannot be acknowledged")
     if not active_consent(db,user.tenant_id,row.patient_id,"intake"):
         raise HTTPException(409,"Current intake consent required")
+    if not active_consent(db,user.tenant_id,row.patient_id,"hospital_coordination"):
+        raise HTTPException(409,"Current hospital coordination consent required")
     row.status="received"
     row.last_actor_id=user.id
     log(db,user,"coordination_received",row.id,"HospitalCoordination")
