@@ -355,7 +355,10 @@ def current_hospital(db: Session, user: User):
 def hospital_profile(db: Session = Depends(get_db),
                      user: User = Depends(hospital_staff)):
     hospital = current_hospital(db, user)
-    return {**hospital_view(db, hospital), "hospital_user_id": user.id,
+    profile = hospital_view(db, hospital)
+    # Admin-only account rosters are not needed inside a provider portal.
+    profile.pop("linked_user_ids", None)
+    return {**profile, "hospital_user_id": user.id,
             "patient_identifiers_included": False, "clinical_approval_possible": False}
 
 
@@ -393,6 +396,8 @@ def create_coordination(hospital_id: str, body: CoordinationIn,
         Case.id == body.case_id, Case.tenant_id == user.tenant_id,
     ).with_for_update())
     if case is None: raise HTTPException(404, "Case not found")
+    if case.status in ("closed", "cancelled"):
+        raise HTTPException(409, "Inactive case cannot be referred to a hospital")
     patient = db.scalar(select(Patient).where(
         Patient.id == case.patient_id, Patient.tenant_id == user.tenant_id,
     ))
