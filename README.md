@@ -67,6 +67,10 @@ The administrator-only `/admin-center` provides tenant-scoped database metrics, 
 
 Consent-bound staff claim/assignment and manual five-language webchat replies, safe status transitions, urgency metadata, patient-message reopening, restricted legacy routes and PHI-free audit are available in /conversations. Official Chatwoot/WhatsApp live integrations and production PHI authorization remain incomplete. See [Section 11](docs/SECTION_11_HUMAN_INBOX_FA.md).
 
+## Section 12 — Physician management (synthetic development)
+
+Tenant-safe physician-specific linked login, expiring *locally attested* credential records, hospital affiliations, proposed time slots and a restricted referral/appointment/availability portal are implemented for development testing. This does NOT independently certify any physician's license, hospital practice rights or appointment availability. See [Section 12](docs/SECTION_12_PHYSICIAN_MANAGEMENT_FA.md).
+
 ## What is NOT finished
 
 The 45-section enterprise master specification **has not yet reached full acceptance**. Critical remaining work includes PostgreSQL Row-Level Security and migration of existing pre-Alembic databases; full patient identity assurance and MFA; doctor/hospital independently scoped portals; real compliant WhatsApp outbound communication; five-language human-validated AI/voice; operational/independently verified S3/KMS storage and ClamAV scanning; approved external visa/hotel/provider APIs; payment gateways; subscription billing; load tests; frontend E2E and independent clinical/privacy/security review.

@@ -403,8 +403,10 @@ def provider_options(body:ProviderFindIn,db:Session=Depends(get_db),user:User=De
     if body.preferred_city:matches=[p for p in matches if p.city.casefold()==body.preferred_city.casefold()]
     return {'status':'requires_human_clinical_review','matched_specialty':c.specialty,
       'results':[{'id':p.id,'name':p.full_name,'specialty':p.specialty,'city':p.city,
-                  'matching_reason':'Verified directory record and matching specialty text only'} for p in matches],
-      'disclaimer':'Not a medical recommendation or treatment decision.'}
+                  'matching_reason':'Administratively marked directory record and matching specialty text; independent license NOT verified'} for p in matches],
+      'disclaimer':'Not a medical recommendation or treatment decision. Directory verified flag alone is NOT independent licensure verification.',
+      'independent_licensure_verified':False,
+      'clinic_appointment_booked':False}
 
 @router.get('/knowledge/search')
 def knowledge_search(q:str=Query(min_length=3,max_length=120),locale:str='en',db:Session=Depends(get_db),user:User=Depends(OPERATOR)):

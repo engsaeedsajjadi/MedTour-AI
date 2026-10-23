@@ -24,7 +24,7 @@ app=FastAPI(title='MedTour AI Coordination API',version='0.5.0-alpha',descriptio
 app.include_router(whatsapp_router)
 app.include_router(telegram_router)
 origins=[p.strip() for p in os.getenv('CORS_ORIGINS','http://localhost:3000').split(',') if p.strip()]
-app.add_middleware(CORSMiddleware,allow_origins=origins,allow_credentials=True,allow_methods=['GET','POST','PATCH'],allow_headers=['Authorization','Content-Type','X-Patient-Access'])
+app.add_middleware(CORSMiddleware,allow_origins=origins,allow_credentials=True,allow_methods=['GET','POST','PATCH','PUT'],allow_headers=['Authorization','Content-Type','X-Patient-Access'])
 
 ROLES = ('admin','operator','physician','patient','auditor')
 MODERATOR = roles('admin','operator')
@@ -495,3 +495,6 @@ app.include_router(admin_control_router)
 
 from .human_inbox import router as human_inbox_router
 app.include_router(human_inbox_router)
+
+from .physician_management import router as physician_management_router
+app.include_router(physician_management_router)
