@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from .database import get_db
 from .enterprise_models import (
     CRMFollowUp, PatientIntake, Operation, OutboundMessage,
-    TranslationDraft, CaseTimeline, IntakeReviewerAssignment,
+    TranslationDraft, CaseTimeline, IntakeReviewerAssignment, HospitalAccount,
 )
 from .models import (
     Audit, Case, Conversation, Patient, Quote, User,
@@ -324,6 +324,9 @@ def deactivate_staff(
         or count(db, IntakeReviewerAssignment, user.tenant_id,
                  IntakeReviewerAssignment.reviewer_user_id == target.id,
                  IntakeReviewerAssignment.active.is_(True))
+        or count(db, HospitalAccount, user.tenant_id,
+                 HospitalAccount.user_id == target.id,
+                 HospitalAccount.active.is_(True))
     ):
         raise HTTPException(409, "Reassign all active work before deactivation")
     target.active = False

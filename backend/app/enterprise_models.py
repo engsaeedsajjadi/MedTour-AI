@@ -344,3 +344,56 @@ class PhysicianAvailability(TenantEntity, Base):
     status: Mapped[str] = mapped_column(String(20), default="proposed", nullable=False)
     recorded_by: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
     __table_args__ = (Index("idx_physician_availability_tenant_window", "tenant_id", "physician_id", "starts_at"),)
+
+# Section 13: hospital coordination metadata; local attestations are NOT
+# independent hospital licensing or official provider confirmations.
+class HospitalAccount(TenantEntity, Base):
+    __tablename__ = "hospital_accounts"
+    hospital_id: Mapped[str] = mapped_column(ForeignKey("hospitals.id"), nullable=False, index=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    linked_by: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    __table_args__ = (UniqueConstraint("tenant_id", "hospital_id", "user_id"), UniqueConstraint("tenant_id", "user_id"))
+
+class HospitalCredential(TenantEntity, Base):
+    __tablename__ = "hospital_credentials"
+    hospital_id: Mapped[str] = mapped_column(ForeignKey("hospitals.id"), nullable=False, index=True)
+    issuing_country: Mapped[str] = mapped_column(String(2), nullable=False)
+    issuing_authority: Mapped[str] = mapped_column(String(120), nullable=False)
+    registration_reference: Mapped[str] = mapped_column(String(100), nullable=False)
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="locally_attested")
+    checked_by: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
+    checked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    __table_args__ = (UniqueConstraint("tenant_id", "hospital_id"),)
+
+class HospitalService(TenantEntity, Base):
+    __tablename__ = "hospital_services"
+    hospital_id: Mapped[str] = mapped_column(ForeignKey("hospitals.id"), nullable=False, index=True)
+    service_code: Mapped[str] = mapped_column(String(48), nullable=False)
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="locally_recorded")
+    recorded_by: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
+    __table_args__ = (UniqueConstraint("tenant_id", "hospital_id", "service_code"),)
+
+class HospitalCapacity(TenantEntity, Base):
+    __tablename__ = "hospital_capacity"
+    hospital_id: Mapped[str] = mapped_column(ForeignKey("hospitals.id"), nullable=False, index=True)
+    service_code: Mapped[str] = mapped_column(String(48), nullable=False)
+    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    proposed_units: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="proposed")
+    recorded_by: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
+    __table_args__ = (Index("idx_hospital_capacity_window", "tenant_id", "hospital_id", "starts_at"),)
+
+class HospitalCoordination(TenantEntity, Base):
+    __tablename__ = "hospital_coordinations"
+    hospital_id: Mapped[str] = mapped_column(ForeignKey("hospitals.id"), nullable=False, index=True)
+    patient_id: Mapped[str] = mapped_column(ForeignKey("patients.id"), nullable=False)
+    case_id: Mapped[str] = mapped_column(ForeignKey("cases.id"), nullable=False, index=True)
+    service_code: Mapped[str] = mapped_column(String(48), nullable=False)
+    reference: Mapped[str] = mapped_column(String(100), nullable=False)
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="requested")
+    recorded_by: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
+    last_actor_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    __table_args__ = (UniqueConstraint("tenant_id", "hospital_id", "case_id", "reference"),)

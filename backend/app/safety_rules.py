@@ -10,13 +10,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .models import Case, Consent, Conversation, Task, Document
-from .enterprise_models import OutboundMessage, PortalAccess, TranslationDraft, CRMFollowUp
+from .enterprise_models import OutboundMessage, PortalAccess, TranslationDraft, CRMFollowUp, HospitalCoordination
 
 
 SAFETY_POLICY_VERSION = "section-02-2026-10-22"
 INVITATION_TASK_TITLE = "Prepare secure portal invitation via an approved private channel"
 CONSENT_PURPOSES = frozenset({
-    "intake", "medical_documents", "communication", "ai_processing"
+    "intake", "medical_documents", "communication", "ai_processing",
+    "hospital_coordination"
 })
 
 
@@ -99,6 +100,16 @@ def revoke_patient_access(db: Session, tenant_id: str, patient_id: str, purpose:
         for task in handoffs:
             task.status = "cancelled"
 
+    blocked_hospital_requests = []
+    if purpose in ("intake", "hospital_coordination"):
+        blocked_hospital_requests = db.scalars(select(HospitalCoordination).where(
+            HospitalCoordination.tenant_id == tenant_id,
+            HospitalCoordination.patient_id == patient_id,
+            HospitalCoordination.status.in_(("requested", "received")),
+        )).all()
+        for request in blocked_hospital_requests:
+            request.status = "blocked"
+
     revoked_documents = []
     if purpose == "medical_documents":
         revoked_documents = db.scalars(select(Document).where(
@@ -132,6 +143,7 @@ def revoke_patient_access(db: Session, tenant_id: str, patient_id: str, purpose:
         "ai_translation_drafts_blocked": len(drafts),
         "documents_access_revoked": len(revoked_documents),
         "crm_followups_blocked": len(blocked_followups),
+        "hospital_requests_blocked": len(blocked_hospital_requests),
     }
 
 
