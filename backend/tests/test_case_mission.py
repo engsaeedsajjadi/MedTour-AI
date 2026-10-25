@@ -69,7 +69,7 @@ def test_consent_revocation_invalidates_mission_evidence(seeded):
 
 
 def test_full_synthetic_case_lifecycle_requires_human_evidence(seeded):
-    (client, auth, _, _), admin, _, case = seeded
+    (client, auth, _, _), admin, patient, case = seeded
     case_id = case["id"]
     operator = auth("a", "operator@example.test")
     assert advance(client, admin, case_id, "intake").status_code == 200
@@ -139,10 +139,47 @@ def test_full_synthetic_case_lifecycle_requires_human_evidence(seeded):
         json={"case_id": case_id, "service_type": "hotel"}
     ).json()
     assert advance(client, admin, case_id, "arrived", "SYNTHETIC-ARRIVAL").status_code == 409
+    # The legacy shortcut cannot claim a booked hotel.
     assert client.patch(
         f"/api/v1/travel/{travel['id']}/status", headers=admin,
         json={"status": "confirmed", "reference": "SYNTHETIC-HOTEL"}
+    ).status_code == 409
+    assert client.patch(
+        f"/api/v1/travel/{travel['id']}/status", headers=admin,
+        json={"status": "cancelled"}
     ).status_code == 200
+    assert client.post("/api/v1/consents", headers=admin, json={
+        "patient_id": patient["id"], "purpose": "accommodation_coordination",
+        "accepted": True, "notice_version": "v18-synthetic"}).status_code == 201
+    hotel = client.post("/api/v1/accommodation/properties", headers=admin,
+       json={"name": "Synthetic Recovery Hotel", "city": "Tehran"})
+    assert hotel.status_code == 201, hotel.text
+    pid = hotel.json()["id"]
+    start = (datetime.now(timezone.utc) + timedelta(days=10)).date().isoformat()
+    end = (datetime.now(timezone.utc) + timedelta(days=14)).date().isoformat()
+    capacity = client.post(f"/api/v1/accommodation/properties/{pid}/inventory",
+       headers=admin, json={"room_type": "double", "starts_on": start,
+       "ends_on": end, "proposed_rooms": 1, "reference": "LOCAL-STOCK-18"})
+    assert capacity.status_code == 201, capacity.text
+    stay = client.post(f"/api/v1/accommodation/cases/{case_id}/stays",
+       headers=admin, json={"request_key": "STAY-MISSION-18",
+       "property_id": pid, "room_type": "double", "starts_on": start,
+       "ends_on": end, "rooms_requested": 1, "guests": 2})
+    assert stay.status_code == 201, stay.text
+    sid = stay.json()["id"]
+    assert advance(client, admin, case_id, "arrived", "SYNTHETIC-ARRIVAL").status_code == 409
+    for action, key, supplier in (
+        ("hold_internally", "HOLD-MISSION-18", None),
+        ("report_provider_request", "REQUEST-MISSION-18", "Synthetic Supplier"),
+        ("report_provider_confirmation", "RESPONSE-MISSION-18", "Synthetic Supplier"),
+    ):
+        payload = {"step_key": key, "action": action, "reference": "LOCAL-STAY-18"}
+        if supplier:
+            payload["supplier_name"] = supplier
+        result = client.post(f"/api/v1/accommodation/stays/{sid}/transition",
+            headers=admin, json=payload)
+        assert result.status_code == 200, result.text
+    assert result.json()["provider_booking_independently_verified"] is False
     assert advance(client, admin, case_id, "arrived", "SYNTHETIC-ARRIVAL").status_code == 200
     assert advance(client, admin, case_id, "in_treatment", "SYNTHETIC-CARE").status_code == 200
     assert advance(client, admin, case_id, "follow_up", "SYNTHETIC-FOLLOW").status_code == 200

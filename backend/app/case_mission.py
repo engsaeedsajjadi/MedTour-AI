@@ -15,7 +15,7 @@ from .models import (
     Appointment, Case, Consent, Conversation, Document, Physician,
     Quote, Referral, TravelRequest, User,
 )
-from .enterprise_models import CaseTimeline, Operation, PatientIntake
+from .enterprise_models import CaseTimeline, Operation, PatientIntake, AccommodationStay
 from .security import roles
 
 router = APIRouter(prefix="/api/v1/cases", tags=["case mission"])
@@ -98,7 +98,17 @@ def mission_evidence(db: Session, case: Case) -> dict:
     travel = _rows(db, TravelRequest, t, TravelRequest.case_id == case.id)
     ops = _rows(db, Operation, t, Operation.case_id == case.id)
     travel_ops = [x for x in ops if x.kind in TRAVEL_KINDS]
-    unresolved_travel = any(
+    stays = _rows(db, AccommodationStay, t, AccommodationStay.case_id == case.id,
+                  AccommodationStay.patient_id == case.patient_id)
+    # Open stays block the existing travel milestone; supplier reports remain
+    # unverified administrative evidence, never actual accommodation proof.
+    unresolved_stays = any(
+        x.status not in ("external_confirmation_reported",
+                         "external_decline_reported", "cancelled")
+        or not _consented(db, t, case.patient_id, "accommodation_coordination")
+        for x in stays
+    )
+    unresolved_travel = unresolved_stays or any(
         x.status not in ("confirmed", "cancelled") or
         (x.status == "confirmed" and not x.external_reference)
         for x in travel
@@ -136,8 +146,9 @@ def mission_evidence(db: Session, case: Case) -> dict:
             "has_staff_conversation": bool(conversations) and communication,
             "human_handoff": any(x.human_handoff for x in conversations),
             "documents_recorded": len(docs),
-            "travel_services_requested": len(travel) + len(travel_ops),
+            "travel_services_requested": len(travel) + len(travel_ops) + len(stays),
             "travel_services_unresolved": unresolved_travel,
+            "accommodation_requests_recorded": len(stays),
             "urgent_intake_detected": emergency,
         },
         "required_for_status": {
