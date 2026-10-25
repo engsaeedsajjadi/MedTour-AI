@@ -9,7 +9,7 @@ import os
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .models import Case, Consent, Conversation, Task, Document
+from .models import Case, Consent, Conversation, Task, Document, Patient
 from .enterprise_models import OutboundMessage, PortalAccess, TranslationDraft, CRMFollowUp, HospitalCoordination, ProviderMatch, AppointmentSlot, MedicalVisa, AccommodationStay, TravelAssignment, AgentReferralIntent, LeadSource
 
 
@@ -58,6 +58,13 @@ def revoke_patient_access(db: Session, tenant_id: str, patient_id: str, purpose:
     translation buffers are scrubbed when communication/AI consent is withdrawn;
     already delivered messages need separately governed retention/erasure.
     """
+    # Serialize consent withdrawal with consent-sensitive agent attribution.
+    # The matching flow also locks this patient row before checking consent.
+    db.scalar(select(Patient.id).where(
+        Patient.tenant_id == tenant_id,
+        Patient.id == patient_id,
+    ).with_for_update())
+
     grants = db.scalars(select(PortalAccess).where(
         PortalAccess.tenant_id == tenant_id,
         PortalAccess.patient_id == patient_id,
