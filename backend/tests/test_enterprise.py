@@ -4,6 +4,15 @@ from datetime import datetime,timedelta,timezone
 from io import BytesIO
 import base64,os,hmac,hashlib,json
 
+def _patient_token(client, invitation):
+    body=invitation.json() if hasattr(invitation,"json") else invitation
+    verified=client.post("/api/v1/portal/session/exchange",json={
+        "invitation_token":body["token"],
+        "verification_code":body["demo_verification_code"]})
+    assert verified.status_code==201,verified.text
+    return verified.json()["access_token"]
+
+
 def test_operations_lifecycle_and_tenant_isolation(seeded):
     (client,auth,_,_),admin,p,c=seeded
     x=client.post('/api/v1/operations',headers=admin,json={'kind':'visa','case_id':c['id'],'title':'Travel documentation'});assert x.status_code==201,x.text
@@ -73,7 +82,7 @@ def test_portal_access_requires_consent_and_own_patient_data(seeded):
     client.post('/api/v1/consents',headers=admin,json={'patient_id':p['id'],'purpose':'communication','accepted':True,'notice_version':'v1'})
     response=client.post('/api/v1/portal/invites/'+p['id'],headers=admin)
     assert response.status_code==201
-    token=response.json()['token'];h={'X-Patient-Access':token}
+    token=_patient_token(client,response);h={'X-Patient-Access':token}
     assert client.get('/api/v1/portal/me',headers=h).json()['id']==p['id']
     trip=client.get('/api/v1/portal/journey',headers=h).json()
     assert len(trip)==1 and trip[0]['case_id']==c['id']
@@ -140,7 +149,7 @@ def test_webhook_routed_only_with_consent_and_signature(seeded,monkeypatch):
 def test_patient_chat_is_consent_gated_and_scoped(seeded):
     (client,auth,_,_),admin,p,c=seeded
     client.post('/api/v1/consents',headers=admin,json={'patient_id':p['id'],'purpose':'communication','accepted':True,'notice_version':'v1'})
-    token=client.post('/api/v1/portal/invites/'+p['id'],headers=admin).json()['token']
+    token=_patient_token(client,client.post('/api/v1/portal/invites/'+p['id'],headers=admin))
     h={'X-Patient-Access':token}
     resp=client.post('/api/v1/portal/chat',headers=h,json={'message':'I would like to see a specialist','language':'en'})
     assert resp.status_code==201 and resp.json()['automated_response']

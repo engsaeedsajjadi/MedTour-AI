@@ -17,7 +17,11 @@ def _portal(client, admin, patient_id):
     _comm(client, admin, patient_id)
     r = client.post("/api/v1/portal/invites/" + patient_id, headers=admin)
     assert r.status_code == 201
-    return {"X-Patient-Access": r.json()["token"]}
+    exchange=client.post("/api/v1/portal/session/exchange",json={
+        "invitation_token":r.json()["token"],
+        "verification_code":r.json()["demo_verification_code"]})
+    assert exchange.status_code==201,exchange.text
+    return {"X-Patient-Access":exchange.json()["access_token"]}
 
 
 def _chat(client, portal, phrase="Hello"):

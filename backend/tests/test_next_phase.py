@@ -13,11 +13,19 @@ def grant(client,headers,patient_id,purpose):
     assert result.status_code==201,result.text
 
 
+def _exchange_portal(client,invitation):
+    body=invitation.json() if hasattr(invitation,"json") else invitation
+    r=client.post("/api/v1/portal/session/exchange",json={
+        "invitation_token":body["token"],"verification_code":body["demo_verification_code"]})
+    assert r.status_code==201,r.text
+    return r.json()["access_token"]
+
+
 def portal(client,headers,patient_id):
     grant(client,headers,patient_id,'communication')
     result=client.post(f'/api/v1/portal/invites/{patient_id}',headers=headers)
     assert result.status_code==201,result.text
-    return {'X-Patient-Access':result.json()['token']}
+    return {'X-Patient-Access':_exchange_portal(client,result)}
 
 
 def test_five_language_questions_are_distinct_and_complete():
@@ -139,8 +147,9 @@ def test_patient_upload_private_dev_storage(monkeypatch,tmp_path,seeded):
     assert client.get('/api/v1/secure-documents/'+res.json()['id'],headers=admin).status_code==200
     other=client.post('/api/v1/patients',headers=admin,json={'full_name':'Another Fake Patient','language':'en'}).json()
     grant(client,admin,other['id'],'communication')
+    grant(client,admin,other['id'],'intake')
     other_header=client.post('/api/v1/portal/invites/'+other['id'],headers=admin).json()
-    assert client.get('/api/v1/secure-documents/portal/cases/'+c['id']+'/list',headers={'X-Patient-Access':other_header['token']}).status_code==404
+    assert client.get('/api/v1/secure-documents/portal/cases/'+c['id']+'/list',headers={'X-Patient-Access':_exchange_portal(client,other_header)}).status_code==404
     client.post('/api/v1/consents',headers=admin,json={'patient_id':p['id'],'purpose':'medical_documents','accepted':False,'notice_version':'v3'})
     assert client.get('/api/v1/secure-documents/'+res.json()['id'],headers=admin).status_code==409
     assert client.get('/api/v1/secure-documents/portal/cases/'+c['id']+'/list',headers=headers).status_code==401
@@ -181,10 +190,11 @@ def test_consent_link_patient_attestation_one_time(seeded):
     grant(client,admin,p['id'],'communication')
     invite=client.post(f'/api/v1/portal/invites/{p["id"]}',headers=admin)
     assert invite.status_code==201
+    access=_exchange_portal(client,invite)
     refused=client.post(f"/api/v1/consent-links/{p['id']}/communication",headers=admin).json()
     withdrawn=client.post('/api/v1/consent-links/respond',json={'token':refused['token'],'notice_version':'v8','accepted':False})
     assert withdrawn.status_code==201
-    assert client.get('/api/v1/portal/me',headers={'X-Patient-Access':invite.json()['token']}).status_code==401
+    assert client.get('/api/v1/portal/me',headers={'X-Patient-Access':access}).status_code==401
 
 
 def test_consent_link_cannot_be_used_for_other_purpose(seeded):

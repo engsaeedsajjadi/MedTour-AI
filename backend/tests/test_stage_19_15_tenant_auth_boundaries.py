@@ -100,6 +100,11 @@ def test_portal_link_remains_patient_and_tenant_bound(context):
     pb = _make_patient(client, hb, "Synthetic B Portal")
     _accept_communication(client, ha, pa)
     _accept_communication(client, hb, pb)
+    for h, pid in ((ha,pa),(hb,pb)):
+        consent=client.post("/api/v1/consents",headers=h,json={
+            "patient_id":pid,"purpose":"intake","accepted":True,
+            "notice_version":"stage-19-15"})
+        assert consent.status_code==201,consent.text
 
     foreign_invite = client.post(f"/api/v1/portal/invites/{pb}", headers=ha)
     assert foreign_invite.status_code == 404, foreign_invite.text
@@ -107,7 +112,14 @@ def test_portal_link_remains_patient_and_tenant_bound(context):
     issued_a = client.post(f"/api/v1/portal/invites/{pa}", headers=ha)
     issued_b = client.post(f"/api/v1/portal/invites/{pb}", headers=hb)
     assert issued_a.status_code == issued_b.status_code == 201
-    tok_a, tok_b = issued_a.json()["token"], issued_b.json()["token"]
+    def redeem(invite):
+        data=invite.json()
+        exchange=client.post("/api/v1/portal/session/exchange",json={
+            "invitation_token":data["token"],
+            "verification_code":data["demo_verification_code"]})
+        assert exchange.status_code==201,exchange.text
+        return exchange.json()["access_token"]
+    tok_a, tok_b = redeem(issued_a), redeem(issued_b)
 
     me_a = client.get("/api/v1/portal/me", headers={"X-Patient-Access": tok_a})
     me_b = client.get("/api/v1/portal/me", headers={"X-Patient-Access": tok_b})
