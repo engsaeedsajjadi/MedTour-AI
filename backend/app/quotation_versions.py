@@ -200,10 +200,13 @@ def list_versions(quote_id:str,db:Session=Depends(get_db),user:User=Depends(staf
 
 @router.post("/versions/{version_id}/approve")
 def approve(version_id:str,body:ReviewIn,db:Session=Depends(get_db),user:User=Depends(admin)):
+    # Match draft lock order: Quote first, then QuoteVersion.
+    existing=db.scalar(select(QuoteVersion).where(
+        QuoteVersion.tenant_id==user.tenant_id,QuoteVersion.id==version_id))
+    if existing is None:raise HTTPException(404,"Version not found")
+    q,case=quote_case(db,user,existing.quote_id,lock=True)
     x=db.scalar(select(QuoteVersion).where(
         QuoteVersion.tenant_id==user.tenant_id,QuoteVersion.id==version_id).with_for_update())
-    if x is None:raise HTTPException(404,"Version not found")
-    q,case=quote_case(db,user,x.quote_id,lock=True)
     if x.status!="draft" or q.status!="draft":raise HTTPException(409,"Not approvable")
     latest=db.scalar(select(func.max(QuoteVersion.version)).where(
         QuoteVersion.tenant_id==user.tenant_id,QuoteVersion.quote_id==q.id))
