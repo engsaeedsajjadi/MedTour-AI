@@ -98,7 +98,7 @@ def request_view(x):
         starts_at=x.starts_at,ends_at=x.ends_at,passengers=x.passengers,
         language=x.language,origin_zone=x.origin_zone,destination_zone=x.destination_zone,
         status=x.status,window_id=x.window_id,reference=x.reference,
-        supplier_reference=x.supplier_reference,external_dispatch_verified=False,
+        supplier_name=x.supplier_name,supplier_reference=x.supplier_reference,external_dispatch_verified=False,
         interpreter_credential_verified=False,internal_coordination_only=True)
 
 
@@ -215,6 +215,10 @@ def request_create(case_id:str,body:RequestIn,db:Session=Depends(get_db),
     c,p=require_case(db,user,case_id,body.kind,lock=True)
     r=require_resource(db,user,body.resource_id,lock=True)
     if KIND[body.kind]!=r.kind:raise HTTPException(422,"Resource type mismatch")
+    if body.kind=="airport_pickup" and body.origin_zone!="airport":
+        raise HTTPException(422,"Airport pickup must begin at airport")
+    if body.kind=="airport_dropoff" and body.destination_zone!="airport":
+        raise HTTPException(422,"Airport dropoff must end at airport")
     if r.kind=="interpreter":
         if body.language!=r.language or body.passengers!=1 or body.origin_zone!="not_applicable" or body.destination_zone!="not_applicable":
             raise HTTPException(422,"Interpreter language or metadata invalid")
@@ -310,11 +314,11 @@ def transition(request_id:str,body:StepIn,db:Session=Depends(get_db),user:User=D
         if overlap:raise HTTPException(409,"Resource already internally allocated")
         x.status="internally_allocated";x.window_id=w.id;x.reference=body.reference
     elif body.action=="report_provider_contact":
-        x.status="provider_contact_reported";x.supplier_reference=body.reference
+        x.status="provider_contact_reported";x.supplier_name=body.supplier_name;x.supplier_reference=body.reference
     elif body.action=="report_provider_ack":
-        x.status="provider_ack_reported";x.supplier_reference=body.reference
+        x.status="provider_ack_reported";x.supplier_name=body.supplier_name;x.supplier_reference=body.reference
     elif body.action=="report_provider_decline":
-        x.status="provider_decline_reported";x.supplier_reference=body.reference
+        x.status="provider_decline_reported";x.supplier_name=body.supplier_name;x.supplier_reference=body.reference
     else:x.status="cancelled"
     db.add(TravelAssignmentEvent(tenant_id=user.tenant_id,request_id=x.id,
         actor_id=user.id,step_key=body.step_key,fingerprint=fingerprint,

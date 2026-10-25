@@ -601,6 +601,7 @@ class TravelAssignment(TenantEntity,Base):
     window_id:Mapped[str|None]=mapped_column(ForeignKey("travel_resource_windows.id"),nullable=True)
     status:Mapped[str]=mapped_column(String(40),nullable=False,default="requested")
     reference:Mapped[str|None]=mapped_column(String(100),nullable=True)
+    supplier_name:Mapped[str|None]=mapped_column(String(100),nullable=True)
     supplier_reference:Mapped[str|None]=mapped_column(String(100),nullable=True)
     created_by:Mapped[str]=mapped_column(ForeignKey("users.id"),nullable=False)
     __table_args__=(UniqueConstraint("tenant_id","case_id","request_key"),

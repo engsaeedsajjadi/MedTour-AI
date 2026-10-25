@@ -46,6 +46,7 @@ def upgrade():
         sa.Column("window_id",sa.String(36),sa.ForeignKey("travel_resource_windows.id"),nullable=True),
         sa.Column("status",sa.String(40),nullable=False),
         sa.Column("reference",sa.String(100),nullable=True),
+        sa.Column("supplier_name",sa.String(100),nullable=True),
         sa.Column("supplier_reference",sa.String(100),nullable=True),
         sa.Column("created_by",sa.String(36),sa.ForeignKey("users.id"),nullable=False),
         sa.UniqueConstraint("tenant_id","case_id","request_key"))
