@@ -5,7 +5,7 @@ import {request} from '@/lib/api';
 type Agent={id:string;name:string;country:string;referral_code:string;active:boolean};
 type Agreement={id:string;contract_key:string;jurisdiction:string;currency:string;scope:string;max_budget_minor:number;status:string;government_or_legal_approval_verified:boolean};
 type Referral={id:string;request_key:string;channel:string;campaign_code:string;status:string;patient_id:string|null;created_at:string};
-type Draft={id:string;draft_key:string;amount_minor:number;status:string;payout_authorized:boolean};
+type Draft={id:string;draft_key:string;activity_reference:string;amount_minor:number;status:string;payout_authorized:boolean};
 type Event={event:string;entity_kind:string;created_at:string};
 const root='/agent-network';
 const states:Record<string,string>={draft:'پیش‌نویس',administratively_reviewed:'بررسی اداری (نه تأیید حقوقی)',rejected:'ردشده',suspended:'تعلیق‌شده',submitted:'منتظر تطبیق با رضایت',attributed:'منتسب با رضایت',blocked:'مسدود پس از لغو رضایت',blocked_legal_review:'مسدود تا بررسی حقوقی'};
@@ -115,7 +115,7 @@ export default function Agents(){
     <label>مرجع فعالیت غیر بالینی<input value={commercialRef} onChange={e=>setCommercialRef(e.target.value)}/></label>
     <label>مبلغ پیشنهادی (واحد کوچک ارز قرارداد)<input type="number" min={1} value={feeAmount} onChange={e=>setFeeAmount(e.target.value)}/></label>
     <button disabled={busy||!latestContract||commercialRef.length<6||Number(feeAmount)<=0} onClick={()=>void send(root+'/agents/'+selected+'/commercial-drafts',{
-     draft_key:'COST-'+crypto.randomUUID(),agreement_id:latestContract.id,
+     draft_key:'COST-'+crypto.randomUUID(),agreement_id:latestContract?.id||'',
      activity_reference:commercialRef,amount_minor:Number(feeAmount)})}>ثبت برآورد مسدود (بدون پرداخت)</button>
    </div>
    {drafts.map(x=><p key={x.id}>{x.activity_reference||x.draft_key} · {x.amount_minor.toLocaleString()} · {status(x.status)} · قابل پرداخت: خیر</p>)}
