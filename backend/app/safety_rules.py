@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .models import Case, Consent, Conversation, Task, Document
-from .enterprise_models import OutboundMessage, PortalAccess, TranslationDraft, CRMFollowUp, HospitalCoordination
+from .enterprise_models import OutboundMessage, PortalAccess, TranslationDraft, CRMFollowUp, HospitalCoordination, ProviderMatch
 
 
 SAFETY_POLICY_VERSION = "section-02-2026-10-22"
@@ -100,6 +100,16 @@ def revoke_patient_access(db: Session, tenant_id: str, patient_id: str, purpose:
         for task in handoffs:
             task.status = "cancelled"
 
+    blocked_provider_matches = []
+    if purpose == "intake":
+        blocked_provider_matches = db.scalars(select(ProviderMatch).where(
+            ProviderMatch.tenant_id == tenant_id,
+            ProviderMatch.patient_id == patient_id,
+            ProviderMatch.status.in_(("pending_human_review", "administratively_shortlisted")),
+        )).all()
+        for row in blocked_provider_matches:
+            row.status = "blocked"
+
     blocked_hospital_requests = []
     if purpose in ("intake", "hospital_coordination"):
         blocked_hospital_requests = db.scalars(select(HospitalCoordination).where(
@@ -144,6 +154,7 @@ def revoke_patient_access(db: Session, tenant_id: str, patient_id: str, purpose:
         "documents_access_revoked": len(revoked_documents),
         "crm_followups_blocked": len(blocked_followups),
         "hospital_requests_blocked": len(blocked_hospital_requests),
+        "provider_matches_blocked": len(blocked_provider_matches),
     }
 
 

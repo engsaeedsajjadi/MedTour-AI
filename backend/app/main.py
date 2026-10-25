@@ -501,3 +501,6 @@ app.include_router(physician_management_router)
 
 from .hospital_management import router as hospital_management_router
 app.include_router(hospital_management_router)
+
+from .provider_matching import router as provider_matching_router
+app.include_router(provider_matching_router)
