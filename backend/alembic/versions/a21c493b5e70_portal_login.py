@@ -21,6 +21,8 @@ def upgrade():
     )
     op.create_index("ix_portal_login_challenges_tenant_id","portal_login_challenges",["tenant_id"])
     op.create_index("idx_portal_login_patient","portal_login_challenges",["tenant_id","patient_id","expires_at"])
+    # Invalidate any old bearer-only sessions that predate challenge verification.
+    op.execute("UPDATE portal_access SET revoked = TRUE WHERE revoked = FALSE")
 
 def downgrade():
     op.drop_index("idx_portal_login_patient",table_name="portal_login_challenges")
