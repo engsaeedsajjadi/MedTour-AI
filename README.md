@@ -75,6 +75,10 @@ Tenant-safe physician-specific linked login, expiring *locally attested* credent
 
 The admin `/hospital-management` and restricted `/hospital-workspace` now cover locally-attested hospital credential metadata, tenant-bound hospital staff accounts, service catalog, non-reservable proposed capacity and patient-consented, non-clinical case handoffs. Consent withdrawal permanently blocks outstanding coordination tasks. No external licence confirmation, live HIS booking or PHI transmission is enabled. See [Section 13](docs/SECTION_13_HOSPITAL_MANAGEMENT_FA.md).
 
+## Section 14 — Provider matching (administrative only)
+
+The `/provider-matching` screen and scoped API offer exact specialty directory options, evidence-gated proposals and an admin-reviewed nonclinical shortlist. No independent licensing, medical suitability determination, automatic referral or booking is claimed. See [Section 14](docs/SECTION_14_PROVIDER_MATCHING_FA.md).
+
 ## What is NOT finished
 
 The 45-section enterprise master specification **has not yet reached full acceptance**. Critical remaining work includes PostgreSQL Row-Level Security and migration of existing pre-Alembic databases; full patient identity assurance and MFA; doctor/hospital independently scoped portals; real compliant WhatsApp outbound communication; five-language human-validated AI/voice; operational/independently verified S3/KMS storage and ClamAV scanning; approved external visa/hotel/provider APIs; payment gateways; subscription billing; load tests; frontend E2E and independent clinical/privacy/security review.
