@@ -47,7 +47,7 @@ def test_agent_link_and_cannot_leak_across_tenants(seeded):
     a=client.post('/api/v1/agents',headers=admin,json={'name':'Synthetic Agency','country':'AF'}).json()
     assert len(a['referral_code'])>10
     assert client.get('/api/v1/agents',headers=auth('b')).json()==[]
-    assert client.post('/api/v1/lead-sources',headers=admin,json={'patient_id':p['id'],'agent_id':a['id'],'source':'agent'}).status_code==201
+    assert client.post('/api/v1/lead-sources',headers=admin,json={'patient_id':p['id'],'agent_id':a['id'],'source':'agent'}).status_code==409
     assert client.post('/api/v1/lead-sources',headers=auth('b'),json={'patient_id':p['id'],'source':'agent'}).status_code==404
 
 def test_quote_items_and_approved_immutability(seeded):

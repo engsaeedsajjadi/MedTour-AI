@@ -138,7 +138,8 @@ class LeadIn(BaseModel):
 @router.post('/lead-sources',status_code=201)
 def lead(body:LeadIn,db:Session=Depends(get_db),user:User=Depends(OPERATOR)):
     owns(db,Patient,body.patient_id,user)
-    if body.agent_id:owns(db,AgentProfile,body.agent_id,user)
+    if body.agent_id:
+        raise HTTPException(409,'Agent attribution must use the consent-controlled agent-network workflow')
     x=LeadSource(tenant_id=user.tenant_id,**body.model_dump());write(db,user,x,'lead_source_attributed')
     return {'id':x.id,'source':x.source,'agent_id':x.agent_id,'patient_id':x.patient_id}
 
@@ -264,6 +265,8 @@ class MoneyIn(BaseModel):
 
 @router.post('/finance/entries',status_code=201)
 def finance_create(body:MoneyIn,db:Session=Depends(get_db),user:User=Depends(ADMIN)):
+    if body.entry_type == 'agency_fee':
+        raise HTTPException(409,'Agency-fee financial entries are disabled pending independent legal and compliance clearance')
     check_case(db,body.case_id,user)
     if not ISO.fullmatch(body.currency.upper()):raise HTTPException(422,'Invalid currency')
     x=MoneyEntry(tenant_id=user.tenant_id,**(body.model_dump()|{'currency':body.currency.upper()}),verified_by=user.id)
