@@ -322,6 +322,10 @@ def quote(body:QuoteIn,db:Session=Depends(get_db),user:User=Depends(MODERATOR)):
 def approve_quote(id:str,db:Session=Depends(get_db),user:User=Depends(MANAGER)):
     q=require_owned(db,Quote,id,user)
     if q.status!='draft':raise HTTPException(409,'Only draft quotes can be approved')
+    from .enterprise_models import QuoteVersion
+    version=db.scalar(select(QuoteVersion).where(QuoteVersion.tenant_id==user.tenant_id,
+        QuoteVersion.quote_id==q.id).limit(1))
+    if version is not None:raise HTTPException(409,'Use quotation-versions approval workflow')
     q.status='approved';q.approved_by=user.id
     return save(db,user,q,'quote_approved')
 
@@ -519,3 +523,6 @@ app.include_router(provider_matching_router)
 
 from .appointment_calendar import router as appointment_calendar_router
 app.include_router(appointment_calendar_router)
+
+from .quotation_versions import router as quotation_versions_router
+app.include_router(quotation_versions_router)

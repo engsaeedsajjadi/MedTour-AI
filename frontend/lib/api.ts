@@ -14,3 +14,32 @@ export async function request<T=unknown>(path:string,options:RequestInit={}):Pro
  if(!result.ok)throw new Error(typeof data.detail==='string'?data.detail:`HTTP ${result.status}`);
  return data as T;
 }
+
+/** Authenticated binary download with the same refresh-token contract as request(). */
+export async function downloadPdf(path:string,filename:string):Promise<void>{
+ const initial=getSession();
+ if(!initial)throw new Error('ابتدا وارد حساب شوید.');
+ const load=(token:string)=>fetch(`${API_BASE}/api/v1${path}`,{
+  method:'GET',headers:{Authorization:`Bearer ${token}`},cache:'no-store'
+ });
+ let response=await load(initial);
+ if(response.status===401){
+  try{
+   if(!inFlight)inFlight=rotate().finally(()=>{inFlight=null});
+   response=await load(await inFlight);
+  }catch{forget();throw new Error('نشست شما منقضی شده است.');}
+ }
+ if(!response.ok){
+  const body=await response.json().catch(()=>({detail:'دریافت سند ناموفق بود.'}));
+  throw new Error(typeof body.detail==='string'?body.detail:'HTTP '+response.status);
+ }
+ const mime=response.headers.get('content-type')||'';
+ if(!mime.includes('application/pdf'))throw new Error('فرمت پاسخ PDF نیست.');
+ const blob=await response.blob();
+ if(blob.size>5_000_000)throw new Error('اندازه PDF بیش از حد مجاز است.');
+ const url=URL.createObjectURL(blob);
+ try{
+  const anchor=document.createElement('a');anchor.href=url;anchor.download=filename;
+  document.body.appendChild(anchor);anchor.click();anchor.remove();
+ }finally{setTimeout(()=>URL.revokeObjectURL(url),1000)}
+}
