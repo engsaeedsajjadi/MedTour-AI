@@ -35,6 +35,10 @@ def _portal(client, admin, patient_id):
         "accepted": True, "notice_version": "section08",
     })
     assert response.status_code == 201
+    intake=client.post("/api/v1/consents",headers=admin,json={
+        "patient_id":patient_id,"purpose":"intake","accepted":True,
+        "notice_version":"section08"})
+    assert intake.status_code==201,intake.text
     invite = client.post("/api/v1/portal/invites/" + patient_id, headers=admin)
     assert invite.status_code == 201, invite.text
     exchange=client.post("/api/v1/portal/session/exchange",json={
