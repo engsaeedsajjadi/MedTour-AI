@@ -37,7 +37,11 @@ def _portal(client, admin, patient_id):
     assert response.status_code == 201
     invite = client.post("/api/v1/portal/invites/" + patient_id, headers=admin)
     assert invite.status_code == 201, invite.text
-    return {"X-Patient-Access": invite.json()["token"]}
+    exchange=client.post("/api/v1/portal/session/exchange",json={
+        "invitation_token":invite.json()["token"],
+        "verification_code":invite.json()["demo_verification_code"]})
+    assert exchange.status_code==201,exchange.text
+    return {"X-Patient-Access": exchange.json()["access_token"]}
 
 
 def _staff_upload(client, admin, case_id, name="synthetic.pdf", raw=RAW):
