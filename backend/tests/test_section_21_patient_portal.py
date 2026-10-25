@@ -162,3 +162,17 @@ def test_cross_tenant_privacy_and_demo_mode_fail_closed(seeded,monkeypatch):
     monkeypatch.setenv("APP_ENV","test")
     good=authorized(client,pending)
     assert client.get(BASE+"/me",headers=good).status_code==200
+
+
+def test_invitation_rate_limit_per_patient(seeded):
+    (client,auth,_,Session),staff,p,_=seeded
+    communication(client,staff,p["id"])
+    for n in range(8):
+        result=client.post(BASE+"/invites/"+p["id"],headers=staff)
+        assert result.status_code==201,(n,result.text)
+    blocked=client.post(BASE+"/invites/"+p["id"],headers=staff)
+    assert blocked.status_code==429,blocked.text
+    with Session() as db:
+        rows=db.query(PortalLoginChallenge).filter(
+            PortalLoginChallenge.patient_id==p["id"]).all()
+        assert len(rows)==8
