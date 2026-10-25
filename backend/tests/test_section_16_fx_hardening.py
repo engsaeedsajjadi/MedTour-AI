@@ -1,7 +1,18 @@
 """Section 16 financial hardening: manual FX is auditable, never a live feed."""
 from datetime import datetime,timedelta,timezone
 from app.enterprise_models import VerifiedFxRate,QuoteVersion
-from .test_section_16_quotations import setup,ROOT
+ROOT="/api/v1/quotation-versions"
+
+def setup(client,admin,case_id):
+    q=client.post("/api/v1/quotes",headers=admin,json={
+        "case_id":case_id,"currency":"USD","amount_minor":0,"details":"Synthetic quote"})
+    assert q.status_code==201,q.text
+    p=client.post("/api/v1/prices",headers=admin,json={
+        "service_code":"diagnostics","label":"Synthetic diagnostics","currency":"USD",
+        "amount_minor":12345,"source":"SYNTHETIC-PROVIDER-REF",
+        "valid_until":(datetime.now(timezone.utc)+timedelta(days=30)).isoformat()})
+    assert p.status_code==201,p.text
+    return q.json()["id"],p.json()["id"]
 
 def make_rate(client,admin,num=1,den=2,from_ccy="EUR",to_ccy="USD",days=4):
     return client.post(ROOT+"/fx-rates",headers=admin,json={
