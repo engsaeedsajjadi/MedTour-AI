@@ -56,7 +56,7 @@ class CaseStatusIn(BaseModel):
     reference:str|None=Field(default=None,min_length=6,max_length=100,pattern=r'^[A-Za-z0-9][A-Za-z0-9._:/-]{5,99}$')
 class ConsentIn(BaseModel):
     patient_id:str
-    purpose:Literal['intake','medical_documents','communication','ai_processing','hospital_coordination' ,'visa_coordination','accommodation_coordination','transport_coordination','interpreter_coordination']
+    purpose:Literal['intake','medical_documents','communication','ai_processing','hospital_coordination' ,'visa_coordination','accommodation_coordination','transport_coordination','interpreter_coordination','agent_referral']
     accepted:bool
     notice_version:str=Field(min_length=1,max_length=40)
 class PhysicianIn(BaseModel):
@@ -538,3 +538,6 @@ app.include_router(accommodation_router)
 
 from .travel_coordination import router as travel_coordination_router
 app.include_router(travel_coordination_router)
+
+from .international_agents import router as international_agents_router
+app.include_router(international_agents_router)
