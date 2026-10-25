@@ -74,3 +74,24 @@ def test_withdrawn_intake_consent_rejects_request(seeded):
         "patient_id":p["id"],"purpose":"intake","accepted":False,"notice_version":"calendar-v15"})
     assert result.status_code==201
     assert make(client,admin,c["id"],pid,when).status_code==409
+
+def test_consent_withdrawal_blocks_previous_calendar_allocations(seeded):
+    (client,auth,tids,Session),admin,p,c=seeded
+    pid,when=setup(client,admin)
+    first=make(client,admin,c["id"],pid,when)
+    assert first.status_code==201
+    booking_id=first.json()["id"]
+    withdrawn=client.post("/api/v1/consents",headers=admin,json={
+        "patient_id":p["id"],"purpose":"intake","accepted":False,
+        "notice_version":"calendar-15-withdrawal"})
+    assert withdrawn.status_code==201
+    with Session() as db:
+        row=db.query(AppointmentSlot).filter(AppointmentSlot.appointment_id==booking_id).one()
+        assert row.status=="blocked"
+    consent=client.post("/api/v1/consents",headers=admin,json={
+        "patient_id":p["id"],"purpose":"intake","accepted":True,
+        "notice_version":"calendar-15-renewal"})
+    assert consent.status_code==201
+    assert client.get(ROOT+f"/cases/{c['id']}",headers=admin).json()["items"][0]["status"]=="blocked"
+    assert client.post(ROOT+f"/requests/{booking_id}/review",headers=admin,
+        json={"action":"internally_confirmed","reference":"REVIEW-AFTER-15"}).status_code==409
