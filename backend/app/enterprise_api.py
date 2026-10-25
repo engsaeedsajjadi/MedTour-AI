@@ -138,7 +138,8 @@ class LeadIn(BaseModel):
 @router.post('/lead-sources',status_code=201)
 def lead(body:LeadIn,db:Session=Depends(get_db),user:User=Depends(OPERATOR)):
     owns(db,Patient,body.patient_id,user)
-    if body.agent_id:owns(db,AgentProfile,body.agent_id,user)
+    if body.agent_id:
+        raise HTTPException(409,'Agent attribution must use the consent-controlled agent-network workflow')
     x=LeadSource(tenant_id=user.tenant_id,**body.model_dump());write(db,user,x,'lead_source_attributed')
     return {'id':x.id,'source':x.source,'agent_id':x.agent_id,'patient_id':x.patient_id}
 
