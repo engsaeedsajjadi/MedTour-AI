@@ -397,3 +397,17 @@ class HospitalCoordination(TenantEntity, Base):
     recorded_by: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
     last_actor_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     __table_args__ = (UniqueConstraint("tenant_id", "hospital_id", "case_id", "reference"),)
+
+# Section 14 - nonclinical provider options are proposals requiring human review.
+class ProviderMatch(TenantEntity, Base):
+    __tablename__="provider_matches"
+    case_id:Mapped[str]=mapped_column(ForeignKey("cases.id"),nullable=False,index=True)
+    patient_id:Mapped[str]=mapped_column(ForeignKey("patients.id"),nullable=False)
+    physician_id:Mapped[str]=mapped_column(ForeignKey("physicians.id"),nullable=False)
+    hospital_id:Mapped[str|None]=mapped_column(ForeignKey("hospitals.id"),nullable=True)
+    status:Mapped[str]=mapped_column(String(30),nullable=False,default="pending_human_review")
+    proposed_by:Mapped[str]=mapped_column(ForeignKey("users.id"),nullable=False)
+    reviewed_by:Mapped[str|None]=mapped_column(ForeignKey("users.id"),nullable=True)
+    review_reference:Mapped[str|None]=mapped_column(String(100),nullable=True)
+    reviewed_at:Mapped[datetime|None]=mapped_column(DateTime(timezone=True),nullable=True)
+    __table_args__=(UniqueConstraint("tenant_id","case_id","physician_id","hospital_id"),)
