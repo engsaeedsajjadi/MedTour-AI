@@ -63,6 +63,19 @@ class PortalAccess(TenantEntity,Base):
     revoked:Mapped[bool]=mapped_column(Boolean,default=False)
     issued_by:Mapped[str]=mapped_column(ForeignKey('users.id'))
 
+# Section 21: invitation + independent code entry before minting patient access.
+# Staff-only demo code handoff is NOT independently verified patient identity.
+class PortalLoginChallenge(TenantEntity, Base):
+    __tablename__ = "portal_login_challenges"
+    patient_id: Mapped[str] = mapped_column(ForeignKey("patients.id"), nullable=False)
+    invitation_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    code_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    issued_by: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
+    __table_args__ = (Index("idx_portal_login_patient", "tenant_id", "patient_id", "expires_at"),)
+
 class ContentPage(TenantEntity,Base):
     __tablename__='content_pages'
     slug:Mapped[str]=mapped_column(String(150))
