@@ -426,3 +426,18 @@ class AppointmentSlot(TenantEntity,Base):
     reviewed_by:Mapped[str|None]=mapped_column(ForeignKey("users.id"),nullable=True)
     review_reference:Mapped[str|None]=mapped_column(String(100),nullable=True)
     __table_args__=(UniqueConstraint("tenant_id","case_id","request_key"),Index("idx_appointment_slots_resource","tenant_id","physician_id","status"),)
+
+# Section 16: immutable financial quotation versions (administrative only).
+class QuoteVersion(TenantEntity,Base):
+    __tablename__="quote_versions"
+    quote_id:Mapped[str]=mapped_column(ForeignKey("quotes.id"),nullable=False,index=True)
+    case_id:Mapped[str]=mapped_column(ForeignKey("cases.id"),nullable=False)
+    version:Mapped[int]=mapped_column(Integer,nullable=False)
+    currency:Mapped[str]=mapped_column(String(3),nullable=False)
+    lines_json:Mapped[str]=mapped_column(Text,nullable=False)
+    total_minor:Mapped[int]=mapped_column(BigInteger,nullable=False)
+    status:Mapped[str]=mapped_column(String(32),nullable=False,default="draft")
+    created_by:Mapped[str]=mapped_column(ForeignKey("users.id"),nullable=False)
+    reviewed_by:Mapped[str|None]=mapped_column(ForeignKey("users.id"),nullable=True)
+    approval_reference:Mapped[str|None]=mapped_column(String(100),nullable=True)
+    __table_args__=(UniqueConstraint("tenant_id","quote_id","version"),)
