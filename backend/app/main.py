@@ -542,5 +542,5 @@ app.include_router(travel_coordination_router)
 from .international_agents import router as international_agents_router
 app.include_router(international_agents_router)
 
-from .international_agents import router as international_agents_router
-app.include_router(international_agents_router)
+from .portal_identity import router as portal_identity_router
+app.include_router(portal_identity_router)
