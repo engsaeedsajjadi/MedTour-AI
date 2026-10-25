@@ -334,12 +334,24 @@ def appointment(body:AppointmentIn,db:Session=Depends(get_db),user:User=Depends(
     if body.requested_at.tzinfo is None:raise HTTPException(422,'Timezone offset required')
     dt=body.requested_at.astimezone(timezone.utc)
     if dt < datetime.now(timezone.utc):raise HTTPException(422,'Appointment must be in the future')
+    # Legacy API records administrative requests only; it must not race with
+    # conflict-safe calendar allocations or imply reserved resources.
+    from .enterprise_models import AppointmentSlot
+    from .safety_rules import active_consent
+    c=require_case(db,user,body.case_id)
+    if not active_consent(db,user.tenant_id,c.patient_id,'intake'):
+        raise HTTPException(409,'Active intake consent required')
     return save(db,user,Appointment(tenant_id=user.tenant_id,case_id=body.case_id,physician_id=body.physician_id,requested_at=dt),'appointment_requested')
 @app.patch('/api/v1/appointments/{id}/status')
 def appointment_status(id:str,body:StatusIn,db:Session=Depends(get_db),user:User=Depends(MANAGER)):
     a=require_owned(db,Appointment,id,user)
     if a.status!='requested' or body.status not in ('confirmed','cancelled'):raise HTTPException(409,'Invalid appointment state')
     if body.status=='confirmed' and not body.reference:raise HTTPException(422,'Independent provider confirmation reference required')
+    from .enterprise_models import AppointmentSlot
+    managed=db.scalar(select(AppointmentSlot).where(
+        AppointmentSlot.tenant_id==user.tenant_id,
+        AppointmentSlot.appointment_id==a.id))
+    if managed:raise HTTPException(409,'Use the appointment-calendar review workflow')
     a.status=body.status;a.confirmation_reference=body.reference
     return save(db,user,a,'appointment_status_changed')
 
