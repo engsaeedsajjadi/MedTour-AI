@@ -441,3 +441,18 @@ class QuoteVersion(TenantEntity,Base):
     reviewed_by:Mapped[str|None]=mapped_column(ForeignKey("users.id"),nullable=True)
     approval_reference:Mapped[str|None]=mapped_column(String(100),nullable=True)
     __table_args__=(UniqueConstraint("tenant_id","quote_id","version"),)
+
+# Section 16 financial hardening: manually sourced FX quoted as a rational
+# minor-unit conversion. Never a live exchange rate, regulator-validated rate,
+# or authorization to charge a patient.
+class VerifiedFxRate(TenantEntity,Base):
+    __tablename__="verified_fx_rates"
+    source_currency:Mapped[str]=mapped_column(String(3),nullable=False)
+    target_currency:Mapped[str]=mapped_column(String(3),nullable=False)
+    numerator:Mapped[int]=mapped_column(BigInteger,nullable=False)
+    denominator:Mapped[int]=mapped_column(BigInteger,nullable=False)
+    source_reference:Mapped[str]=mapped_column(String(180),nullable=False)
+    expires_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),nullable=False)
+    reviewed_by:Mapped[str]=mapped_column(ForeignKey("users.id"),nullable=False)
+    active:Mapped[bool]=mapped_column(Boolean,nullable=False,default=True)
+    __table_args__=(Index("idx_fx_rates_tenant_pair","tenant_id","source_currency","target_currency"),)
