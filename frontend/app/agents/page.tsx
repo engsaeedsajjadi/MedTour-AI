@@ -22,7 +22,7 @@ export default function Agents(){
  const selectedAgent=agents.find(x=>x.id===selected);
  const latestContract=contracts.find(x=>x.status==='administratively_reviewed');
  async function reloadAgents(){
-  const xs=await request<Agent[]>('/agents');setAgents(xs);setSelected(x=>x||xs[0]?.id||'');
+  const xs=await request<Agent[]>('/agents');setAgents(xs);const next=selected||xs[0]?.id||'';setSelected(next);if(next)await reloadSelected(next);
  }
  async function reloadSelected(id:string){
   if(!id){setContracts([]);setRefs([]);setDrafts([]);setHistory([]);return;}
@@ -43,7 +43,8 @@ export default function Agents(){
   try{
    await request(path,{method:'POST',body:JSON.stringify(payload)});
    setNotice('عملیات اداری ثبت شد؛ تأیید قانونی، اعطای دسترسی بیمار و پرداخت به‌صورت خودکار انجام نمی‌شود.');
-   await reloadAgents();if(selected)await reloadSelected(selected);
+   if(path.endsWith('/account'))setPassword('');
+   await reloadAgents();
   }catch(e){setError((e as Error).message);}finally{setBusy(false);}
  }
  return <Shell title="مدیریت نمایندگان بین‌المللی">
