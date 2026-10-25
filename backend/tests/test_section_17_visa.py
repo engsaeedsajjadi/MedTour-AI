@@ -125,8 +125,8 @@ def test_consent_and_country_validation_and_no_legacy_visa_shortcut(seeded):
         headers=admin, json={"status": "confirmed", "reference": REF})
     assert blocked.status_code == 409
     # No passport number, medical narrative, or arbitrary attachments in typed request.
-    assert "passport_number" not in new(client, admin, case["id"],
-      key="VISA-SECOND-REQUEST-17", passport_number="SECRET").json()
+    assert new(client, admin, case["id"], key="VISA-SECOND-REQUEST-17",
+               passport_number="SECRET").status_code == 422
 
 
 def test_tenant_boundary_and_intake_withdrawal(seeded):
@@ -156,6 +156,7 @@ def test_due_queue_is_bounded_and_only_returns_authorized_cases(seeded):
     due_at = (datetime.now(timezone.utc) + timedelta(minutes=1)).isoformat()
     record = new(client, admin, case["id"], next_action_due_at=due_at)
     assert record.status_code == 201, record.text
+    assert new(client, admin, case["id"], next_action_due_at=due_at).json()["reused"] is True
     from app.enterprise_models import MedicalVisa
     with Session() as db:
         row = db.query(MedicalVisa).filter(MedicalVisa.id == record.json()["id"]).one()

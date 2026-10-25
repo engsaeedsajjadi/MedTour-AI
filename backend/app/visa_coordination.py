@@ -12,7 +12,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -99,6 +99,8 @@ def view(row: MedicalVisa, checks: list[MedicalVisaChecklist]):
 
 
 class CreateVisa(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     request_key: str = Field(min_length=8, max_length=100, pattern=KEY)
     origin_country: str = Field(pattern=r"^[A-Z]{2}$")
     destination_country: Literal["IR"] = "IR"
@@ -134,8 +136,8 @@ def create(case_id: str, body: CreateVisa,
         if (old.origin_country != body.origin_country
                 or old.destination_country != body.destination_country
                 or old.visa_type != body.visa_type
-                or old.intended_departure_at != (utc(body.intended_departure_at) if body.intended_departure_at else None)
-                or old.next_action_due_at != (utc(body.next_action_due_at) if body.next_action_due_at else None)):
+                or ((utc(old.intended_departure_at) if old.intended_departure_at else None) != (utc(body.intended_departure_at) if body.intended_departure_at else None))
+                or ((utc(old.next_action_due_at) if old.next_action_due_at else None) != (utc(body.next_action_due_at) if body.next_action_due_at else None))):
             raise HTTPException(409, "Idempotency key conflict")
         if old.status == "blocked":
             raise HTTPException(409, "Old record blocked on consent withdrawal")
@@ -181,6 +183,7 @@ def due(limit: int = Query(50, ge=1, le=100),
     rows = db.scalars(select(MedicalVisa).join(
         Case, Case.id == MedicalVisa.case_id).where(
         MedicalVisa.tenant_id == user.tenant_id, Case.tenant_id == user.tenant_id,
+        Case.status.notin_(("closed", "cancelled")),
         MedicalVisa.status.in_(ACTIVE), MedicalVisa.next_action_due_at.is_not(None),
         MedicalVisa.next_action_due_at <= now).order_by(
             MedicalVisa.next_action_due_at.asc()).limit(limit)).all()
@@ -194,6 +197,8 @@ def due(limit: int = Query(50, ge=1, le=100),
 
 
 class ChecklistIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     item_key: Literal["identity_document", "provider_invitation", "travel_plan", "application_forms"]
     status: Literal["received", "needs_update", "locally_reviewed"]
     review_reference: str | None = Field(default=None, min_length=6, max_length=100, pattern=REF)
@@ -229,6 +234,8 @@ def review_check(application_id: str, body: ChecklistIn,
 
 
 class StepIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     step_key: str = Field(min_length=8, max_length=100, pattern=KEY)
     action: Literal["start_review", "ready_for_manual_submission", "record_submission",
                     "record_outcome", "cancel"]
