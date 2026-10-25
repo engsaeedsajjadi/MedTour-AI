@@ -10,14 +10,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .models import Case, Consent, Conversation, Task, Document
-from .enterprise_models import OutboundMessage, PortalAccess, TranslationDraft, CRMFollowUp, HospitalCoordination, ProviderMatch, AppointmentSlot, MedicalVisa, AccommodationStay, TravelAssignment
+from .enterprise_models import OutboundMessage, PortalAccess, TranslationDraft, CRMFollowUp, HospitalCoordination, ProviderMatch, AppointmentSlot, MedicalVisa, AccommodationStay, TravelAssignment, AgentReferralIntent
 
 
 SAFETY_POLICY_VERSION = "section-02-2026-10-22"
 INVITATION_TASK_TITLE = "Prepare secure portal invitation via an approved private channel"
 CONSENT_PURPOSES = frozenset({
     "intake", "medical_documents", "communication", "ai_processing",
-    "hospital_coordination", "visa_coordination", "accommodation_coordination", "transport_coordination", "interpreter_coordination"
+    "hospital_coordination", "visa_coordination", "accommodation_coordination", "transport_coordination", "interpreter_coordination", "agent_referral"
 })
 
 
@@ -173,6 +173,17 @@ def revoke_patient_access(db: Session, tenant_id: str, patient_id: str, purpose:
             # remain occupied until separately reconciled with the external provider.
             assignment.status = "blocked"
 
+    blocked_agent_referrals = []
+    if purpose in ("intake", "agent_referral"):
+        blocked_agent_referrals = db.scalars(select(AgentReferralIntent).where(
+            AgentReferralIntent.tenant_id == tenant_id,
+            AgentReferralIntent.patient_id == patient_id,
+            AgentReferralIntent.status == "attributed",
+        )).all()
+        for intent in blocked_agent_referrals:
+            # Old attribution never reactivates on future reconsent.
+            intent.status = "blocked"
+
     revoked_documents = []
     if purpose == "medical_documents":
         revoked_documents = db.scalars(select(Document).where(
@@ -212,6 +223,7 @@ def revoke_patient_access(db: Session, tenant_id: str, patient_id: str, purpose:
         "visa_records_blocked": len(blocked_visas),
         "accommodation_stays_blocked": len(blocked_stays),
         "travel_assignments_blocked": len(blocked_assignments),
+        "agent_referrals_blocked": len(blocked_agent_referrals),
     }
 
 
