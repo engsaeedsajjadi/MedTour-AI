@@ -182,3 +182,6 @@ Section 17 administrative visa coordination: see [docs/SECTION_17_VISA_FA.md](do
 
 
 Section 18 internal accommodation coordination: [docs/SECTION_18_ACCOMMODATION_FA.md](docs/SECTION_18_ACCOMMODATION_FA.md). Proposed local hotel inventory and reported external replies are NOT confirmed bookings.
+
+
+Section 19: [Transport / interpreter coordination](docs/SECTION_19_TRANSPORT_INTERPRETERS_FA.md) is internal scheduling only, with no independently confirmed dispatch.

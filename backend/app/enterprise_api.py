@@ -97,7 +97,7 @@ class OperationChange(BaseModel):
 def transition(pk:str,body:OperationChange,db:Session=Depends(get_db),user:User=Depends(OPERATOR)):
     op=owns(db,Operation,pk,user)
     # Generic operations are not authority to confirm accommodation bookings.
-    if op.kind == "hotel" and body.status == "confirmed":
+    if op.kind in ("hotel","transport","interpreter","airport_pickup") and body.status == "confirmed":
         raise HTTPException(409, "Use accommodation workflow for manual hotel status")
     if body.status not in MOVES.get(op.status,set()):raise HTTPException(409,f'Invalid transition {op.status} to {body.status}')
     if body.status in ('confirmed','completed') and user.role!='admin':raise HTTPException(403,'Confirmation requires supervisor approval')
