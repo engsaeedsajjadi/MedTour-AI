@@ -116,5 +116,5 @@ def test_many_lines_generate_multi_page_pdf_without_oversized_single_page(seeded
     pdf=client.get(ROOT+"/versions/"+body.json()["id"]+"/pdf",headers=admin)
     assert pdf.status_code==200,pdf.text[:100]
     # ReportLab page objects are generated for more than one A4 sheet.
-    assert pdf.content.count(b"/Type /Page ")>=2
+    assert pdf.content.count(b"/Type /Page")-pdf.content.count(b"/Type /Pages")>=2
     assert len(pdf.content)<5_000_000
