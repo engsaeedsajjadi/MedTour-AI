@@ -562,3 +562,59 @@ class AccommodationEvent(TenantEntity, Base):
     reference: Mapped[str] = mapped_column(String(100), nullable=False)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     __table_args__ = (UniqueConstraint("tenant_id", "stay_id", "step_key"),)
+
+
+# Section 19: administrative resource availability; no real dispatch or clinical data.
+class TravelResource(TenantEntity,Base):
+    __tablename__="travel_resources"
+    kind:Mapped[str]=mapped_column(String(24),nullable=False)
+    label:Mapped[str]=mapped_column(String(120),nullable=False)
+    city:Mapped[str]=mapped_column(String(80),nullable=False)
+    seats:Mapped[int]=mapped_column(Integer,nullable=False)
+    language:Mapped[str|None]=mapped_column(String(10),nullable=True)
+    status:Mapped[str]=mapped_column(String(24),nullable=False,default="locally_attested")
+    recorded_by:Mapped[str]=mapped_column(ForeignKey("users.id"),nullable=False)
+
+class TravelResourceWindow(TenantEntity,Base):
+    __tablename__="travel_resource_windows"
+    resource_id:Mapped[str]=mapped_column(ForeignKey("travel_resources.id"),nullable=False)
+    starts_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),nullable=False)
+    ends_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),nullable=False)
+    reference:Mapped[str]=mapped_column(String(100),nullable=False)
+    status:Mapped[str]=mapped_column(String(24),nullable=False,default="proposed")
+    recorded_by:Mapped[str]=mapped_column(ForeignKey("users.id"),nullable=False)
+    __table_args__=(Index("idx_travel_windows_resource","tenant_id","resource_id","starts_at"),)
+
+class TravelAssignment(TenantEntity,Base):
+    __tablename__="travel_assignments"
+    case_id:Mapped[str]=mapped_column(ForeignKey("cases.id"),nullable=False)
+    patient_id:Mapped[str]=mapped_column(ForeignKey("patients.id"),nullable=False)
+    resource_id:Mapped[str]=mapped_column(ForeignKey("travel_resources.id"),nullable=False)
+    request_key:Mapped[str]=mapped_column(String(100),nullable=False)
+    kind:Mapped[str]=mapped_column(String(40),nullable=False)
+    starts_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),nullable=False)
+    ends_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),nullable=False)
+    passengers:Mapped[int]=mapped_column(Integer,nullable=False)
+    language:Mapped[str|None]=mapped_column(String(10),nullable=True)
+    origin_zone:Mapped[str]=mapped_column(String(30),nullable=False)
+    destination_zone:Mapped[str]=mapped_column(String(30),nullable=False)
+    window_id:Mapped[str|None]=mapped_column(ForeignKey("travel_resource_windows.id"),nullable=True)
+    status:Mapped[str]=mapped_column(String(40),nullable=False,default="requested")
+    reference:Mapped[str|None]=mapped_column(String(100),nullable=True)
+    supplier_reference:Mapped[str|None]=mapped_column(String(100),nullable=True)
+    created_by:Mapped[str]=mapped_column(ForeignKey("users.id"),nullable=False)
+    __table_args__=(UniqueConstraint("tenant_id","case_id","request_key"),
+        Index("idx_travel_assignment_resource","tenant_id","resource_id","status","starts_at","ends_at"),)
+
+class TravelAssignmentEvent(TenantEntity,Base):
+    __tablename__="travel_assignment_events"
+    request_id:Mapped[str]=mapped_column(ForeignKey("travel_assignments.id"),nullable=False)
+    actor_id:Mapped[str]=mapped_column(ForeignKey("users.id"),nullable=False)
+    step_key:Mapped[str]=mapped_column(String(100),nullable=False)
+    fingerprint:Mapped[str]=mapped_column(String(64),nullable=False)
+    action:Mapped[str]=mapped_column(String(40),nullable=False)
+    old_status:Mapped[str]=mapped_column(String(40),nullable=False)
+    new_status:Mapped[str]=mapped_column(String(40),nullable=False)
+    reference:Mapped[str]=mapped_column(String(100),nullable=False)
+    occurred_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),nullable=False)
+    __table_args__=(UniqueConstraint("tenant_id","request_id","step_key"),)
