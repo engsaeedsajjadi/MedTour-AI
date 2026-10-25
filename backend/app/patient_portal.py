@@ -10,6 +10,7 @@ from .database import get_db
 from .models import Patient,Case,Appointment,Quote,TravelRequest,Consent,User,Audit
 from .enterprise_models import PortalAccess,Operation
 from .security import roles
+from .safety_rules import active_consent
 
 router=APIRouter(prefix='/api/v1/portal',tags=['patient portal'])
 
@@ -21,38 +22,18 @@ def portal_session(token:str|None,db:Session):
     expires=grant.expires_at
     if expires.tzinfo is None:expires=expires.replace(tzinfo=timezone.utc)
     if expires<=datetime.now(timezone.utc):raise HTTPException(401,'Patient access expired')
+    if not active_consent(db,grant.tenant_id,grant.patient_id,"intake") or not active_consent(
+            db,grant.tenant_id,grant.patient_id,"communication"):
+        raise HTTPException(401,"Portal access consent no longer active")
     return grant
-
-@router.post('/invites/{patient_id}',status_code=201)
-def invite(patient_id:str,db:Session=Depends(get_db),user:User=Depends(roles('admin','operator'))):
-    p=db.scalar(select(Patient).where(Patient.id==patient_id,Patient.tenant_id==user.tenant_id))
-    if not p:raise HTTPException(404,'Patient not found')
-    consent=db.scalar(select(Consent).where(Consent.patient_id==p.id,Consent.tenant_id==user.tenant_id,
-        Consent.purpose=='communication').order_by(Consent.created_at.desc()).limit(1))
-    if not consent or not consent.accepted:raise HTTPException(409,'Communication consent required')
-    token=secrets.token_urlsafe(36)
-    grant=PortalAccess(tenant_id=user.tenant_id,patient_id=p.id,token_hash=hashlib.sha256(token.encode()).hexdigest(),
-            expires_at=datetime.now(timezone.utc)+timedelta(hours=2),issued_by=user.id)
-    db.add(grant);db.flush()
-    db.add(Audit(tenant_id=user.tenant_id,user_id=user.id,event='patient_portal_invite_issued',entity_type='Patient',entity_id=p.id))
-    db.commit()
-    # Operator must pass link over an approved channel. Token returned only at creation.
-    return {'token':token,'expires_in_seconds':7200,'warning':'Single-purpose time-limited access. Share only via an approved private channel.'}
-
-@router.post('/invites/revoke/{patient_id}')
-def revoke(patient_id:str,db:Session=Depends(get_db),user:User=Depends(roles('admin','operator'))):
-    p=db.scalar(select(Patient).where(Patient.id==patient_id,Patient.tenant_id==user.tenant_id))
-    if not p:raise HTTPException(404,'Patient not found')
-    gs=db.scalars(select(PortalAccess).where(PortalAccess.tenant_id==user.tenant_id,PortalAccess.patient_id==p.id,PortalAccess.revoked==False)).all()
-    for g in gs:g.revoked=True
-    db.commit();return {'revoked':len(gs)}
 
 @router.get('/me')
 def me(x_patient_access:str|None=Header(None,alias='X-Patient-Access'),db:Session=Depends(get_db)):
     grant=portal_session(x_patient_access,db)
     p=db.scalar(select(Patient).where(Patient.id==grant.patient_id,Patient.tenant_id==grant.tenant_id))
     if not p:raise HTTPException(404,'Patient not found')
-    return {'name':p.full_name,'country':p.country,'language':p.language,'id':p.id}
+    return {'name':p.full_name,'country':p.country,'language':p.language,'id':p.id,
+            'session_expires_at':grant.expires_at,'independent_identity_assurance':False}
 
 @router.get('/journey')
 def journey(x_patient_access:str|None=Header(None,alias='X-Patient-Access'),db:Session=Depends(get_db)):
