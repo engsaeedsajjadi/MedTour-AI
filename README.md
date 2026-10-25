@@ -188,3 +188,6 @@ Section 19: [Transport / interpreter coordination](docs/SECTION_19_TRANSPORT_INT
 
 
 Section 20 international agent governance: [docs/SECTION_20_INTERNATIONAL_AGENTS_FA.md](docs/SECTION_20_INTERNATIONAL_AGENTS_FA.md). Account and contract review are internal only; external legal clearance and payouts disabled.
+
+
+Section 21: [Development-only patient portal OTP invitation, consent and session security](docs/SECTION_21_PATIENT_PORTAL_FA.md). Real patient identity verification and production PHI remain disabled.
