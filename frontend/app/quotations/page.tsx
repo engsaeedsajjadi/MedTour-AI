@@ -1,7 +1,7 @@
 'use client';
 import {useEffect,useState} from 'react';
 import Shell from '@/components/Shell';
-import {request} from '@/lib/api';
+import {request,downloadPdf} from '@/lib/api';
 
 type Quote={id:string;case_id:string;currency:string;amount_minor:number;status:string};
 type Case={id:string;status:string};
@@ -78,7 +78,7 @@ export default function Quotations(){
     {v.lines.map((l,i)=><p key={i}>{l.label}: {l.units} × {l.line_total_minor/l.units} = {l.line_total_minor}</p>)}
     {v.status==='draft'&&role==='admin'&&<button disabled={busy||reference.length<6}
      onClick={()=>void act(ROOT+'/versions/'+v.id+'/approve','POST',{reference})}>تأیید داخلی نسخه</button>}
-    {v.status==='approved'&&<p>خروجی PDF این نسخه از API محافظت‌شده در دسترس است: <code>{ROOT+'/versions/'+v.id+'/pdf'}</code></p>}
+    {v.status==='approved'&&<button disabled={busy} onClick={()=>void downloadPdf(ROOT+'/versions/'+v.id+'/pdf','quotation-'+v.id+'.pdf').catch(e=>setError((e as Error).message))}>دریافت PDF نسخه تأییدشده</button>}
    </div>)}
   </section>
  </Shell>;
