@@ -56,7 +56,7 @@ class CaseStatusIn(BaseModel):
     reference:str|None=Field(default=None,min_length=6,max_length=100,pattern=r'^[A-Za-z0-9][A-Za-z0-9._:/-]{5,99}$')
 class ConsentIn(BaseModel):
     patient_id:str
-    purpose:Literal['intake','medical_documents','communication','ai_processing','hospital_coordination']
+    purpose:Literal['intake','medical_documents','communication','ai_processing','hospital_coordination','visa_coordination']
     accepted:bool
     notice_version:str=Field(min_length=1,max_length=40)
 class PhysicianIn(BaseModel):
@@ -370,6 +370,9 @@ def travel(body:TravelIn,db:Session=Depends(get_db),user:User=Depends(MODERATOR)
 @app.patch('/api/v1/travel/{id}/status')
 def travel_status(id:str,body:StatusIn,db:Session=Depends(get_db),user:User=Depends(MANAGER)):
     t=require_owned(db,TravelRequest,id,user)
+    # Legacy travel may record generic visa requests, but cannot certify approval.
+    if t.service_type == "visa" and body.status == "confirmed" and body.reference:
+        raise HTTPException(409, "Use visa-coordination for manual official-outcome reporting")
     if t.status!='requested' or body.status not in ('confirmed','cancelled'):raise HTTPException(409,'Invalid travel state')
     if body.status=='confirmed' and not body.reference:raise HTTPException(422,'External/human confirmation reference required')
     t.status=body.status;t.external_reference=body.reference
@@ -526,3 +529,6 @@ app.include_router(appointment_calendar_router)
 
 from .quotation_versions import router as quotation_versions_router
 app.include_router(quotation_versions_router)
+
+from .visa_coordination import router as visa_coordination_router
+app.include_router(visa_coordination_router)
