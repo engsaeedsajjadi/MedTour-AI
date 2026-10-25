@@ -233,6 +233,11 @@ class ItemIn(BaseModel):
 def add_quote_item(pk:str,body:ItemIn,db:Session=Depends(get_db),user:User=Depends(OPERATOR)):
     q=owns(db,Quote,pk,user)
     if q.status!='draft':raise HTTPException(409,'Cannot change approved quotation')
+    from .enterprise_models import QuoteVersion
+    has_managed=db.scalar(select(QuoteVersion.id).where(
+        QuoteVersion.tenant_id==user.tenant_id,QuoteVersion.quote_id==q.id).limit(1))
+    if has_managed is not None:
+        raise HTTPException(409,'Use managed quotation revisions for financial line items')
     row=QuoteItem(tenant_id=user.tenant_id,quote_id=q.id,**body.model_dump())
     db.add(row);db.flush()
     line_total=body.units*body.unit_amount_minor

@@ -85,7 +85,7 @@ The `/appointments` workspace now supports non-overlapping, timezone-aware inter
 
 ## Section 16 — Versioned quotations (internal only)
 
-Source-bound quote versions, reconciled financial totals, admin approval and export of approved internal PDF snapshots. No live FX/provider invoice/PHI production approval. See [Section 16](docs/SECTION_16_QUOTATIONS_FA.md).
+Source-bound quote versions, reconciled financial totals, admin approval and export of approved internal PDF snapshots. Manual source-attested minor-unit FX ratios are supported without live FX. Multi-line UI, paginated English administrative PDF and approval revalidation added. No live FX, legal provider invoice, multilingual PDF or PHI production approval. See [Section 16](docs/SECTION_16_QUOTATIONS_FA.md).
 
 ## What is NOT finished
 
