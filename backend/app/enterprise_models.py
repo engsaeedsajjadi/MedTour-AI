@@ -619,3 +619,58 @@ class TravelAssignmentEvent(TenantEntity,Base):
     reference:Mapped[str]=mapped_column(String(100),nullable=False)
     occurred_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),nullable=False)
     __table_args__=(UniqueConstraint("tenant_id","request_id","step_key"),)
+
+
+# Section 20: agent access, agreements and opaque referrals. Alpha: no compensation payout.
+class AgentAgreement(TenantEntity,Base):
+    __tablename__="agent_agreements"
+    agent_id:Mapped[str]=mapped_column(ForeignKey("agents.id"),nullable=False)
+    contract_key:Mapped[str]=mapped_column(String(100),nullable=False)
+    jurisdiction:Mapped[str]=mapped_column(String(2),nullable=False)
+    currency:Mapped[str]=mapped_column(String(3),nullable=False)
+    max_budget_minor:Mapped[int]=mapped_column(BigInteger,nullable=False)
+    scope:Mapped[str]=mapped_column(String(80),nullable=False)
+    status:Mapped[str]=mapped_column(String(30),nullable=False,default="draft")
+    document_reference:Mapped[str|None]=mapped_column(String(100),nullable=True)
+    reviewed_by:Mapped[str|None]=mapped_column(ForeignKey("users.id"),nullable=True)
+    __table_args__=(UniqueConstraint("tenant_id","agent_id","contract_key"),)
+
+class AgentIdentity(TenantEntity,Base):
+    __tablename__="agent_identities"
+    agent_id:Mapped[str]=mapped_column(ForeignKey("agents.id"),nullable=False)
+    user_id:Mapped[str]=mapped_column(ForeignKey("users.id"),nullable=False)
+    provisioned_by:Mapped[str]=mapped_column(ForeignKey("users.id"),nullable=False)
+    __table_args__=(UniqueConstraint("tenant_id","user_id"),UniqueConstraint("tenant_id","agent_id"),)
+
+class AgentReferralIntent(TenantEntity,Base):
+    __tablename__="agent_referral_intents"
+    agent_id:Mapped[str]=mapped_column(ForeignKey("agents.id"),nullable=False)
+    agreement_id:Mapped[str]=mapped_column(ForeignKey("agent_agreements.id"),nullable=False)
+    request_key:Mapped[str]=mapped_column(String(100),nullable=False)
+    channel:Mapped[str]=mapped_column(String(30),nullable=False)
+    campaign_code:Mapped[str]=mapped_column(String(60),nullable=False)
+    status:Mapped[str]=mapped_column(String(30),nullable=False,default="submitted")
+    patient_id:Mapped[str|None]=mapped_column(ForeignKey("patients.id"),nullable=True)
+    matched_by:Mapped[str|None]=mapped_column(ForeignKey("users.id"),nullable=True)
+    __table_args__=(UniqueConstraint("tenant_id","agent_id","request_key"),
+        UniqueConstraint("tenant_id","patient_id"),Index("idx_agent_intents_by_agent","tenant_id","agent_id","status"),)
+
+class AgentCommercialDraft(TenantEntity,Base):
+    __tablename__="agent_commercial_drafts"
+    agent_id:Mapped[str]=mapped_column(ForeignKey("agents.id"),nullable=False)
+    agreement_id:Mapped[str]=mapped_column(ForeignKey("agent_agreements.id"),nullable=False)
+    draft_key:Mapped[str]=mapped_column(String(100),nullable=False)
+    activity_reference:Mapped[str]=mapped_column(String(100),nullable=False)
+    amount_minor:Mapped[int]=mapped_column(BigInteger,nullable=False)
+    status:Mapped[str]=mapped_column(String(48),nullable=False,default="blocked_legal_review")
+    reviewed_by:Mapped[str|None]=mapped_column(ForeignKey("users.id"),nullable=True)
+    __table_args__=(UniqueConstraint("tenant_id","agent_id","draft_key"),)
+
+class AgentGovernanceEvent(TenantEntity,Base):
+    __tablename__="agent_governance_events"
+    agent_id:Mapped[str]=mapped_column(ForeignKey("agents.id"),nullable=False)
+    actor_id:Mapped[str]=mapped_column(ForeignKey("users.id"),nullable=False)
+    entity_kind:Mapped[str]=mapped_column(String(40),nullable=False)
+    entity_id:Mapped[str]=mapped_column(String(36),nullable=False)
+    action:Mapped[str]=mapped_column(String(48),nullable=False)
+    reference:Mapped[str]=mapped_column(String(100),nullable=False,default="")
