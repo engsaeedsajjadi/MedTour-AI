@@ -185,3 +185,6 @@ Section 18 internal accommodation coordination: [docs/SECTION_18_ACCOMMODATION_F
 
 
 Section 19: [Transport / interpreter coordination](docs/SECTION_19_TRANSPORT_INTERPRETERS_FA.md) is internal scheduling only, with no independently confirmed dispatch.
+
+
+Section 20 international agent governance: [docs/SECTION_20_INTERNATIONAL_AGENTS_FA.md](docs/SECTION_20_INTERNATIONAL_AGENTS_FA.md). Account and contract review are internal only; external legal clearance and payouts disabled.
