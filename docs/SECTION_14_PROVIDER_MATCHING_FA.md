@@ -10,7 +10,7 @@ APIهای جدید:
 - `GET /api/v1/provider-matching/cases/{case_id}/proposals`: فهرست پیشنهادهای همان پرونده.
 - `POST /api/v1/provider-matching/proposals/{match_id}/review`: مدیر سازمان می‌تواند فقط برای فهرست اداری پیشنهاد را بپذیرد یا رد کند و مرجع غیرحساس بازبینی ثبت شود.
 
-Migration `g14a62c391dd` جدول `provider_matches` را با محدودیت سازمان و کلیدهای خارجی اضافه می‌کند. صفحه فارسی `/provider-matching` امکان مشاهده، ثبت و بازبینی انسانی پیشنهادها را فراهم می‌کند.
+Migration `a14a62c391dd` جدول `provider_matches` را با محدودیت سازمان و کلیدهای خارجی اضافه می‌کند. صفحه فارسی `/provider-matching` امکان مشاهده، ثبت و بازبینی انسانی پیشنهادها را فراهم می‌کند.
 
 **تست‌ها:** `backend/tests/test_section_14_provider_matching.py` شامل رضایت، جداسازی Tenant، نیاز به شواهد معتبر محلی، تخصص دقیق، عدم تأیید خودکار، نقش مدیر و عدم پذیرش بیمارستان بدون مدارک/ارتباط است. ادغام مشروط به CI کامل Backend، Frontend و PostgreSQL/Redis است.
 
