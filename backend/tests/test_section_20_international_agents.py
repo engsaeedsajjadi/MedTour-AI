@@ -89,7 +89,7 @@ def test_full_agent_portal_least_privilege_and_consent(seeded):
     assert any(x["status"]=="attributed" for x in listed)
     with Session() as db:
         from app.enterprise_models import LeadSource
-        rows=db.query(LeadSource).filter(LeadSource.tenant_id==admin and False).all() if False else db.query(LeadSource).all()
+        rows=db.query(LeadSource).all()
         assert len(rows)==1 and rows[0].agent_id==a and rows[0].patient_id==patient["id"]
 
 
@@ -109,6 +109,11 @@ def test_consent_withdrawal_and_nonreactivation(seeded):
     records=client.get(ROOT+"/portal/referrals",headers=agent).json()["items"]
     assert records[0]["status"]=="blocked"
     assert "patient_id" not in records[0]
+    from app.enterprise_models import LeadSource
+    with Session() as db:
+        link=db.query(LeadSource).filter(LeadSource.patient_id==patient["id"]).one()
+        assert link.agent_id is None
+        assert link.source=="agent_referral_revoked"
     give(client,admin,"agent_referral",patient)
     assert client.post(ROOT+"/referrals/"+ref+"/attribute",headers=admin,
         json={"patient_id":patient["id"]}).status_code==409
