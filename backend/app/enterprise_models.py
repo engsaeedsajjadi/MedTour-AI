@@ -1,6 +1,6 @@
 """Additional operational entities. These are coordination records, NOT clinical orders."""
 from __future__ import annotations
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, BigInteger, String, Text, UniqueConstraint, Index
 from sqlalchemy.orm import Mapped, mapped_column
 from .database import Base
