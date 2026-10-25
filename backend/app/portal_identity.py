@@ -8,7 +8,7 @@ import hashlib,hmac,secrets,os
 from datetime import datetime,timedelta,timezone
 from fastapi import APIRouter,Depends,HTTPException,Header
 from pydantic import BaseModel,ConfigDict,Field
-from sqlalchemy import select
+from sqlalchemy import select,func
 from sqlalchemy.orm import Session
 from .database import get_db
 from .models import Patient,Consent,Audit,User
@@ -21,6 +21,7 @@ router=APIRouter(prefix="/api/v1/portal",tags=["patient portal identity"])
 LIFETIME_MINUTES=10
 SESSION_MINUTES=30
 MAX_ATTEMPTS=5
+MAX_INVITES_PER_HOUR=8
 
 def dev_only():
     if os.getenv("APP_ENV","development").lower() not in ("development","test"):
@@ -45,6 +46,12 @@ def invite(patient_id:str,db:Session=Depends(get_db),user:User=Depends(roles("ad
             db,user.tenant_id,patient.id,"intake"):
         raise HTTPException(409,"Active communication and intake consent required")
     now=datetime.now(timezone.utc)
+    recent=db.scalar(select(func.count()).select_from(PortalLoginChallenge).where(
+        PortalLoginChallenge.tenant_id==user.tenant_id,
+        PortalLoginChallenge.patient_id==patient.id,
+        PortalLoginChallenge.created_at>=now-timedelta(hours=1)))
+    if recent>=MAX_INVITES_PER_HOUR:
+        raise HTTPException(429,"Too many patient invitation requests")
     pending=db.scalars(select(PortalLoginChallenge).where(
         PortalLoginChallenge.tenant_id==user.tenant_id,
         PortalLoginChallenge.patient_id==patient.id,
