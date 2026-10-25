@@ -1,7 +1,7 @@
 """Additional operational entities. These are coordination records, NOT clinical orders."""
 from __future__ import annotations
 from datetime import datetime, timezone
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, BigInteger, String, Text, UniqueConstraint, Index
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, BigInteger, String, Text, UniqueConstraint, Index
 from sqlalchemy.orm import Mapped, mapped_column
 from .database import Base
 from .models import TenantEntity, uid, utcnow
@@ -503,3 +503,62 @@ class MedicalVisaEvent(TenantEntity, Base):
     reference: Mapped[str] = mapped_column(String(100), nullable=False)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     __table_args__ = (UniqueConstraint("tenant_id", "application_id", "step_key"),)
+
+
+# Section 18: hotel records are manually supplied coordination metadata, NOT
+# live hotel inventory, independent hotel partner validation or bookings.
+class AccommodationProperty(TenantEntity, Base):
+    __tablename__ = "accommodation_properties"
+    name: Mapped[str] = mapped_column(String(150), nullable=False)
+    city: Mapped[str] = mapped_column(String(80), nullable=False)
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="locally_recorded")
+    recorded_by: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
+
+class AccommodationInventory(TenantEntity, Base):
+    __tablename__ = "accommodation_inventory"
+    property_id: Mapped[str] = mapped_column(ForeignKey("accommodation_properties.id"), nullable=False)
+    room_type: Mapped[str] = mapped_column(String(24), nullable=False)
+    starts_on: Mapped[date] = mapped_column(Date, nullable=False)
+    ends_on: Mapped[date] = mapped_column(Date, nullable=False)
+    proposed_rooms: Mapped[int] = mapped_column(Integer, nullable=False)
+    reference: Mapped[str] = mapped_column(String(100), nullable=False)
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="proposed")
+    recorded_by: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
+    __table_args__ = (Index("idx_accommodation_inventory_windows",
+        "tenant_id", "property_id", "room_type", "starts_on", "ends_on"),)
+
+class AccommodationStay(TenantEntity, Base):
+    __tablename__ = "accommodation_stays"
+    case_id: Mapped[str] = mapped_column(ForeignKey("cases.id"), nullable=False)
+    patient_id: Mapped[str] = mapped_column(ForeignKey("patients.id"), nullable=False)
+    property_id: Mapped[str] = mapped_column(ForeignKey("accommodation_properties.id"), nullable=False)
+    request_key: Mapped[str] = mapped_column(String(100), nullable=False)
+    room_type: Mapped[str] = mapped_column(String(24), nullable=False)
+    starts_on: Mapped[date] = mapped_column(Date, nullable=False)
+    ends_on: Mapped[date] = mapped_column(Date, nullable=False)
+    rooms_requested: Mapped[int] = mapped_column(Integer, nullable=False)
+    guests: Mapped[int] = mapped_column(Integer, nullable=False)
+    inventory_id: Mapped[str | None] = mapped_column(ForeignKey("accommodation_inventory.id"), nullable=True)
+    status: Mapped[str] = mapped_column(String(40), nullable=False, default="requested")
+    created_by: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
+    internal_reference: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    supplier_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    supplier_reference: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "case_id", "request_key"),
+        Index("idx_accommodation_stay_allocation",
+              "tenant_id", "property_id", "inventory_id", "status", "starts_on", "ends_on"),
+    )
+
+class AccommodationEvent(TenantEntity, Base):
+    __tablename__ = "accommodation_events"
+    stay_id: Mapped[str] = mapped_column(ForeignKey("accommodation_stays.id"), nullable=False)
+    actor_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
+    step_key: Mapped[str] = mapped_column(String(100), nullable=False)
+    fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    action: Mapped[str] = mapped_column(String(40), nullable=False)
+    old_status: Mapped[str] = mapped_column(String(40), nullable=False)
+    new_status: Mapped[str] = mapped_column(String(40), nullable=False)
+    reference: Mapped[str] = mapped_column(String(100), nullable=False)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    __table_args__ = (UniqueConstraint("tenant_id", "stay_id", "step_key"),)

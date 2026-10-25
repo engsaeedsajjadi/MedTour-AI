@@ -10,14 +10,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .models import Case, Consent, Conversation, Task, Document
-from .enterprise_models import OutboundMessage, PortalAccess, TranslationDraft, CRMFollowUp, HospitalCoordination, ProviderMatch, AppointmentSlot, MedicalVisa
+from .enterprise_models import OutboundMessage, PortalAccess, TranslationDraft, CRMFollowUp, HospitalCoordination, ProviderMatch, AppointmentSlot, MedicalVisa, AccommodationStay
 
 
 SAFETY_POLICY_VERSION = "section-02-2026-10-22"
 INVITATION_TASK_TITLE = "Prepare secure portal invitation via an approved private channel"
 CONSENT_PURPOSES = frozenset({
     "intake", "medical_documents", "communication", "ai_processing",
-    "hospital_coordination", "visa_coordination"
+    "hospital_coordination", "visa_coordination", "accommodation_coordination"
 })
 
 
@@ -143,6 +143,19 @@ def revoke_patient_access(db: Session, tenant_id: str, patient_id: str, purpose:
             # An already reported government submission needs separate manual follow-up.
             request.status = "blocked"
 
+    blocked_stays = []
+    if purpose in ("intake", "accommodation_coordination"):
+        blocked_stays = db.scalars(select(AccommodationStay).where(
+            AccommodationStay.tenant_id == tenant_id,
+            AccommodationStay.patient_id == patient_id,
+            AccommodationStay.status.in_(("requested", "internally_held",
+                "external_request_reported", "external_confirmation_reported")),
+        )).all()
+        for request in blocked_stays:
+            # Old stay does not reactivate after new consent.
+            # Any provider-facing cancellation is a separate human task.
+            request.status = "blocked"
+
     revoked_documents = []
     if purpose == "medical_documents":
         revoked_documents = db.scalars(select(Document).where(
@@ -180,6 +193,7 @@ def revoke_patient_access(db: Session, tenant_id: str, patient_id: str, purpose:
         "provider_matches_blocked": len(blocked_provider_matches),
         "appointment_slots_blocked": len(blocked_appointments),
         "visa_records_blocked": len(blocked_visas),
+        "accommodation_stays_blocked": len(blocked_stays),
     }
 
 
