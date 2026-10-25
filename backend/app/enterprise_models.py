@@ -411,3 +411,18 @@ class ProviderMatch(TenantEntity, Base):
     review_reference:Mapped[str|None]=mapped_column(String(100),nullable=True)
     reviewed_at:Mapped[datetime|None]=mapped_column(DateTime(timezone=True),nullable=True)
     __table_args__=(UniqueConstraint("tenant_id","case_id","physician_id","hospital_id"),)
+
+# Section 15: internally held calendar slots never certify external bookings.
+class AppointmentSlot(TenantEntity,Base):
+    __tablename__="appointment_slots"
+    appointment_id:Mapped[str]=mapped_column(ForeignKey("appointments.id"),nullable=False,unique=True)
+    case_id:Mapped[str]=mapped_column(ForeignKey("cases.id"),nullable=False)
+    patient_id:Mapped[str]=mapped_column(ForeignKey("patients.id"),nullable=False)
+    physician_id:Mapped[str]=mapped_column(ForeignKey("physicians.id"),nullable=False)
+    availability_id:Mapped[str|None]=mapped_column(ForeignKey("physician_availability.id"),nullable=True)
+    ends_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),nullable=False)
+    status:Mapped[str]=mapped_column(String(24),nullable=False,default="requested")
+    request_key:Mapped[str]=mapped_column(String(100),nullable=False)
+    reviewed_by:Mapped[str|None]=mapped_column(ForeignKey("users.id"),nullable=True)
+    review_reference:Mapped[str|None]=mapped_column(String(100),nullable=True)
+    __table_args__=(UniqueConstraint("tenant_id","case_id","request_key"),Index("idx_appointment_slots_resource","tenant_id","physician_id","status"),)
