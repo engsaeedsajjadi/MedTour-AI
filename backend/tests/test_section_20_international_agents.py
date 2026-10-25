@@ -21,13 +21,13 @@ def review(client,admin,id):
     assert not r.json()["binding_contract_verified"]
     assert not r.json()["compensation_payable"]
 
-def provision(client,admin,id,email="agent20@example.test"):
+def provision(client,admin,id,email="agent20@example.com"):
     return client.post(ROOT+"/agents/"+id+"/account",headers=admin,json={
         "email":email,"password":PASSWORD})
 
 def agent_login(client):
     r=client.post("/api/v1/auth/login",json={
-        "tenant_slug":"a","email":"agent20@example.test","password":PASSWORD})
+        "tenant_slug":"a","email":"agent20@example.com","password":PASSWORD})
     assert r.status_code==200,r.text
     return {"Authorization":"Bearer "+r.json()["access_token"]},r.json()["refresh_token"]
 
@@ -161,7 +161,7 @@ def test_disable_account_blocks_refresh_and_portal(seeded):
     assert client.get(ROOT+"/portal/me",headers=agent).status_code==401
     assert client.post("/api/v1/auth/refresh",json={"refresh_token":refresh}).status_code==401
     assert client.post("/api/v1/auth/login",json={
-        "tenant_slug":"a","email":"agent20@example.test","password":PASSWORD}).status_code==401
+        "tenant_slug":"a","email":"agent20@example.com","password":PASSWORD}).status_code==401
     assert client.post(ROOT+"/agents/"+a+"/agreements",headers=admin,json={
         "contract_key":"NEW-CONTRACT-20","jurisdiction":"AF","currency":"USD",
         "max_budget_minor":10}).status_code==409
@@ -173,7 +173,7 @@ def test_tenant_isolation_and_agent_cannot_hijack_other_id(seeded):
     outsider=auth("b")
     assert client.get(ROOT+"/agents/"+a+"/agreements",headers=outsider).status_code==404
     assert client.post(ROOT+"/agents/"+a+"/account",headers=outsider,json={
-        "email":"someone@example.test","password":PASSWORD}).status_code==404
+        "email":"someone@example.com","password":PASSWORD}).status_code==404
     assert client.get(ROOT+"/agents/"+a+"/referrals",headers=outsider).status_code==404
     assert client.post(ROOT+"/agents/"+a+"/commercial-drafts",headers=outsider,json={
         "draft_key":"COST-FOREIGN-20","agreement_id":ag,
