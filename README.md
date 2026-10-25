@@ -83,6 +83,10 @@ The `/provider-matching` screen and scoped API offer exact specialty directory o
 
 The `/appointments` workspace now supports non-overlapping, timezone-aware internally proposed slots with administrator review, consent and tenant guard, and idempotency. These do not imply real hospital/physician booking. See [Section 15](docs/SECTION_15_APPOINTMENTS_FA.md).
 
+## Section 16 — Versioned quotations (internal only)
+
+Source-bound quote versions, reconciled financial totals, admin approval and export of approved internal PDF snapshots. No live FX/provider invoice/PHI production approval. See [Section 16](docs/SECTION_16_QUOTATIONS_FA.md).
+
 ## What is NOT finished
 
 The 45-section enterprise master specification **has not yet reached full acceptance**. Critical remaining work includes PostgreSQL Row-Level Security and migration of existing pre-Alembic databases; full patient identity assurance and MFA; doctor/hospital independently scoped portals; real compliant WhatsApp outbound communication; five-language human-validated AI/voice; operational/independently verified S3/KMS storage and ClamAV scanning; approved external visa/hotel/provider APIs; payment gateways; subscription billing; load tests; frontend E2E and independent clinical/privacy/security review.
