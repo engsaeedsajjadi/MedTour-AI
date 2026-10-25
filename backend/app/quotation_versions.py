@@ -6,11 +6,10 @@ Snapshots are immutable; administrator approval is not provider confirmation.
 import json
 import re
 from io import BytesIO
-from decimal import Decimal
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle, Spacer, KeepTogether
+from reportlab.platypus import SimpleDocTemplate, Paragraph
 from xml.sax.saxutils import escape
 from datetime import datetime,timezone,timedelta
 from fastapi import APIRouter,Depends,HTTPException,Response
@@ -245,7 +244,7 @@ def pdf_bytes(lines):
     """Multi-page, text-sanitized A4 PDF with bounded wrapping and no medical notes."""
     buffer=BytesIO()
     document=SimpleDocTemplate(buffer,pagesize=A4,topMargin=48,bottomMargin=48,
-                                leftMargin=42,rightMargin=42,
+                                leftMargin=42,rightMargin=42,pageCompression=0,
                                 title="MedTour administrative quotation (test only)")
     styles=getSampleStyleSheet()
     normal=ParagraphStyle("SafeQuoteBody",parent=styles["BodyText"],fontName="Helvetica",
@@ -296,7 +295,7 @@ def export_pdf(version_id:str,db:Session=Depends(get_db),user:User=Depends(staff
     lines+=["----------------------------------------","TOTAL: "+str(x.total_minor)+" "+x.currency+" minor units",
             "Documented manual FX only when listed; no live-provider confirmation.",
             "Not a clinical recommendation or payment confirmation."]
-    if len(lines)>200:raise HTTPException(422,"Document exceeds bounded export limit")
+    if len(lines)>350:raise HTTPException(422,"Document exceeds bounded export limit")
     return Response(pdf_bytes(lines),media_type="application/pdf",
         headers={"Content-Disposition":'attachment; filename="quotation-'+x.id+'.pdf"',
                  "Cache-Control":"no-store","X-Content-Type-Options":"nosniff"})
