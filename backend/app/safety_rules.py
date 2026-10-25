@@ -10,14 +10,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .models import Case, Consent, Conversation, Task, Document
-from .enterprise_models import OutboundMessage, PortalAccess, TranslationDraft, CRMFollowUp, HospitalCoordination, ProviderMatch, AppointmentSlot, MedicalVisa, AccommodationStay
+from .enterprise_models import OutboundMessage, PortalAccess, TranslationDraft, CRMFollowUp, HospitalCoordination, ProviderMatch, AppointmentSlot, MedicalVisa, AccommodationStay, TravelAssignment
 
 
 SAFETY_POLICY_VERSION = "section-02-2026-10-22"
 INVITATION_TASK_TITLE = "Prepare secure portal invitation via an approved private channel"
 CONSENT_PURPOSES = frozenset({
     "intake", "medical_documents", "communication", "ai_processing",
-    "hospital_coordination", "visa_coordination", "accommodation_coordination"
+    "hospital_coordination", "visa_coordination", "accommodation_coordination", "transport_coordination", "interpreter_coordination"
 })
 
 
@@ -156,6 +156,23 @@ def revoke_patient_access(db: Session, tenant_id: str, patient_id: str, purpose:
             # Any provider-facing cancellation is a separate human task.
             request.status = "blocked"
 
+    blocked_assignments = []
+    if purpose in ("intake", "transport_coordination", "interpreter_coordination"):
+        predicates = [
+            TravelAssignment.tenant_id == tenant_id,
+            TravelAssignment.patient_id == patient_id,
+            TravelAssignment.status.in_(("requested","internally_allocated",
+                                          "provider_contact_reported","provider_ack_reported"))]
+        if purpose == "transport_coordination":
+            predicates.append(TravelAssignment.kind != "interpreter_session")
+        if purpose == "interpreter_coordination":
+            predicates.append(TravelAssignment.kind == "interpreter_session")
+        blocked_assignments = db.scalars(select(TravelAssignment).where(*predicates)).all()
+        for assignment in blocked_assignments:
+            # Remains blocked even after renewed consent, and allocated resources
+            # remain occupied until separately reconciled with the external provider.
+            assignment.status = "blocked"
+
     revoked_documents = []
     if purpose == "medical_documents":
         revoked_documents = db.scalars(select(Document).where(
@@ -194,6 +211,7 @@ def revoke_patient_access(db: Session, tenant_id: str, patient_id: str, purpose:
         "appointment_slots_blocked": len(blocked_appointments),
         "visa_records_blocked": len(blocked_visas),
         "accommodation_stays_blocked": len(blocked_stays),
+        "travel_assignments_blocked": len(blocked_assignments),
     }
 
 
