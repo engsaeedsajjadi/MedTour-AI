@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .models import Case, Consent, Conversation, Task, Document, Patient
-from .enterprise_models import OutboundMessage, PortalAccess, TranslationDraft, CRMFollowUp, HospitalCoordination, ProviderMatch, AppointmentSlot, MedicalVisa, AccommodationStay, TravelAssignment, AgentReferralIntent, LeadSource
+from .enterprise_models import OutboundMessage, PortalAccess, PortalLoginChallenge, TranslationDraft, CRMFollowUp, HospitalCoordination, ProviderMatch, AppointmentSlot, MedicalVisa, AccommodationStay, TravelAssignment, AgentReferralIntent, LeadSource
 
 
 SAFETY_POLICY_VERSION = "section-02-2026-10-22"
@@ -72,6 +72,14 @@ def revoke_patient_access(db: Session, tenant_id: str, patient_id: str, purpose:
     )).all()
     for grant in grants:
         grant.revoked = True
+    pending_portal_challenges = db.scalars(select(PortalLoginChallenge).where(
+        PortalLoginChallenge.tenant_id == tenant_id,
+        PortalLoginChallenge.patient_id == patient_id,
+        PortalLoginChallenge.consumed_at.is_(None),
+    )).all()
+    from datetime import datetime, timezone
+    for challenge in pending_portal_challenges:
+        challenge.consumed_at = datetime.now(timezone.utc)
 
     outbox = db.scalars(select(OutboundMessage).where(
         OutboundMessage.tenant_id == tenant_id,
@@ -233,6 +241,7 @@ def revoke_patient_access(db: Session, tenant_id: str, patient_id: str, purpose:
             row.draft_text = ""
     return {
         "portal_grants_revoked": len(grants),
+        "pending_patient_challenges_blocked": len(pending_portal_challenges),
         "outbound_blocked": len(outbox),
         "ai_translation_drafts_blocked": len(drafts),
         "documents_access_revoked": len(revoked_documents),
