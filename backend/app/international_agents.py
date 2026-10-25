@@ -265,7 +265,7 @@ def attribute(intent_id:str,body:MatchIn,
     contract_guard(db,user,a.id)
     x=own(db,user,AgentReferralIntent,intent_id,True)
     if x.status!="submitted":raise HTTPException(409,"Attribution already recorded or blocked")
-    patient=own(db,user,Patient,body.patient_id)
+    patient=own(db,user,Patient,body.patient_id,True)
     if not active_consent(db,user.tenant_id,patient.id,"intake") or not active_consent(
         db,user.tenant_id,patient.id,"agent_referral"):
         raise HTTPException(409,"Patient intake and specific agent referral consent required")
