@@ -3,10 +3,11 @@ from datetime import datetime,timedelta,timezone
 from app.enterprise_models import TravelAssignment,TravelResourceWindow,TravelAssignmentEvent
 ROOT="/api/v1/travel-coordination"
 REF="SYNTHETIC-REVIEW-19"
+CLOCK_ANCHOR=datetime.now(timezone.utc).replace(microsecond=0)
 
 
 def times(start_days=10,hours=2):
-    a=datetime.now(timezone.utc).replace(microsecond=0)+timedelta(days=start_days)
+    a=CLOCK_ANCHOR+timedelta(days=start_days)
     return a.isoformat(),(a+timedelta(hours=hours)).isoformat()
 
 
@@ -66,6 +67,7 @@ def test_vehicle_lifecycle_audit_and_no_verified_dispatch(seeded):
         z=action(client,admin,x["id"],name,key,desk)
         assert z.status_code==200,z.text
     assert z.json()["status"]=="provider_ack_reported"
+    assert z.json()["supplier_name"]=="Synthetic Vendor"
     assert z.json()["external_dispatch_verified"] is False
     repeated=action(client,admin,x["id"],"report_provider_ack","LOCAL-ACK-19","Synthetic Vendor")
     assert repeated.status_code==200 and repeated.json()["reused"] is True
@@ -154,6 +156,7 @@ def test_invalid_inputs_roles_and_legacy_bypass(seeded):
     rid=resource(client,admin)
     assert req(client,admin,c,rid,passport="SENSITIVE").status_code==422
     assert req(client,admin,c,rid,passengers=5).status_code==422
+    assert req(client,admin,c,rid,origin_zone="hotel").status_code==422
     assert req(client,admin,c,rid,origin_zone="hotel",destination_zone="hotel").status_code==422
     assert req(client,admin,c,rid,start="2026-11-01T10:00:00",
                end="2026-11-01T11:00:00").status_code==422
