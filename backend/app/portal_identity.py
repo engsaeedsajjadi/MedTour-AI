@@ -80,8 +80,17 @@ class VerifyIn(BaseModel):
 def exchange(body:VerifyIn,db:Session=Depends(get_db)):
     dev_only()
     now=datetime.now(timezone.utc)
+    candidate=db.scalar(select(PortalLoginChallenge).where(
+        PortalLoginChallenge.invitation_hash==hashed(body.invitation_token)))
+    if not candidate:
+        raise HTTPException(401,"Invalid or used invitation")
+    # Lock order is patient -> challenge for issuance, revocation and exchange.
+    p=db.scalar(select(Patient).where(Patient.tenant_id==candidate.tenant_id,
+        Patient.id==candidate.patient_id).with_for_update())
+    if not p:raise HTTPException(401,"Invalid or used invitation")
     c=db.scalar(select(PortalLoginChallenge).where(
-        PortalLoginChallenge.invitation_hash==hashed(body.invitation_token)).with_for_update())
+        PortalLoginChallenge.tenant_id==candidate.tenant_id,
+        PortalLoginChallenge.id==candidate.id).with_for_update())
     if not c or c.consumed_at is not None or c.attempts>=MAX_ATTEMPTS:
         raise HTTPException(401,"Invalid or used invitation")
     if expiration(c.expires_at)<=now:
@@ -93,9 +102,7 @@ def exchange(body:VerifyIn,db:Session=Depends(get_db)):
         if c.attempts>=MAX_ATTEMPTS:c.consumed_at=now
         db.commit()
         raise HTTPException(401,"Invalid verification code")
-    p=db.scalar(select(Patient).where(Patient.tenant_id==c.tenant_id,
-        Patient.id==c.patient_id).with_for_update())
-    if not p or not active_consent(db,c.tenant_id,c.patient_id,"intake") or not active_consent(
+    if not active_consent(db,c.tenant_id,c.patient_id,"intake") or not active_consent(
             db,c.tenant_id,c.patient_id,"communication"):
         c.consumed_at=now;db.commit()
         raise HTTPException(401,"Patient portal consent unavailable")
