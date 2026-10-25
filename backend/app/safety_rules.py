@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .models import Case, Consent, Conversation, Task, Document
-from .enterprise_models import OutboundMessage, PortalAccess, TranslationDraft, CRMFollowUp, HospitalCoordination, ProviderMatch, AppointmentSlot, MedicalVisa, AccommodationStay, TravelAssignment, AgentReferralIntent
+from .enterprise_models import OutboundMessage, PortalAccess, TranslationDraft, CRMFollowUp, HospitalCoordination, ProviderMatch, AppointmentSlot, MedicalVisa, AccommodationStay, TravelAssignment, AgentReferralIntent, LeadSource
 
 
 SAFETY_POLICY_VERSION = "section-02-2026-10-22"
@@ -184,6 +184,19 @@ def revoke_patient_access(db: Session, tenant_id: str, patient_id: str, purpose:
             # Old attribution never reactivates on future reconsent.
             intent.status = "blocked"
 
+    unlinked_agent_leads = []
+    if purpose in ("intake", "agent_referral"):
+        unlinked_agent_leads = db.scalars(select(LeadSource).where(
+            LeadSource.tenant_id == tenant_id,
+            LeadSource.patient_id == patient_id,
+            LeadSource.source == "agent_portal",
+            LeadSource.agent_id.is_not(None),
+        )).all()
+        for lead in unlinked_agent_leads:
+            # Historical audit remains, but no active agent attribution survives.
+            lead.agent_id = None
+            lead.source = "agent_referral_revoked"
+
     revoked_documents = []
     if purpose == "medical_documents":
         revoked_documents = db.scalars(select(Document).where(
@@ -224,6 +237,7 @@ def revoke_patient_access(db: Session, tenant_id: str, patient_id: str, purpose:
         "accommodation_stays_blocked": len(blocked_stays),
         "travel_assignments_blocked": len(blocked_assignments),
         "agent_referrals_blocked": len(blocked_agent_referrals),
+        "agent_leads_unlinked": len(unlinked_agent_leads),
     }
 
 
