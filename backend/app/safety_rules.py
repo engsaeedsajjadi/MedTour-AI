@@ -10,14 +10,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .models import Case, Consent, Conversation, Task, Document
-from .enterprise_models import OutboundMessage, PortalAccess, TranslationDraft, CRMFollowUp, HospitalCoordination, ProviderMatch, AppointmentSlot
+from .enterprise_models import OutboundMessage, PortalAccess, TranslationDraft, CRMFollowUp, HospitalCoordination, ProviderMatch, AppointmentSlot, MedicalVisa
 
 
 SAFETY_POLICY_VERSION = "section-02-2026-10-22"
 INVITATION_TASK_TITLE = "Prepare secure portal invitation via an approved private channel"
 CONSENT_PURPOSES = frozenset({
     "intake", "medical_documents", "communication", "ai_processing",
-    "hospital_coordination"
+    "hospital_coordination", "visa_coordination"
 })
 
 
@@ -130,6 +130,19 @@ def revoke_patient_access(db: Session, tenant_id: str, patient_id: str, purpose:
         for request in blocked_hospital_requests:
             request.status = "blocked"
 
+    blocked_visas = []
+    if purpose in ("intake", "medical_documents", "visa_coordination"):
+        blocked_visas = db.scalars(select(MedicalVisa).where(
+            MedicalVisa.tenant_id == tenant_id,
+            MedicalVisa.patient_id == patient_id,
+            MedicalVisa.status.in_(("requested", "in_review",
+                                    "ready_for_manual_submission", "submission_reported")),
+        )).all()
+        for request in blocked_visas:
+            # Never reactivate this record after later re-consent.
+            # An already reported government submission needs separate manual follow-up.
+            request.status = "blocked"
+
     revoked_documents = []
     if purpose == "medical_documents":
         revoked_documents = db.scalars(select(Document).where(
@@ -166,6 +179,7 @@ def revoke_patient_access(db: Session, tenant_id: str, patient_id: str, purpose:
         "hospital_requests_blocked": len(blocked_hospital_requests),
         "provider_matches_blocked": len(blocked_provider_matches),
         "appointment_slots_blocked": len(blocked_appointments),
+        "visa_records_blocked": len(blocked_visas),
     }
 
 

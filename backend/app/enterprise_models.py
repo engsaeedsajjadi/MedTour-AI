@@ -456,3 +456,50 @@ class VerifiedFxRate(TenantEntity,Base):
     reviewed_by:Mapped[str]=mapped_column(ForeignKey("users.id"),nullable=False)
     active:Mapped[bool]=mapped_column(Boolean,nullable=False,default=True)
     __table_args__=(Index("idx_fx_rates_tenant_pair","tenant_id","source_currency","target_currency"),)
+
+
+# Section 17 - administrative visa coordination with no passport/PHI fields.
+# All references denote human-entered metadata; no government API is connected.
+class MedicalVisa(TenantEntity, Base):
+    __tablename__ = "medical_visas"
+    case_id: Mapped[str] = mapped_column(ForeignKey("cases.id"), nullable=False)
+    patient_id: Mapped[str] = mapped_column(ForeignKey("patients.id"), nullable=False)
+    origin_country: Mapped[str] = mapped_column(String(2), nullable=False)
+    destination_country: Mapped[str] = mapped_column(String(2), nullable=False)
+    visa_type: Mapped[str] = mapped_column(String(24), nullable=False)
+    request_key: Mapped[str] = mapped_column(String(100), nullable=False)
+    intended_departure_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    next_action_due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    status: Mapped[str] = mapped_column(String(36), nullable=False, default="requested")
+    created_by: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
+    reviewed_by: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    authority_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    external_reference: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    decision_reported: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "case_id", "request_key"),
+        Index("idx_medical_visas_due", "tenant_id", "status", "next_action_due_at"),
+    )
+
+class MedicalVisaChecklist(TenantEntity, Base):
+    __tablename__ = "medical_visa_checklist"
+    application_id: Mapped[str] = mapped_column(ForeignKey("medical_visas.id"), nullable=False)
+    item_key: Mapped[str] = mapped_column(String(40), nullable=False)
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="pending")
+    review_reference: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    reviewed_by: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    __table_args__ = (UniqueConstraint("tenant_id", "application_id", "item_key"),)
+
+class MedicalVisaEvent(TenantEntity, Base):
+    __tablename__ = "medical_visa_events"
+    application_id: Mapped[str] = mapped_column(ForeignKey("medical_visas.id"), nullable=False)
+    actor_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
+    step_key: Mapped[str] = mapped_column(String(100), nullable=False)
+    fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    action: Mapped[str] = mapped_column(String(40), nullable=False)
+    old_status: Mapped[str] = mapped_column(String(36), nullable=False)
+    new_status: Mapped[str] = mapped_column(String(36), nullable=False)
+    reference: Mapped[str] = mapped_column(String(100), nullable=False)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    __table_args__ = (UniqueConstraint("tenant_id", "application_id", "step_key"),)

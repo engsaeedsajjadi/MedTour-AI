@@ -13,7 +13,7 @@ from .enterprise_models import PatientConsentChallenge,PortalAccess,OutboundMess
 from .safety_rules import revoke_patient_access
 
 router=APIRouter(prefix='/api/v1/consent-links',tags=['patient attested consent'])
-PURPOSES={'intake','medical_documents','communication','ai_processing'}
+PURPOSES={'intake','medical_documents','communication','ai_processing','visa_coordination'}
 
 @router.post('/{patient_id}/{purpose}',status_code=201)
 def issue(patient_id:str,purpose:str,db:Session=Depends(get_db),user:User=Depends(roles('admin','operator'))):
