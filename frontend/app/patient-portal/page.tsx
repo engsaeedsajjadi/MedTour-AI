@@ -14,6 +14,8 @@ const CHAT_UI:Record<string,{chat:string,placeholder:string,send:string,handoff:
 };
 
 export default function PatientPortal(){
+ const [invite,setInvite]=useState(''),[otp,setOtp]=useState(''),[otpBusy,setOtpBusy]=useState(false);
+ const [consents,setConsents]=useState<Record<string,boolean>>({}),[consentNotice,setConsentNotice]=useState('v21-synthetic');
  const [token,setToken]=useState(''),[patient,setPatient]=useState<{name:string,language:string}|null>(null),[journey,setJourney]=useState<Journey[]>([]);
  const [intake,setIntake]=useState<{id:string;case_id:string;status:string;next_prompt:string|null;language:string;stage:number}|null>(null);
  const [intakeAnswer,setIntakeAnswer]=useState('');
@@ -24,12 +26,16 @@ export default function PatientPortal(){
  const copy=CHAT_UI[chatLocale]||CHAT_UI.en;
  const [messages,setMessages]=useState<ChatMessage[]>([]),[input,setInput]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false);
  useEffect(()=>{
-   const hash=window.location.hash.slice(1);const code=hash.startsWith('access=')?decodeURIComponent(hash.slice(7)):'';
-   if(code){sessionStorage.setItem('medtour_patient_access',code);window.history.replaceState({},'',window.location.pathname);}
-   setToken(code||sessionStorage.getItem('medtour_patient_access')||'');
+   const hash=window.location.hash.slice(1);
+   const invitation=hash.startsWith('invite=')?decodeURIComponent(hash.slice(7)):'';
+   // Legacy access tokens are never accepted from the URL; session must come
+   // from a successfully exchanged OTP challenge.
+   if(invitation){sessionStorage.setItem('medtour_patient_invite',invitation);window.history.replaceState({},'',window.location.pathname);}
+   setInvite(invitation||sessionStorage.getItem('medtour_patient_invite')||'');
+   setToken(sessionStorage.getItem('medtour_patient_access')||'');
  },[]);
  async function call<T>(path:string,init:RequestInit={}):Promise<T>{const r=await fetch(`${API_BASE}/api/v1/portal${path}`,{...init,headers:{'Content-Type':'application/json','X-Patient-Access':token,...init.headers},cache:'no-store'});const data=await r.json();if(!r.ok)throw new Error(String(data.detail||'Request failed'));return data as T;}
- useEffect(()=>{if(!token)return;Promise.all([call<{name:string,language:string}>('/me'),call<Journey[]>('/journey'),call<ChatMessage[]>('/chat')]).then(([p,j,m])=>{setPatient(p);setChatLocale(CHAT_UI[p.language]?p.language:'en');setJourney(j);setMessages(m)}).catch(e=>setError(e.message));},[token]);
+ useEffect(()=>{if(!token)return;Promise.all([call<{name:string,language:string}>('/me'),call<Journey[]>('/journey'),call<ChatMessage[]>('/chat'),call<{purposes:Record<string,boolean>}>('/consents')]).then(([p,j,m,co])=>{setPatient(p);setChatLocale(CHAT_UI[p.language]?p.language:'en');setJourney(j);setMessages(m);setConsents(co.purposes)}).catch(e=>{setError(e.message);sessionStorage.removeItem('medtour_patient_access');setToken('');setPatient(null);});},[token]);
  async function send(e:React.FormEvent){e.preventDefault();setBusy(true);setError('');try{const result=await call<{warning:string|null,human_handoff:boolean,handoff_notice?:string|null}>('/chat',{method:'POST',body:JSON.stringify({message:input,language:chatLocale})});setMessages(await call<ChatMessage[]>('/chat'));setInput('');if(result.warning)setError(result.warning);else if(result.human_handoff)setError(result.handoff_notice||copy.handoff)}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
  async function startIntake(caseId:string){setBusy(true);setError('');try{setIntake(await call<NonNullable<typeof intake>>('/intake/sessions',{method:'POST',body:JSON.stringify({case_id:caseId,language:chatLocale})}));}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
  async function answerIntake(e:React.FormEvent){e.preventDefault();if(!intake)return;setBusy(true);setError('');try{const out=await call<typeof intake&{warning?:string}>(`/intake/sessions/${intake.id}/answer`,{method:'POST',body:JSON.stringify({answer:intakeAnswer})});setIntake(out);setIntakeAnswer('');if(out.warning)setError(out.warning);}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
@@ -56,12 +62,48 @@ export default function PatientPortal(){
   }catch(e){setError((e as Error).message)}finally{setBusy(false)}
  }
  async function uploadDocument(caseId:string){if(!documentFile)return;setBusy(true);setDocumentStatus('');setError('');try{const body=new FormData();body.append('file',documentFile);const r=await fetch(`${API_BASE}/api/v1/secure-documents/portal/cases/${caseId}`,{method:'POST',headers:{'X-Patient-Access':token},body,cache:'no-store'});const result=await r.json();if(!r.ok)throw new Error(String(result.detail||'Upload unavailable'));setDocumentStatus('Synthetic file stored: '+result.status+'. Real patient documents are not permitted.');setDocumentFile(null);await loadDocuments(caseId);}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
- const logout=()=>{sessionStorage.removeItem('medtour_patient_access');setToken('');setPatient(null);setJourney([]);setMessages([]);setDocumentsByCase({})};
+ async function redeem(e:React.FormEvent){e.preventDefault();setOtpBusy(true);setError('');
+  try{
+   const response=await fetch(API_BASE+'/api/v1/portal/session/exchange',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({invitation_token:invite,verification_code:otp}),cache:'no-store'});
+   const body=await response.json();if(!response.ok)throw new Error(String(body.detail||'Invalid invitation or code'));
+   sessionStorage.removeItem('medtour_patient_invite');sessionStorage.setItem('medtour_patient_access',body.access_token);
+   setInvite('');setOtp('');setToken(body.access_token);
+  }catch(e){setError((e as Error).message);}finally{setOtpBusy(false);}
+ }
+ async function changeConsent(purpose:string,accepted:boolean){
+  setBusy(true);setError('');
+  try{
+   await call('/consents',{method:'POST',body:JSON.stringify({purpose,accepted,notice_version:consentNotice})});
+   if(!accepted){await logout();setError('رضایت لغو و نشست بسته شد. برای دسترسی دوباره دعوت جدید لازم است.');}
+   else setConsents(x=>({...x,[purpose]:true}));
+  }catch(e){setError((e as Error).message);}finally{setBusy(false);}
+ }
+ async function logout(){
+  const t=token;
+  sessionStorage.removeItem('medtour_patient_access');sessionStorage.removeItem('medtour_patient_invite');
+  setToken('');setInvite('');setOtp('');setPatient(null);setJourney([]);setMessages([]);setDocumentsByCase({});setConsents({});
+  if(t)try{await fetch(API_BASE+'/api/v1/portal/session/logout',{method:'POST',headers:{'X-Patient-Access':t},cache:'no-store'});}catch{}
+ }
  return <main style={{maxWidth:900,margin:'32px auto',padding:24,fontFamily:'system-ui',color:'#142b3c'}}>
  <header style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12}}><h1>✚ MedTour AI | Patient Portal</h1><button onClick={logout}>Clear access</button></header>
  <p>Secure coordination portal · بوابة المريض · پورتال بیمار</p><p>Information shown here is for administrative coordination; emergency care and clinical decisions require qualified local services.</p>
  {error&&<div role="alert" style={{background:'#ffefdd',padding:16,borderRadius:10}}>{error}</div>}
- {!patient?<p>Open the short-lived private link provided by your coordinator. Do not share it.</p>:<><h2 dir="auto">{patient.name}</h2>
+ {!patient?<section style={{border:'1px solid #cedae0',padding:20,borderRadius:12}}>
+ <h2>تأیید دسترسی · Verify access</h2>
+ <p>فقط محیط آزمایشی با اطلاعات ساختگی؛ احراز هویت مستقل SMS/Email فعال نیست. لینک دعوت به‌تنهایی مجوز مشاهده پرونده نمی‌دهد.</p>
+ <form onSubmit={redeem} style={{display:'grid',gap:12,maxWidth:470}}>
+  <label>لینک دعوت / Invitation token<input required dir="ltr" value={invite} onChange={e=>setInvite(e.target.value)} placeholder="Token supplied privately"/></label>
+  <label>کد شش‌رقمی / Verification code<input required dir="ltr" inputMode="numeric" maxLength={6} pattern="[0-9]{6}" autoComplete="one-time-code" value={otp} onChange={e=>setOtp(e.target.value)}/></label>
+  <button disabled={otpBusy||invite.length<35||otp.length!==6}>{otpBusy?'در حال بررسی…':'ورود با کد یک‌بارمصرف / Verify'}</button>
+ </form><p>هر دعوت ۱۰ دقیقه و حداکثر ۵ تلاش اعتبار دارد. کد آزمایشی را تنها از هماهنگ‌کننده دریافت کنید.</p>
+ </section>:<><h2 dir="auto">{patient.name}</h2>
+ <section style={{border:'1px solid #cedae0',padding:20,margin:'16px 0',borderRadius:12}}>
+ <h3>رضایت‌های ثبت‌شده · Consent preferences</h3>
+ <p>تمام تغییرات آزمایشی ثبت می‌شوند. لغو هر رضایت باعث بسته‌شدن نشست می‌شود؛ دسترسی واقعی درمانی در این محیط مجاز نیست.</p>
+ <label>نسخه اطلاعیه حریم خصوصی<input dir="ltr" required value={consentNotice} onChange={e=>setConsentNotice(e.target.value)} maxLength={40}/></label>
+ {Object.entries(consents).map(([purpose,accepted])=><div key={purpose} style={{padding:'8px 0',display:'flex',justifyContent:'space-between',gap:12,alignItems:'center'}}>
+ <span>{purpose}: {accepted?'فعال':'غیرفعال'}</span><button disabled={busy||!consentNotice.trim()} onClick={()=>void changeConsent(purpose,!accepted)}>{accepted?'لغو رضایت':'اعطای رضایت'}</button></div>)}
+ </section>
  {journey.map(c=><section key={c.case_id} style={{border:'1px solid #cedae0',padding:20,margin:'16px 0',borderRadius:12}}><h3>Medical case · {c.specialty||'Medical service'} — {c.status}</h3>
  <small>Reference: {c.case_id}</small><p><button disabled={busy} onClick={()=>startIntake(c.case_id)}>Start / resume structured intake</button></p><div style={{border:'1px solid #d2e5e0',padding:12,borderRadius:8,margin:'10px 0'}}><h4>Secure medical document upload</h4><p>PDF/JPG/PNG up to 8 MiB; only after your explicit document consent and secure storage setup.</p><input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e=>setDocumentFile(e.target.files?.[0]||null)}/><button disabled={busy||!documentFile} onClick={()=>uploadDocument(c.case_id)}>Upload securely</button>{documentStatus&&<p>{documentStatus}</p>}
  <div style={{marginTop:10}}>
