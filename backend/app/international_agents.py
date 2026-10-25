@@ -273,6 +273,12 @@ def attribute(intent_id:str,body:MatchIn,
         AgentReferralIntent.tenant_id==user.tenant_id,
         AgentReferralIntent.patient_id==patient.id).limit(1))
     if prior:raise HTTPException(409,"Patient already attributed to agent referral")
+    old_legacy_agent_link=db.scalar(select(LeadSource.id).where(
+        LeadSource.tenant_id==user.tenant_id,
+        LeadSource.patient_id==patient.id,
+        LeadSource.agent_id.is_not(None)).limit(1))
+    if old_legacy_agent_link:
+        raise HTTPException(409,"Legacy agent attribution needs independent reconciliation")
     # Direct legacy lead attribution remains prohibited, as it skips consent.
     lead=LeadSource(tenant_id=user.tenant_id,patient_id=patient.id,
         agent_id=a.id,source="agent_portal",campaign=x.campaign_code)
