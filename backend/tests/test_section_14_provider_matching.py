@@ -76,3 +76,26 @@ def test_unlinked_hospital_not_eligible(seeded):
     url=ROOT+f"/cases/{c['id']}/proposals"
     assert client.post(url,headers=admin,json={"physician_id":pid,"hospital_id":h["id"]}).status_code==409
     assert client.post(url,headers=auth("b"),json={"physician_id":pid}).status_code==404
+
+def test_intake_withdrawal_blocks_existing_provider_shortlist(seeded):
+    (client,auth,tids,Session),admin,p,c=seeded
+    pid=doctor(client,admin)
+    url=ROOT+f"/cases/{c['id']}/proposals"
+    created=client.post(url,headers=admin,json={"physician_id":pid})
+    assert created.status_code==201,created.text
+    approved=client.post(ROOT+f"/proposals/{created.json()['id']}/review",
+        headers=admin,json={"decision":"administratively_shortlisted",
+                            "reference":"HUMAN-REVIEW-14"})
+    assert approved.status_code==200
+    consent=lambda accepted:client.post("/api/v1/consents",headers=admin,json={
+        "patient_id":p["id"],"purpose":"intake","accepted":accepted,
+        "notice_version":"match-consent-14"})
+    assert consent(False).status_code==201
+    with Session() as db:
+        assert db.get(ProviderMatch,created.json()["id"]).status=="blocked"
+    assert client.get(url,headers=admin).status_code==409
+    assert consent(True).status_code==201
+    assert client.get(url,headers=admin).json()["items"][0]["status"]=="blocked"
+    assert client.post(ROOT+f"/proposals/{created.json()['id']}/review",
+        headers=admin,json={"decision":"rejected",
+                            "reference":"NO-REOPEN-14"}).status_code==409
