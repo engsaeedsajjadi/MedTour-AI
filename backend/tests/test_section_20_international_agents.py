@@ -202,3 +202,34 @@ def test_agent_identity_provision_rejects_duplicate_and_bad_inputs(seeded):
     assert client.post(ROOT+"/agents/"+a+"/agreements",headers=operator,json={
         "contract_key":"ANOTHER-CONTRACT-20","jurisdiction":"AF","currency":"USD",
         "max_budget_minor":0}).status_code==403
+
+
+def test_legacy_agency_fee_accounting_remains_closed(seeded):
+    (client,auth,_,_),admin,_,case=seeded
+    attempted=client.post("/api/v1/finance/entries",headers=admin,json={
+        "case_id":case["id"],"entry_type":"agency_fee",
+        "currency":"USD","amount_minor":200,
+        "source_reference":"NONCLINICAL-ESTIMATE-20"})
+    assert attempted.status_code==409
+    assert client.get("/api/v1/finance/entries",headers=admin).json()==[]
+
+
+def test_same_tenant_agents_cannot_read_each_others_tracking(seeded):
+    (client,auth,_,_),admin,_,_=seeded
+    first,_=setup(client,admin)
+    first_user,_=agent_login(client)
+    referral=intent(client,first_user).json()
+    second=agent_create(client,admin,"Another Synthetic Agency 20")
+    other_ag=agreement(client,admin,second,code="CONTRACT-SECOND-20")
+    review(client,admin,other_ag)
+    other_provision=provision(client,admin,second,email="agent21@example.com")
+    assert other_provision.status_code==201,other_provision.text
+    response=client.post("/api/v1/auth/login",json={
+        "tenant_slug":"a","email":"agent21@example.com","password":PASSWORD})
+    assert response.status_code==200,response.text
+    second_user={"Authorization":"Bearer "+response.json()["access_token"]}
+    assert client.get(ROOT+"/portal/referrals",headers=second_user).json()["items"]==[]
+    assert client.get(ROOT+"/portal/me",headers=second_user).json()["agent_id"]==second
+    assert client.get(ROOT+"/portal/me",headers=first_user).json()["agent_id"]==first
+    assert client.get(ROOT+"/portal/referrals",headers=first_user).json()["items"][0]["id"]==referral["id"]
+    assert client.get(ROOT+"/agents/"+first+"/referrals",headers=second_user).status_code==403
