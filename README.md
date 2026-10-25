@@ -176,3 +176,4 @@ The platform remains a **development alpha** and must undergo local tests and in
 ```
 
 This test needs the existing local API Docker image, not a Meta account or Telegram token. No patient records are processed. **Never expose app.main to the internet merely for a Telegram webhook; deploy the isolated app.telegram_entrypoint:app behind HTTPS instead.**
+\n\nSection 17 administrative visa coordination: see [docs/SECTION_17_VISA_FA.md](docs/SECTION_17_VISA_FA.md). No visa is issued or independently verified by this alpha platform.\n
