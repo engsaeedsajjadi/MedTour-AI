@@ -504,3 +504,6 @@ app.include_router(hospital_management_router)
 
 from .provider_matching import router as provider_matching_router
 app.include_router(provider_matching_router)
+
+from .appointment_calendar import router as appointment_calendar_router
+app.include_router(appointment_calendar_router)
