@@ -3,7 +3,7 @@ export function proxy(request:NextRequest){
  const parts=request.nextUrl.pathname.split('/');
  const locale=parts[1]==='public'?parts[3]:'';
  const headers=new Headers(request.headers);
- if(locale==='en'||locale==='fa'||locale==='ar')
+ if(locale==='en'||locale==='fa'||locale==='ar'||locale==='ps'||locale==='prs')
   headers.set('x-medtour-public-locale',locale);
  return NextResponse.next({request:{headers}});
 }
