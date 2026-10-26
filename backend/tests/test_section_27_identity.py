@@ -35,8 +35,11 @@ def test_enrollment_verification_login_and_replay(context):
         assert good.status_code==200,good.text
         assert client.post("/api/v1/auth/login",json=data|{"totp_code":code}).status_code==401
     finally:mfa.time.time=original
-    assert client.get(BASE+"/mfa/status",headers=admin).json()["enrolled"]
-    assert client.post(BASE+"/mfa/setup",headers=admin).status_code==409
+    # A pre-MFA JWT no longer authenticates once MFA is activated.
+    assert client.get(BASE+"/mfa/status",headers=admin).status_code==401
+    new_auth={"Authorization":"Bearer "+good.json()["access_token"]}
+    assert client.get(BASE+"/mfa/status",headers=new_auth).json()["enrolled"]
+    assert client.post(BASE+"/mfa/setup",headers=new_auth).status_code==409
 
 def test_doctor_case_grants_no_cross_tenant_access(context):
     client,auth,tids,Session=context
