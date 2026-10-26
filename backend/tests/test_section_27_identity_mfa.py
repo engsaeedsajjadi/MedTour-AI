@@ -148,7 +148,8 @@ def test_physician_identity_requires_active_tenant_account(context):
         "email":"doctor27@example.test","password":"synthetic-doctor-password-27"})
     assert blocked.status_code==200
     unbound={"Authorization":"Bearer "+blocked.json()["access_token"]}
-    assert client.get("/api/v1/auth/me",headers=unbound).status_code==403
+    assert client.get("/api/v1/auth/me",headers=unbound).status_code==200
+    assert client.get("/api/v1/physician-management/portal/me",headers=unbound).status_code==403
     admin=auth("a")
     staff=client.get("/api/v1/auth/staff",headers=admin)
     assert staff.status_code==200
