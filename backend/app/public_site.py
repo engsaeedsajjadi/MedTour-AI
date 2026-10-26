@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import re
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -136,3 +136,44 @@ def bootstrap(db:Session=Depends(get_db),user:User=Depends(roles("admin"))):
     return {"created":len(created),"items":created,
         "published":0,"manual_legal_medical_translation_review_required":True,
         "real_patient_data_allowed":False}
+
+class DraftEdit(BaseModel):
+    model_config=ConfigDict(extra="forbid")
+    title:str=Field(min_length=2,max_length=250)
+    body:str=Field(min_length=1,max_length=30000)
+
+@router.get("/cms/public-site/drafts/{page_id}")
+def draft_read(page_id:str,db:Session=Depends(get_db),user:User=Depends(roles("admin"))):
+    x=db.scalar(select(ContentPage).where(ContentPage.id==page_id,
+        ContentPage.tenant_id==user.tenant_id))
+    if not x:raise HTTPException(404,"CMS page not found")
+    return {"id":x.id,"slug":x.slug,"locale":x.locale,
+        "title":x.title,"body":x.body,"status":x.status}
+
+@router.patch("/cms/public-site/drafts/{page_id}")
+def draft_edit(page_id:str,body:DraftEdit,db:Session=Depends(get_db),
+               user:User=Depends(roles("admin"))):
+    x=db.scalar(select(ContentPage).where(ContentPage.id==page_id,
+        ContentPage.tenant_id==user.tenant_id).with_for_update())
+    if not x:raise HTTPException(404,"CMS page not found")
+    if x.status!="draft":
+        raise HTTPException(409,"Unpublish before editing; review translation and legal text again")
+    x.title=body.title.strip()
+    x.body=body.body.strip()
+    db.add(Audit(tenant_id=user.tenant_id,user_id=user.id,event="public_website_draft_edited",
+        entity_type="ContentPage",entity_id=x.id))
+    db.commit()
+    return {"id":x.id,"slug":x.slug,"locale":x.locale,"status":x.status,"title":x.title}
+
+@router.patch("/cms/public-site/pages/{page_id}/unpublish")
+def unpublish(page_id:str,db:Session=Depends(get_db),
+              user:User=Depends(roles("admin"))):
+    x=db.scalar(select(ContentPage).where(ContentPage.id==page_id,
+        ContentPage.tenant_id==user.tenant_id).with_for_update())
+    if not x:raise HTTPException(404,"CMS page not found")
+    if x.status!="published":raise HTTPException(409,"Only published pages can be unpublished")
+    x.status="draft";x.approved_by=None
+    db.add(Audit(tenant_id=user.tenant_id,user_id=user.id,event="public_website_page_unpublished",
+        entity_type="ContentPage",entity_id=x.id))
+    db.commit()
+    return {"id":x.id,"status":"draft","search_indexing_pending_review":True}
