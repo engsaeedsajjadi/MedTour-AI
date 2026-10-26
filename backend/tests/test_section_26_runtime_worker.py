@@ -79,3 +79,17 @@ def test_guarded_worker_rejects_unprovisioned_and_revoked_epoch(monkeypatch):
                 sender=lambda _:{"status":"synthetic"})
         assert calls==[(TID_A,4)]
     finally:registry.close()
+
+def test_strict_mode_disables_shared_get_db_and_tenant_global_meta_sender(context,monkeypatch):
+    from app.database import get_db
+    _,_,tenants,Session=context
+    monkeypatch.setenv("TENANT_DB_ROUTING_MODE","strict")
+    monkeypatch.setattr(delivery,"enabled",lambda:True)
+    with pytest.raises(RuntimeError,match="verified request-bound"):
+        next(get_db())
+    # Even with a restricted tenant DB factory, the legacy global Meta
+    # credentials cannot dispatch through a strict-mode worker.
+    result=delivery.send_one(str(uuid4()),
+        tenant_session_factory=Session,expected_tenant_id=tenants[0])
+    assert result["status"]=="blocked"
+    assert "Tenant-specific Meta" in result["reason"]
