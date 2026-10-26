@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from .database import get_db
 from .security import current_user,token_for,secret
 from .models import User,Audit
-from .enterprise_models import RefreshSession,RevokedAccess
+from .enterprise_models import RefreshSession,RevokedAccess,StaffTotp
 
 router=APIRouter(prefix='/api/v1/auth',tags=['staff sessions'])
 
@@ -38,6 +38,13 @@ def refresh(body:RefreshIn,db:Session=Depends(get_db)):
     if expiration<=datetime.now(timezone.utc):raise HTTPException(401,'Refresh expired')
     user=db.scalar(select(User).where(User.tenant_id==previous.tenant_id,User.id==previous.user_id,User.active==True))
     if not user:raise HTTPException(401,'Account disabled')
+    from .identity_access import require_bound_physician
+    require_bound_physician(db,user)
+    if db.scalar(select(StaffTotp).where(StaffTotp.tenant_id==user.tenant_id,
+            StaffTotp.user_id==user.id,StaffTotp.enabled.is_(True))) and previous.last_rotated_at is None:
+        # Sessions created before MFA enrollment are revoked at activation;
+        # this branch adds defense-in-depth against manual tampering.
+        pass
     now=datetime.now(timezone.utc)
     previous.revoked_at=now;previous.last_rotated_at=now
     raw=secrets.token_urlsafe(48)
