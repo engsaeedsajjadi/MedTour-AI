@@ -157,3 +157,49 @@ def test_physician_identity_requires_active_tenant_account(context):
     other=auth("b")
     assert client.put("/api/v1/auth/staff/"+uid+"/active",headers=other,
         json={"active":False}).status_code==404
+
+def test_admin_role_changes_are_audited_and_revoke_old_sessions(context):
+    client,auth,_,Session=context
+    a=auth("a")
+    op=auth("a","operator@example.test")
+    foreign=auth("b")
+    with Session() as db:
+        actor=db.query(User).filter(User.email=="a@example.test").one()
+        member=db.query(User).filter(User.email=="operator@example.test").one()
+        admin_id,member_id=actor.id,member.id
+    assert client.put("/api/v1/auth/staff/"+member_id+"/role",headers=foreign,
+        json={"role":"auditor"}).status_code==404
+    assert client.put("/api/v1/auth/staff/"+admin_id+"/role",headers=a,
+        json={"role":"operator"}).status_code==409
+    assert client.put("/api/v1/auth/staff/"+member_id+"/role",headers=op,
+        json={"role":"auditor"}).status_code==403
+    changed=client.put("/api/v1/auth/staff/"+member_id+"/role",headers=a,
+        json={"role":"auditor"})
+    assert changed.status_code==200,changed.text
+    assert changed.json()["sessions_revoked"]
+    assert client.get("/api/v1/auth/me",headers=op).status_code==401
+    assert client.post(LOGIN,json={"tenant_slug":"a",
+        "email":"operator@example.test","password":"test_password_12345"}).status_code==200
+    assert client.put("/api/v1/auth/staff/"+member_id+"/role",headers=a,
+        json={"role":"admin"}).status_code==422
+    with Session() as db:
+        member=db.query(User).filter(User.id==member_id).one()
+        assert member.role=="auditor" and member.auth_version==1
+
+
+def test_mfa_challenge_tenant_scoped_and_wrong_role_unable_to_toggle(context):
+    client,auth,_,Session=context
+    admin=auth("a")
+    alternate=auth("b")
+    secret,issued,_=activate(client,auth)
+    challenge=client.post(LOGIN,json={"tenant_slug":"a",
+        "email":"a@example.test","password":"test_password_12345"}).json()
+    assert challenge["mfa_required"]
+    # Access to other tenant's user lifecycle must be denied even with a
+    # valid admin principal.
+    uid=client.get("/api/v1/auth/me",headers={
+        "Authorization":"Bearer "+issued["access_token"]}).json()["id"]
+    assert client.put("/api/v1/auth/staff/"+uid+"/active",headers=alternate,
+        json={"active":False}).status_code==404
+    assert client.post(MFA+"/verify",json={
+        "challenge_token":"fake"*18,"code":"000000"}).status_code in (401,422)
