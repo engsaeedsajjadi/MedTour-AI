@@ -38,8 +38,6 @@ def refresh(body:RefreshIn,db:Session=Depends(get_db)):
     if expiration<=datetime.now(timezone.utc):raise HTTPException(401,'Refresh expired')
     user=db.scalar(select(User).where(User.tenant_id==previous.tenant_id,User.id==previous.user_id,User.active==True))
     if not user:raise HTTPException(401,'Account disabled')
-    from .identity_access import require_bound_physician
-    require_bound_physician(db,user)
     now=datetime.now(timezone.utc)
     previous.revoked_at=now;previous.last_rotated_at=now
     raw=secrets.token_urlsafe(48)
