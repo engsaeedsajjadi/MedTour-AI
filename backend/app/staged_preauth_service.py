@@ -27,6 +27,7 @@ from sqlalchemy.orm import sessionmaker
 
 from .enterprise_models import RefreshSession
 from .models import User
+from .enterprise_models import StaffTotp,PhysicianAccount
 from .security import password_hash, password_verify, token_for
 from .staged_tenant_transactions import StagedTenantCredentialTransactions
 from .tenant_route_tokens import TenantRouteKeyring, token_sha256
@@ -144,6 +145,18 @@ class StagedPreAuthService:
                     return None
                 if not password_verify(password, user.password_hash):
                     return None
+                # MFA identities cannot silently fall back to the staged
+                # password-only pre-auth implementation. Full MFA cutover
+                # requires an independently audited routed challenge flow.
+                factor=db.scalar(select(StaffTotp.id).where(
+                    StaffTotp.tenant_id==tenant_id,StaffTotp.user_id==user.id,
+                    StaffTotp.enabled.is_(True)))
+                if factor:return None
+                if user.role=="physician":
+                    linked=db.scalar(select(PhysicianAccount.id).where(
+                        PhysicianAccount.tenant_id==tenant_id,
+                        PhysicianAccount.user_id==user.id,PhysicianAccount.active.is_(True)))
+                    if not linked:return None
                 now = datetime.now(timezone.utc)
                 raw = self._keyring.issue(
                     purpose="refresh", tenant_id=tenant_id,
