@@ -155,7 +155,7 @@ class StagedTenantCredentialTransactions:
                 # refresh for a stale or manually injected refresh family.
                 if db.scalar(select(StaffTotp.id).where(
                     StaffTotp.tenant_id==tenant_id,
-                    StaffTotp.user_id==user.id,StaffTotp.enabled.is_(True))):
+                    StaffTotp.user_id==user.id,StaffTotp.enabled.is_(True))) and not row.mfa_verified:
                     return None
                 if user.role=="physician" and not db.scalar(select(PhysicianAccount.id).where(
                     PhysicianAccount.tenant_id==tenant_id,
@@ -176,6 +176,7 @@ class StagedTenantCredentialTransactions:
                         refresh_hash=token_sha256(replacement),
                         family_id=row.family_id,
                         expires_at=checked + timedelta(days=7),
+                        mfa_verified=row.mfa_verified,
                     )
                 )
                 result = RotatedRefresh(
