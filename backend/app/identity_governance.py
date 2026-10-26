@@ -8,11 +8,11 @@ from __future__ import annotations
 import base64,secrets,urllib.parse
 from fastapi import APIRouter,Depends,HTTPException
 from pydantic import BaseModel,Field,ConfigDict
-from sqlalchemy import select
+from sqlalchemy import select,update
 from sqlalchemy.orm import Session
 from .database import get_db
 from .models import User,Case,Audit
-from .enterprise_models import StaffMFA,DoctorCaseGrant
+from .enterprise_models import StaffMFA,DoctorCaseGrant,RefreshSession
 from .security import current_user,roles
 from .staff_mfa import encrypted,decrypted,totp,row_for,verify
 from .rate_limit import throttle
@@ -62,6 +62,9 @@ def activate(body:CodeIn,user:User=Depends(current_user),db:Session=Depends(get_
         __import__("hmac").compare_digest(totp(seed,t),body.code)]
     if not matches:raise HTTPException(401,"Invalid MFA code")
     row.enabled=True;row.last_counter=max(matches)
+    from .models import utcnow
+    db.execute(update(RefreshSession).where(RefreshSession.tenant_id==user.tenant_id,
+        RefreshSession.user_id==user.id,RefreshSession.revoked_at.is_(None)).values(revoked_at=utcnow()))
     db.add(Audit(tenant_id=user.tenant_id,user_id=user.id,event="staff_mfa_activated",
         entity_type="User",entity_id=user.id))
     db.commit()
