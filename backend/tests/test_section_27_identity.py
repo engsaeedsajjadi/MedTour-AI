@@ -18,8 +18,12 @@ def enroll(client,auth,Session):
 def test_enrollment_verification_login_and_replay(context):
     client,auth,_,Session=context
     admin=auth("a")
-    seed=enroll(client,admin,Session)
     data={"tenant_slug":"a","email":"a@example.test","password":"test_password_12345"}
+    before=client.post("/api/v1/auth/login",json=data)
+    assert before.status_code==200
+    seed=enroll(client,admin,Session)
+    assert client.post("/api/v1/auth/refresh",json={
+        "refresh_token":before.json()["refresh_token"]}).status_code==401
     assert client.post("/api/v1/auth/login",json=data).status_code==401
     wrong=client.post("/api/v1/auth/login",json=data|{"totp_code":"000000"})
     assert wrong.status_code==401
