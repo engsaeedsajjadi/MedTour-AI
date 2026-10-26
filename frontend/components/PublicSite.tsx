@@ -26,7 +26,7 @@ export function PublicShell({tenant,locale,manifest,slug,children}:{
      {PUBLIC_LOCALES.map(l=>{
       const href=slug&&hasPage(manifest,slug,l)?publicPath(tenant,l,slug):publicPath(tenant,l);
       return <Link key={l} href={href} hrefLang={l} lang={l} aria-label={l}
-        aria-current={l===locale?'page':undefined}>{l==='fa'?'FA':l==='ar'?'AR':'EN'}</Link>;
+        aria-current={l===locale?'page':undefined}>{l==='fa'?'FA':l==='ar'?'AR':l==='ps'?'PS':l==='prs'?'DR':'EN'}</Link>;
      })}
     </div>
    </div>
@@ -43,7 +43,7 @@ export function PublicShell({tenant,locale,manifest,slug,children}:{
    </div>
    <div className="site-wide site-footer-bottom">
      <span>© MedTour AI · Alpha demonstration</span>
-     <span>{manifest.all_languages_complete?'3 / 3 locales published':'Content and translations pending review'}</span>
+     <span>{manifest.all_languages_complete?'5 / 5 locales published':'Content and translations pending review'}</span>
    </div>
   </footer>
  </div>;
