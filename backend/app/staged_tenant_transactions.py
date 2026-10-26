@@ -37,6 +37,7 @@ class RotatedRefresh:
     user_id: str
     role: str
     refresh_token: str
+    auth_version: int = 0
 
 
 @dataclass(frozen=True)
@@ -182,6 +183,7 @@ class StagedTenantCredentialTransactions:
                     user_id=user.id,
                     role=user.role,
                     refresh_token=replacement,
+                    auth_version=user.auth_version,
                 )
                 db.commit()
                 return result
