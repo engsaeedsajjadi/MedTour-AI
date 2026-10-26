@@ -61,7 +61,7 @@ def test_tts_provider_static_wav_contract_and_untrusted_response_fails(monkeypat
             return Response(silent_wav() if len(seen)==1 else b"<html>not audio</html>")
     monkeypatch.setattr(voice_provider.httpx,"Client",FakeClient)
     payload,ms=voice_provider.synthesize("Generic admin greeting","ps")
-    assert payload.startswith(b"RIFF") and ms==100
+    assert payload.startswith(b"RIFF") and ms==200
     assert seen[0][0]=="https://synthetic-voice.example/audio/speech"
     assert seen[0][1]["json"]["voice"]=="alloy"
     assert seen[0][1]["json"]["response_format"]=="wav"
