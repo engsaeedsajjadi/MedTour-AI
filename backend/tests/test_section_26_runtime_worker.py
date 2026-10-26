@@ -61,14 +61,21 @@ def test_guarded_worker_rejects_unprovisioned_and_revoked_epoch(monkeypatch):
     calls=[]
     monkeypatch.setattr(tenant_scoped_worker,"poll_once",lambda **kw:
         calls.append((kw["tenant_id"],kw["batch_size"])) or {"status":"inert"})
+    assert tenant_scoped_worker.poll_provisioned_tenant(
+        registry=registry,tenant_id=TID_A,batch_size=4)=={
+        "status":"provider_binding_required","processed":0,
+        "reason":"Strict mode cannot use global Meta credentials"}
     try:
         assert tenant_scoped_worker.poll_provisioned_tenant(
-            registry=registry,tenant_id=TID_A,batch_size=4)["status"]=="inert"
+            registry=registry,tenant_id=TID_A,batch_size=4,
+            sender=lambda _:{"status":"synthetic"})["status"]=="inert"
         assert calls==[(TID_A,4)]
         with pytest.raises(LookupError):
-            tenant_scoped_worker.poll_provisioned_tenant(registry=registry,tenant_id=TID_B)
+            tenant_scoped_worker.poll_provisioned_tenant(registry=registry,tenant_id=TID_B,
+                sender=lambda _:{"status":"synthetic"})
         authority.state[TID_A]=EpochState(2,False)
         with pytest.raises(LookupError):
-            tenant_scoped_worker.poll_provisioned_tenant(registry=registry,tenant_id=TID_A)
+            tenant_scoped_worker.poll_provisioned_tenant(registry=registry,tenant_id=TID_A,
+                sender=lambda _:{"status":"synthetic"})
         assert calls==[(TID_A,4)]
     finally:registry.close()
