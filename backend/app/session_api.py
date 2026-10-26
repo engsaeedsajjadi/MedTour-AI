@@ -44,7 +44,9 @@ def refresh(body:RefreshIn,db:Session=Depends(get_db)):
     newer=RefreshSession(tenant_id=user.tenant_id,user_id=user.id,refresh_hash=hash_token(raw),
         family_id=previous.family_id,expires_at=now+timedelta(days=7))
     db.add(newer);db.commit()
-    return {'access_token':token_for(user,mfa_verified=True),'refresh_token':raw,'token_type':'bearer','expires_in':1800}
+    return {'access_token':token_for(user,mfa_verified=bool(
+        (enrollment:=__import__("app.staff_mfa",fromlist=["row_for"]).row_for(
+            db,user.tenant_id,user.id)) and enrollment.enabled)),'refresh_token':raw,'token_type':'bearer','expires_in':1800}
 
 @router.post('/logout')
 def logout(authorization:str|None=Header(None),user:User=Depends(current_user),db:Session=Depends(get_db)):
