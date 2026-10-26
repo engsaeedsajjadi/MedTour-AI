@@ -11,7 +11,7 @@ type Manifest={
  indexing_opt_in:boolean;legal_review_self_attested:boolean;
 };
 type CmsDetail={id:string;slug:string;locale:string;status:string;title:string;body:string};
-const localeNames:Record<string,string>={fa:'فارسی',ar:'العربية',en:'English'};
+const localeNames:Record<string,string>={fa:'فارسی',ar:'العربية',en:'English',ps:'پښتو',prs:'دری'};
 
 export default function Cms(){
  const [pages,setPages]=useState<Row[]>([]);
@@ -66,7 +66,7 @@ export default function Cms(){
   setEditing(null);
  }
  return <Shell title="وب‌سایت عمومی چندزبانه">
-  <div className="infoBanner">محتوای پیش‌نویس هرگز عمومی نیست. فعال‌سازی سئو به انتشار تمام صفحات اصلی به سه زبان، بررسی حقوقی اعلام‌شده توسط سازمان و تنظیم صریح نیاز دارد. این تأیید به معنی بررسی مستقل قانون یا پزشک نیست.</div>
+  <div className="infoBanner">محتوای پیش‌نویس هرگز عمومی نیست. فعال‌سازی سئو به انتشار تمام صفحات اصلی به پنج زبان، بررسی حقوقی اعلام‌شده توسط سازمان و تنظیم صریح نیاز دارد. این تأیید به معنی بررسی مستقل قانون یا پزشک نیست.</div>
   {error&&<div className="errorBox" role="alert">{error}</div>}
   {notice&&<div className="infoBanner" role="status">{notice}</div>}
   <section className="panel" style={{padding:20,marginBottom:22}}>
@@ -74,15 +74,15 @@ export default function Cms(){
    <div style={{display:'flex',gap:12,flexWrap:'wrap',alignItems:'end'}}>
     <label>شناسه سازمان<input value={tenant} dir="ltr" onChange={e=>setTenant(e.target.value)}/></label>
     <button className="button" disabled={busy} onClick={()=>void refresh().catch(e=>setError((e as Error).message))}>بررسی انتشار</button>
-    <button className="button" disabled={busy} onClick={()=>void bootstrap()}>افزودن ۲۴ پیش‌نویس سه‌زبانه (بدون انتشار)</button>
+    <button className="button" disabled={busy} onClick={()=>void bootstrap()}>افزودن ۴۰ پیش‌نویس پنج‌زبانه (بدون انتشار)</button>
     <a href={'/public/'+encodeURIComponent(tenant)+'/fa'} target="_blank" rel="noopener noreferrer">پیش‌نمایش فارسی وب‌سایت ↗</a>
    </div>
    {manifest&&<div style={{marginTop:20}}>
-    <p>پوشش کامل سه‌زبانه: <strong>{manifest.all_languages_complete?'بله':'خیر'}</strong> · اجازه نمایه‌سازی: <strong>{manifest.search_indexing_allowed?'فعال':'غیرفعال'}</strong></p>
+    <p>پوشش کامل پنج‌زبانه: <strong>{manifest.all_languages_complete?'بله':'خیر'}</strong> · اجازه نمایه‌سازی: <strong>{manifest.search_indexing_allowed?'فعال':'غیرفعال'}</strong></p>
     <div className="tableScroll"><table>
-     <thead><tr><th>صفحه</th><th>فارسی</th><th>عربی</th><th>انگلیسی</th></tr></thead>
+     <thead><tr><th>صفحه</th><th>فارسی</th><th>عربی</th><th>انگلیسی</th><th>پشتو</th><th>دری</th></tr></thead>
      <tbody>{manifest.required_slugs.map(s=><tr key={s}>
-      <td dir="ltr">{s}</td>{['fa','ar','en'].map(l=><td key={l}>
+      <td dir="ltr">{s}</td>{['fa','ar','en','ps','prs'].map(l=><td key={l}>
        {manifest.missing_translations[l]?.includes(s)?'نیازمند بررسی/انتشار':'منتشر شده'}
       </td>)}
      </tr>)}</tbody>
