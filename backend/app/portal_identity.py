@@ -61,7 +61,9 @@ def invite(patient_id:str,db:Session=Depends(get_db),user:User=Depends(roles("ad
         PortalAccess.tenant_id==user.tenant_id,
         PortalAccess.patient_id==patient.id,PortalAccess.revoked.is_(False))).all()
     for item in prior:item.revoked=True
-    invitation=secrets.token_urlsafe(40)
+    signer=db.info.get("tenant_route_keyring")
+    invitation=(signer.issue(purpose="portal",tenant_id=user.tenant_id,
+        ttl_seconds=LIFETIME_MINUTES*60) if signer else secrets.token_urlsafe(40))
     code=str(secrets.randbelow(1000000)).zfill(6)
     challenge=PortalLoginChallenge(tenant_id=user.tenant_id,patient_id=patient.id,
         invitation_hash=hashed(invitation),code_hash="pending",
@@ -114,7 +116,9 @@ def exchange(body:VerifyIn,db:Session=Depends(get_db)):
         c.consumed_at=now;db.commit()
         raise HTTPException(401,"Patient portal consent unavailable")
     # Only verified exchange creates a portal grant: invitation itself is powerless.
-    raw=secrets.token_urlsafe(48)
+    signer=db.info.get("tenant_route_keyring")
+    raw=(signer.issue(purpose="portal",tenant_id=c.tenant_id,
+         ttl_seconds=SESSION_MINUTES*60) if signer else secrets.token_urlsafe(48))
     g=PortalAccess(tenant_id=c.tenant_id,patient_id=c.patient_id,
         token_hash=hashed(raw),expires_at=now+timedelta(minutes=SESSION_MINUTES),
         issued_by=c.issued_by,revoked=False)
