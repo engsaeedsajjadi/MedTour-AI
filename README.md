@@ -197,3 +197,6 @@ Section 22: [Five-language public website (FA/AR/EN/PS/PRS), draft templates, pu
 
 
 Section 23: [Tenant-scoped CMS versions, separate legal/medical/translation review roles, restored snapshot reapproval and migration disclosure](docs/SECTION_23_CMS_GOVERNANCE_FA.md). Governance workspace: /cms-workflow. Prior unreviewed published content is deliberately unpublished at migration.
+
+
+Section 24: [Bounded, tenant-opt-in administrative AI agent orchestration, read-only tool registry and manual approval](docs/SECTION_24_AI_ORCHESTRATION_FA.md). UI /ai-orchestration; no patient PHI, automatic medical decision, live speech or automatic outbound messages.
