@@ -15,6 +15,7 @@ from contextlib import contextmanager
 from uuid import UUID
 import jwt
 from fastapi import FastAPI,Request,HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text,select
 from sqlalchemy.exc import SQLAlchemyError
 from .database import get_db
@@ -75,6 +76,10 @@ class StrictTenantGateway:
             raise RuntimeError("Another DB override is already installed")
         inner_app.dependency_overrides[get_db]=self.get_db
         self.preauth=FastAPI(docs_url=None,redoc_url=None,openapi_url=None)
+        origins=[x.strip() for x in os.getenv("CORS_ORIGINS","http://localhost:3000").split(",") if x.strip()]
+        self.preauth.add_middleware(CORSMiddleware,allow_origins=origins,
+            allow_credentials=True,allow_methods=["POST"],
+            allow_headers=["Authorization","Content-Type"])
         for route in staged_preauth_router(self.service).routes:
             if route.path in _PREAUTH:self.preauth.router.routes.append(route)
 
@@ -87,7 +92,7 @@ class StrictTenantGateway:
             await self.app(scope,receive,send);return
         method=scope.get("method")
         path=scope.get("path","")
-        if path in _PREAUTH and method=="POST":
+        if path in _PREAUTH and method in ("POST","OPTIONS"):
             await self.preauth(scope,receive,send);return
         if path in _PREAUTH or path==_META and method not in ("POST","GET"):
             # Method mismatch never reaches legacy pre-auth.
