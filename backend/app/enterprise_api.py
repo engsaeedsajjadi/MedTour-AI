@@ -15,6 +15,7 @@ from .enterprise_models import (Operation,OperationEvent,ServicePrice,QuoteItem,
     LeadSource,MoneyEntry,CaseTimeline)
 from .security import roles,current_user,password_hash
 from .intake import LANGUAGES,PROMPTS,intake_response
+from .cms_workflow import initialize_version,publish as governed_publish
 
 router=APIRouter(prefix='/api/v1',tags=['enterprise'])
 OPERATOR=roles('admin','operator')
@@ -158,7 +159,7 @@ class ContentIn(BaseModel):
 def cms_add(body:ContentIn,db:Session=Depends(get_db),user:User=Depends(ADMIN)):
     if body.locale not in LANGUAGES:raise HTTPException(422,'Unsupported locale')
     try:
-        x=ContentPage(tenant_id=user.tenant_id,**body.model_dump());write(db,user,x,'content_drafted')
+        x=ContentPage(tenant_id=user.tenant_id,**body.model_dump());db.add(x);db.flush();initialize_version(db,user,x);write(db,user,x,'content_drafted')
         return {'id':x.id,'slug':x.slug,'locale':x.locale,'status':x.status}
     except IntegrityError:
         db.rollback();raise HTTPException(409,'A page for this slug and locale already exists')
@@ -170,8 +171,7 @@ def cms_list(db:Session=Depends(get_db),user:User=Depends(OPERATOR)):
 
 @router.patch('/cms/pages/{pk}/publish')
 def cms_publish(pk:str,db:Session=Depends(get_db),user:User=Depends(ADMIN)):
-    x=owns(db,ContentPage,pk,user);x.status='published';x.approved_by=user.id
-    write(db,user,x,'content_published');return {'id':x.id,'status':x.status}
+    return governed_publish(pk,db,user)
 
 @router.get('/public/{tenant_slug}/pages/{locale}/{slug}')
 def public_page(tenant_slug:str,locale:str,slug:str,db:Session=Depends(get_db)):
@@ -179,7 +179,8 @@ def public_page(tenant_slug:str,locale:str,slug:str,db:Session=Depends(get_db)):
     tenant=db.scalar(select(Tenant).where(Tenant.slug==tenant_slug))
     if not tenant:raise HTTPException(404,'Page not found')
     x=db.scalar(select(ContentPage).where(ContentPage.tenant_id==tenant.id,ContentPage.locale==locale,
-           ContentPage.slug==slug,ContentPage.status=='published'))
+           ContentPage.slug==slug,ContentPage.status=='published',
+           ContentPage.published_version_no.is_not(None)))
     if not x:raise HTTPException(404,'Page not found')
     return {'title':x.title,'body':x.body,'locale':x.locale,'slug':x.slug}
 
