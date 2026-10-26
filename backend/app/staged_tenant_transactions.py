@@ -24,6 +24,8 @@ from .enterprise_models import (
     PatientConsentChallenge,
     PortalAccess,
     RefreshSession,
+    StaffTotp,
+    PhysicianAccount,
 )
 from .models import Audit, Consent, Patient, User
 from .tenant_route_tokens import TenantRouteKeyring, token_sha256
@@ -35,6 +37,7 @@ class RotatedRefresh:
     user_id: str
     role: str
     refresh_token: str
+    auth_version: int = 0
 
 
 @dataclass(frozen=True)
@@ -146,8 +149,20 @@ class StagedTenantCredentialTransactions:
                         User.active.is_(True),
                     )
                 )
-                if user is None:
+                if user is None:return None
+                # Staged strict pre-auth has no second-factor handoff yet.
+                # Reject MFA identities rather than issuing an MFA-bypassing
+                # refresh for a stale or manually injected refresh family.
+                if db.scalar(select(StaffTotp.id).where(
+                    StaffTotp.tenant_id==tenant_id,
+                    StaffTotp.user_id==user.id,StaffTotp.enabled.is_(True))) and not row.mfa_verified:
                     return None
+                if user.role=="physician" and not db.scalar(select(PhysicianAccount.id).where(
+                    PhysicianAccount.tenant_id==tenant_id,
+                    PhysicianAccount.user_id==user.id,PhysicianAccount.active.is_(True))):return None
+                # Existing refresh token families issued before MFA enrollment
+                # are invalidated on enable. A staged login may not create new
+                # families for MFA-enabled users.
                 replacement = self._keyring.issue(
                     purpose="refresh", tenant_id=tenant_id,
                     ttl_seconds=7 * 24 * 3600, now=int(checked.timestamp()),
@@ -161,6 +176,7 @@ class StagedTenantCredentialTransactions:
                         refresh_hash=token_sha256(replacement),
                         family_id=row.family_id,
                         expires_at=checked + timedelta(days=7),
+                        mfa_verified=row.mfa_verified,
                     )
                 )
                 result = RotatedRefresh(
@@ -168,6 +184,7 @@ class StagedTenantCredentialTransactions:
                     user_id=user.id,
                     role=user.role,
                     refresh_token=replacement,
+                    auth_version=user.auth_version,
                 )
                 db.commit()
                 return result
