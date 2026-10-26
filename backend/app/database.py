@@ -5,6 +5,14 @@ from sqlalchemy.orm import DeclarativeBase, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///./medtour_dev.sqlite3')
+# Until an independently reviewed production control plane exists, strict
+# tenant workers must not even *create* an engine from a shared privileged DSN.
+if os.getenv("TENANT_DB_ROUTING_MODE","").lower()=="strict" and (
+    os.getenv("APP_ENV","development")!="test"
+    or os.getenv("MEDTOUR_SYNTHETIC_CLONE")!="1"
+    or DATABASE_URL!="sqlite://"
+):
+    raise RuntimeError("Strict tenant mode requires the verified synthetic clone; no shared database DSN")
 if DATABASE_URL.startswith('sqlite') and os.getenv('APP_ENV', 'development') == 'production':
     raise RuntimeError('SQLite is not allowed in production')
 kwargs = {'connect_args': {'check_same_thread': False}} if DATABASE_URL.startswith('sqlite') else {'pool_pre_ping': True}
