@@ -123,6 +123,7 @@ class StrictTenantGateway:
             routing=self.service.verify_webhook_route(raw,
                 request.headers.get("x-hub-signature-256"))
             if not routing:raise HTTPException(403,"Invalid Meta signature or tenant route")
+            request.state.verified_whatsapp_phone=routing.phone_number_id
             return routing.tenant_id,None
         staff=self._jwt_tenant(request)
         if staff:
@@ -194,6 +195,8 @@ class StrictTenantGateway:
                     self._prove_connection(db,tid)
                     db.info["verified_tenant_id"]=tid
                     if slug:db.info["verified_public_slug"]=slug
+                    if hasattr(request.state,"verified_whatsapp_phone"):
+                        db.info["verified_whatsapp_phone"]=request.state.verified_whatsapp_phone
                     db.info["tenant_route_keyring"]=self.keyring
                     yield db
         except HTTPException:raise
