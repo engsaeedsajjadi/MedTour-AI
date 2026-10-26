@@ -11,11 +11,21 @@ kwargs = {'connect_args': {'check_same_thread': False}} if DATABASE_URL.startswi
 if DATABASE_URL == 'sqlite://':
     kwargs['poolclass'] = StaticPool
 engine = create_engine(DATABASE_URL, **kwargs)
-SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+_shared_session_factory = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+def _strict_shared_session_blocked(*args,**kwargs):
+    raise RuntimeError("Shared database sessions forbidden in tenant strict mode; use a verified tenant principal")
+
+# Fail closed even if a background helper bypasses FastAPI dependencies and
+# imports SessionLocal directly. Only the explicit tenant registry owns DB work.
+SessionLocal = (_strict_shared_session_blocked
+    if os.getenv("TENANT_DB_ROUTING_MODE","").lower()=="strict"
+    else _shared_session_factory)
 
 class Base(DeclarativeBase):
     pass
 
 def get_db():
+    if os.getenv("TENANT_DB_ROUTING_MODE","").lower()=="strict":
+        raise RuntimeError("Tenant mode requires a verified request-bound database gateway")
     with SessionLocal() as db:
         yield db
