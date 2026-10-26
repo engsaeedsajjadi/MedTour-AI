@@ -84,7 +84,40 @@ class ContentPage(TenantEntity,Base):
     body:Mapped[str]=mapped_column(Text,default='')
     status:Mapped[str]=mapped_column(String(24),default='draft')
     approved_by:Mapped[str|None]=mapped_column(ForeignKey('users.id'),nullable=True)
+    published_version_no:Mapped[int|None]=mapped_column(Integer,nullable=True)
     __table_args__=(UniqueConstraint('tenant_id','slug','locale'),)
+
+class CmsVersion(TenantEntity,Base):
+    __tablename__='cms_versions'
+    page_id:Mapped[str]=mapped_column(ForeignKey('content_pages.id'),nullable=False)
+    version_no:Mapped[int]=mapped_column(Integer,nullable=False)
+    title:Mapped[str]=mapped_column(String(250),nullable=False)
+    body:Mapped[str]=mapped_column(Text,nullable=False)
+    content_hash:Mapped[str]=mapped_column(String(64),nullable=False)
+    author_id:Mapped[str]=mapped_column(ForeignKey('users.id'),nullable=False)
+    reason:Mapped[str]=mapped_column(String(200),nullable=False)
+    status:Mapped[str]=mapped_column(String(30),nullable=False,default='draft')
+    __table_args__=(UniqueConstraint('tenant_id','page_id','version_no'),
+        Index('ix_cms_versions_page','tenant_id','page_id','version_no'),)
+
+class CmsReview(TenantEntity,Base):
+    __tablename__='cms_reviews'
+    version_id:Mapped[str]=mapped_column(ForeignKey('cms_versions.id'),nullable=False)
+    stage:Mapped[str]=mapped_column(String(30),nullable=False)
+    decision:Mapped[str]=mapped_column(String(30),nullable=False)
+    reviewer_id:Mapped[str]=mapped_column(ForeignKey('users.id'),nullable=False)
+    evidence_reference:Mapped[str]=mapped_column(String(100),nullable=False)
+    __table_args__=(UniqueConstraint('tenant_id','version_id','stage'),
+        Index('ix_cms_reviews_version','tenant_id','version_id'),)
+
+class CmsWorkflowEvent(TenantEntity,Base):
+    __tablename__='cms_workflow_events'
+    page_id:Mapped[str]=mapped_column(ForeignKey('content_pages.id'),nullable=False)
+    version_id:Mapped[str|None]=mapped_column(ForeignKey('cms_versions.id'),nullable=True)
+    actor_id:Mapped[str]=mapped_column(ForeignKey('users.id'),nullable=False)
+    action:Mapped[str]=mapped_column(String(55),nullable=False)
+    reference:Mapped[str]=mapped_column(String(100),nullable=False,default='')
+    __table_args__=(Index('ix_cms_workflow_events_page','tenant_id','page_id','created_at'),)
 
 class TenantSetting(TenantEntity,Base):
     __tablename__='tenant_settings'
