@@ -149,6 +149,13 @@ class StagedTenantCredentialTransactions:
                     )
                 )
                 if user is None:return None
+                # Staged strict pre-auth has no second-factor handoff yet.
+                # Reject MFA identities rather than issuing an MFA-bypassing
+                # refresh for a stale or manually injected refresh family.
+                if db.scalar(select(StaffTotp.id).where(
+                    StaffTotp.tenant_id==tenant_id,
+                    StaffTotp.user_id==user.id,StaffTotp.enabled.is_(True))):
+                    return None
                 if user.role=="physician" and not db.scalar(select(PhysicianAccount.id).where(
                     PhysicianAccount.tenant_id==tenant_id,
                     PhysicianAccount.user_id==user.id,PhysicianAccount.active.is_(True))):return None
