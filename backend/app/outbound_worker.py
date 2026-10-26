@@ -48,9 +48,12 @@ def _heartbeat() -> None:
 
 def poll_once(*, session_factory=None, sender=None, batch_size: int = 20,
               tenant_id: str | None = None) -> dict:
-    if (session_factory is None) != (tenant_id is None):
-        raise ValueError("Tenant-scoped work needs both a session factory and trusted tenant ID")
-    if os.getenv("TENANT_DB_ROUTING_MODE") == "strict" and tenant_id is None:
+    strict=os.getenv("TENANT_DB_ROUTING_MODE") == "strict"
+    if tenant_id is not None and session_factory is None:
+        raise ValueError("A trusted tenant ID requires a scoped session factory")
+    if strict and tenant_id is None and session_factory is not None:
+        raise ValueError("Shared factory cannot be injected into strict tenant worker")
+    if strict and tenant_id is None:
         return {"status":"blocked","processed":0,
                 "reason":"Shared worker DB is forbidden under strict tenant routing"}
     if not 1 <= batch_size <= 100:
