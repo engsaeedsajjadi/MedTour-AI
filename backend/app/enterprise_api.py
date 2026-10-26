@@ -447,3 +447,6 @@ def translate_draft(body:TranslateIn,db:Session=Depends(get_db),user:User=Depend
     answer=translate(body.text,body.source_language,body.target_language)
     return {'translation_draft':answer,'human_review_required':True,
       'warning':'A qualified human must verify translation of clinically important information before delivery.'}
+
+from .ai_orchestration import router as ai_orchestration_router
+router.include_router(ai_orchestration_router)
