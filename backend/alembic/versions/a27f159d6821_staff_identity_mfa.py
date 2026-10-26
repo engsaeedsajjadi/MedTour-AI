@@ -16,6 +16,8 @@ def common():
             sa.Column("created_at",sa.DateTime(timezone=True),nullable=False)]
 def upgrade():
     op.add_column("users",sa.Column("auth_version",sa.Integer(),server_default="0",nullable=False))
+    op.add_column("refresh_sessions",sa.Column("mfa_verified",sa.Boolean(),
+        server_default=sa.false(),nullable=False))
     op.create_table("staff_totp",*common(),
         sa.Column("user_id",sa.String(36),sa.ForeignKey("users.id"),nullable=False),
         sa.Column("encrypted_secret",sa.Text(),nullable=False),
@@ -47,4 +49,5 @@ def downgrade():
     op.drop_table("staff_mfa_challenges")
     op.drop_index("ix_staff_totp_tenant_id",table_name="staff_totp")
     op.drop_table("staff_totp")
+    op.drop_column("refresh_sessions","mfa_verified")
     op.drop_column("users","auth_version")
