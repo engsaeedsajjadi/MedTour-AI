@@ -197,6 +197,24 @@ with TestClient(gateway) as client:
     assert second["processed"]==0 and observed==[],second
     assert poll_provisioned_tenant(registry=registry,tenant_id=tenants[0],
         sender=None)["status"]=="provider_binding_required"
+    # MFA on real restricted tenant PostgreSQL roles must not be bypassable
+    # through the staged pre-auth endpoint or an already-issued JWT.
+    import base64 as _base64, time as _time
+    from app.staff_mfa import totp
+    os.environ["STAFF_MFA_ENCRYPTION_KEY"]=_base64.urlsafe_b64encode(b"z"*32).decode()
+    started=client.post("/api/v1/identity/mfa/setup",headers=headers[0])
+    assert started.status_code==200,started.text
+    encoded=started.json()["manual_secret"]
+    seed=_base64.b32decode(encoded+"="*(-len(encoded)%8))
+    otp=totp(seed,int(_time.time()//30))
+    done=client.post("/api/v1/identity/mfa/activate",headers=headers[0],
+        json={"code":otp})
+    assert done.status_code==200,done.text
+    assert client.get("/api/v1/patients",headers=headers[0]).status_code==401
+    wrong=client.post("/api/v1/auth/login",json={
+        "tenant_slug":"cutover-a","email":"admin@example.test",
+        "password":"synthetic_password_12345"})
+    assert wrong.status_code==401,wrong.text
     # A cross-worker epoch cutover MUST deny existing staff JWT routes
     # before entering an old or privileged connection.
     epoch.active=False
