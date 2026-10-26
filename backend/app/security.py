@@ -46,7 +46,7 @@ def current_user(credentials:HTTPAuthorizationCredentials|None=Depends(BEARER),d
                 PhysicianAccount.tenant_id==user.tenant_id,
                 PhysicianAccount.user_id==user.id,
                 PhysicianAccount.active.is_(True)).first()
-            if not link:raise ValueError('physician account no longer bound')
+            if not link:raise HTTPException(403,'Physician identity is not linked to an active account')
         revoked=db.query(RevokedAccess.id).filter(RevokedAccess.tenant_id==user.tenant_id,
             RevokedAccess.jti_hash==hashlib.sha256(data['jti'].encode()).hexdigest()).first()
         if revoked: raise ValueError('Access token has been revoked')
