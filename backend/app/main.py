@@ -556,3 +556,6 @@ app.include_router(cms_workflow_router)
 
 from .tenant_isolation_status import router as tenant_isolation_router
 app.include_router(tenant_isolation_router)
+
+from .identity_governance import router as identity_governance_router
+app.include_router(identity_governance_router)
