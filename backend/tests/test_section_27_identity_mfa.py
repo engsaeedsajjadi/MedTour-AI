@@ -16,7 +16,7 @@ MFA="/api/v1/auth/mfa"
 @pytest.fixture(autouse=True)
 def mfa_key(monkeypatch):
     monkeypatch.setenv("MFA_ENCRYPTION_KEY",
-        base64.urlsafe_b64encode(b"synthetic-not-production-mfa-key-32").decode())
+        base64.urlsafe_b64encode(b"0123456789abcdef0123456789abcdef").decode())
 
 def otp(secret):
     return mfa.code_for(secret,int(time.time())//30)
