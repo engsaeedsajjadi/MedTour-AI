@@ -21,14 +21,15 @@ from types import SimpleNamespace
 from typing import Mapping
 from uuid import UUID, uuid4
 
-from sqlalchemy import select, text
+from sqlalchemy import select, text, update
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 
 from .enterprise_models import RefreshSession
 from .models import User
-from .enterprise_models import StaffTotp,PhysicianAccount
+from .enterprise_models import StaffTotp,PhysicianAccount,StaffMfaChallenge
 from .security import password_hash, password_verify, token_for
+from .identity_access import encryption_key,open_secret,accepted_step,utc
 from .staged_tenant_transactions import StagedTenantCredentialTransactions
 from .tenant_route_tokens import TenantRouteKeyring, token_sha256
 from .whatsapp import valid_signature
@@ -41,6 +42,12 @@ class LoginResult:
     role: str
     access_token: str
     refresh_token: str
+
+
+@dataclass(frozen=True)
+class MfaPending:
+    challenge_token: str
+    expires_in: int
 
 
 @dataclass(frozen=True)
@@ -148,10 +155,21 @@ class StagedPreAuthService:
                 # MFA identities cannot silently fall back to the staged
                 # password-only pre-auth implementation. Full MFA cutover
                 # requires an independently audited routed challenge flow.
-                factor=db.scalar(select(StaffTotp.id).where(
+                factor=db.scalar(select(StaffTotp).where(
                     StaffTotp.tenant_id==tenant_id,StaffTotp.user_id==user.id,
                     StaffTotp.enabled.is_(True)))
-                if factor:return None
+                if factor:
+                    encryption_key() # Never downgrade to password-only login.
+                    started=datetime.now(timezone.utc)
+                    challenge=self._keyring.issue(
+                        purpose="mfa",tenant_id=tenant_id,ttl_seconds=300,
+                        now=int(started.timestamp()))
+                    db.add(StaffMfaChallenge(tenant_id=tenant_id,user_id=user.id,
+                        challenge_hash=token_sha256(challenge),
+                        auth_version=user.auth_version,
+                        expires_at=started+timedelta(minutes=5),attempts=0))
+                    db.commit()
+                    return MfaPending(challenge_token=challenge,expires_in=300)
                 if user.role=="physician":
                     linked=db.scalar(select(PhysicianAccount.id).where(
                         PhysicianAccount.tenant_id==tenant_id,
@@ -178,6 +196,67 @@ class StagedPreAuthService:
                 )
                 return LoginResult(tenant_id, user_id, user_role, signed_jwt, raw)
         except (SQLAlchemyError, LookupError):
+            return None
+
+    def verify_mfa(self,challenge_token:str,code:str)->LoginResult|None:
+        """Consume an authenticated tenant-bound challenge before issuing tokens.
+
+        This is the ONLY MFA route for the strict test-clone PostgreSQL
+        principal gateway. It does not query any shared superuser session.
+        """
+        moment=datetime.now(timezone.utc)
+        hint=self._keyring.verify(challenge_token,expected_purpose="mfa",
+            now=int(moment.timestamp()))
+        if not hint:return None
+        factory=self._sessions.get(hint.tenant_id)
+        if not factory:return None
+        try:
+            with factory() as db:
+                if not self._db_role_matches(db,hint.tenant_id):return None
+                raw_hash=token_sha256(challenge_token)
+                preliminary=db.scalar(select(StaffMfaChallenge).where(
+                    StaffMfaChallenge.tenant_id==hint.tenant_id,
+                    StaffMfaChallenge.challenge_hash==raw_hash))
+                if not preliminary:return None
+                user=db.scalar(select(User).where(
+                    User.tenant_id==hint.tenant_id,User.id==preliminary.user_id,
+                    User.active.is_(True)).with_for_update())
+                if not user:return None
+                row=db.scalar(select(StaffMfaChallenge).where(
+                    StaffMfaChallenge.tenant_id==hint.tenant_id,
+                    StaffMfaChallenge.challenge_hash==raw_hash).with_for_update())
+                if (row is None or row.user_id!=user.id or row.auth_version!=user.auth_version
+                    or row.used_at is not None or row.attempts>=5
+                    or utc(row.expires_at)<=moment):
+                    return None
+                factor=db.scalar(select(StaffTotp).where(
+                    StaffTotp.tenant_id==hint.tenant_id,
+                    StaffTotp.user_id==user.id,StaffTotp.enabled.is_(True)).with_for_update())
+                if not factor:return None
+                row.attempts+=1
+                step=accepted_step(open_secret(factor),code,factor.last_step)
+                if step is None:
+                    if row.attempts>=5:row.used_at=moment
+                    db.commit()
+                    return None
+                factor.last_step=step
+                row.used_at=moment
+                db.execute(update(StaffMfaChallenge).where(
+                    StaffMfaChallenge.tenant_id==hint.tenant_id,
+                    StaffMfaChallenge.user_id==user.id,
+                    StaffMfaChallenge.used_at.is_(None)).values(used_at=moment))
+                replacement=self._keyring.issue(purpose="refresh",
+                    tenant_id=hint.tenant_id,ttl_seconds=7*86400,
+                    now=int(moment.timestamp()))
+                db.add(RefreshSession(tenant_id=hint.tenant_id,user_id=user.id,
+                    refresh_hash=token_sha256(replacement),
+                    family_id=str(uuid4()),expires_at=moment+timedelta(days=7)))
+                uid,role,version=user.id,user.role,user.auth_version
+                db.commit()
+                jwt_access=token_for(SimpleNamespace(
+                    id=uid,tenant_id=hint.tenant_id,role=role,auth_version=version))
+                return LoginResult(hint.tenant_id,uid,role,jwt_access,replacement)
+        except (SQLAlchemyError,LookupError):
             return None
 
     def refresh(self, credential: str) -> LoginResult | None:
