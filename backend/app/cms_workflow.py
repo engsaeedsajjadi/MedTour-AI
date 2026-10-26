@@ -222,8 +222,6 @@ def publish(page_id:str,db:Session=Depends(get_db),user:User=Depends(MANAGER)):
         raise HTTPException(409,"Author cannot be a reviewer")
     if any(a.reviewer_id==user.id for a in approvals):
         raise HTTPException(409,"Publisher must be separate from reviewers")
-    if v.author_id==user.id:
-        raise HTTPException(409,"Publisher must be separate from author")
     v.status="published"
     page.title=v.title;page.body=v.body;page.status="published"
     page.published_version_no=v.version_no;page.approved_by=user.id
