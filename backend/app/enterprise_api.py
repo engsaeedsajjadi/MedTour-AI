@@ -450,3 +450,6 @@ def translate_draft(body:TranslateIn,db:Session=Depends(get_db),user:User=Depend
 
 from .ai_orchestration import router as ai_orchestration_router
 router.include_router(ai_orchestration_router)
+
+from .voice_api import router as voice_api_router
+router.include_router(voice_api_router)
