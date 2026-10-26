@@ -194,3 +194,6 @@ Section 21: [Development-only patient portal OTP invitation, consent and session
 
 
 Section 22: [Five-language public website (FA/AR/EN/PS/PRS), draft templates, published-only SEO and legal readiness gates](docs/SECTION_22_MULTILINGUAL_WEBSITE_FA.md). Admin preview at /cms; public pages at /public/{tenant}/{locale}. Real legal notices, professional translations and clinical/partner verification remain external gates.
+
+
+Section 23: [Tenant-scoped CMS versions, separate legal/medical/translation review roles, restored snapshot reapproval and migration disclosure](docs/SECTION_23_CMS_GOVERNANCE_FA.md). Governance workspace: /cms-workflow. Prior unreviewed published content is deliberately unpublished at migration.
