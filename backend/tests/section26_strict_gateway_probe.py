@@ -16,6 +16,7 @@ assert pg.database=="medtour_ci" and pg.host in ("localhost","127.0.0.1")
 os.environ["APP_ENV"]="test"
 os.environ["DATABASE_URL"]="sqlite://"
 os.environ["MEDTOUR_SYNTHETIC_CLONE"]="1"
+os.environ["TENANT_DB_ROUTING_MODE"]="strict"
 os.environ["WHATSAPP_BUSINESS_ELIGIBILITY_APPROVED"]="true"
 os.environ["WHATSAPP_INBOUND_PROCESSING_APPROVED"]="true"
 os.environ["WHATSAPP_TENANT_SLUG"]="cutover-a"
