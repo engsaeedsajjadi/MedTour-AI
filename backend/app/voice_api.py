@@ -59,11 +59,14 @@ def voice_readiness(user:User=Depends(STAFF)):
 
 @router.post("/transcribe",status_code=201)
 async def transcription(
+    response:Response,
     file:UploadFile=File(...),
     locale:Literal["fa","ar","en","ps","prs"]=Form(...),
     request_key:str=Form(...),
     synthetic_sample_only:bool=Form(...),
     db:Session=Depends(get_db),user:User=Depends(STAFF)):
+    response.headers["Cache-Control"]="no-store, private"
+    response.headers["X-Content-Type-Options"]="nosniff"
     demo_only()
     if not synthetic_sample_only:
         raise HTTPException(422,"Explicit synthetic-sample confirmation required")
