@@ -10,7 +10,7 @@ from app.models import Audit
 BASE="/api/v1"
 SLUGS={"about","services","process","faq","contact",
        "privacy","terms","medical-disclaimer"}
-LOCALES={"fa","ar","en"}
+LOCALES={"fa","ar","en","ps","prs"}
 
 def manifest(client,tenant="a"):
     return client.get(BASE+"/public/"+tenant+"/site-manifest")
@@ -41,7 +41,7 @@ def test_no_unreviewed_content_leaks_and_tenant_not_found(context):
     admin=auth("a")
     seeded=bootstrap(client,admin)
     assert seeded.status_code==201,seeded.text
-    assert seeded.json()["created"]==24
+    assert seeded.json()["created"]==40
     assert seeded.json()["published"]==0
     assert seeded.json()["manual_legal_medical_translation_review_required"] is True
     assert manifest(client).json()["pages"]==[]
@@ -53,8 +53,8 @@ def test_no_unreviewed_content_leaks_and_tenant_not_found(context):
     assert client.get(BASE+"/cms/public-site/drafts/"+seeded.json()["items"][0]["id"]).status_code==401
     with Session() as db:
         rows=db.query(ContentPage).all()
-        assert len(rows)==24 and all(p.status=="draft" for p in rows)
-        assert db.query(Audit).filter(Audit.event=="public_website_template_drafted").count()==24
+        assert len(rows)==40 and all(p.status=="draft" for p in rows)
+        assert db.query(Audit).filter(Audit.event=="public_website_template_drafted").count()==40
 
 
 def test_bootstrap_idempotent_preserves_edits(context):
@@ -166,6 +166,23 @@ def test_public_portal_setting_must_be_explicit_self_attestation(context):
         "legal_content_reviewed":True}).status_code==200
     assert manifest(client).json()["search_indexing_allowed"] is True
     assert client.get(BASE+"/public/not-there/site-manifest").status_code==404
+
+
+def test_pashto_and_dari_are_distinct_and_private_until_published(context):
+    client,auth,_,Session=context
+    admin=auth("a")
+    entries=bootstrap(client,admin).json()["items"]
+    ps=next(x for x in entries if x["slug"]=="services" and x["locale"]=="ps")
+    prs=next(x for x in entries if x["slug"]=="services" and x["locale"]=="prs")
+    assert client.get(BASE+"/public/a/pages/ps/services").status_code==404
+    assert client.get(BASE+"/public/a/pages/prs/services").status_code==404
+    assert publish(client,admin,ps).status_code==200
+    assert publish(client,admin,prs).status_code==200
+    pashto=client.get(BASE+"/public/a/pages/ps/services").json()
+    dari=client.get(BASE+"/public/a/pages/prs/services").json()
+    assert pashto["locale"]=="ps" and dari["locale"]=="prs"
+    assert pashto["body"]!=dari["body"]
+    assert manifest(client).json()["search_indexing_allowed"] is False
 
 
 def test_safe_plaintext_content_not_script_executed_by_api(context):
