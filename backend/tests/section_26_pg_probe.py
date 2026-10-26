@@ -49,7 +49,7 @@ def main():
             conn.execute(text(f"ALTER TABLE public.{label} FORCE ROW LEVEL SECURITY"))
         for i in range(2):
             role=roles[i]
-            conn.execute(text(f"CREATE ROLE {role} LOGIN PASSWORD :password NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT"),{"password":passwords[i]})
+            conn.execute(text(f"CREATE ROLE {role} LOGIN PASSWORD '{passwords[i]}' NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT"))
             conn.execute(text("INSERT INTO public.tenants(id,slug,name,created_at) VALUES"
                               " (:id,:slug,:name,now())"),{"id":tenants[i],"slug":f"probe26-{i}","name":"Synthetic DB Role"})
             conn.execute(text("INSERT INTO public.patients(id,tenant_id,full_name,country,language,contact,created_at) VALUES"
