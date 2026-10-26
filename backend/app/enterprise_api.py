@@ -175,8 +175,8 @@ def cms_publish(pk:str,db:Session=Depends(get_db),user:User=Depends(ADMIN)):
 
 @router.get('/public/{tenant_slug}/pages/{locale}/{slug}')
 def public_page(tenant_slug:str,locale:str,slug:str,db:Session=Depends(get_db)):
-    from .models import Tenant
-    tenant=db.scalar(select(Tenant).where(Tenant.slug==tenant_slug))
+    from .public_site import tenant_by_slug
+    tenant=tenant_by_slug(db,tenant_slug)
     if not tenant:raise HTTPException(404,'Page not found')
     x=db.scalar(select(ContentPage).where(ContentPage.tenant_id==tenant.id,ContentPage.locale==locale,
            ContentPage.slug==slug,ContentPage.status=='published',

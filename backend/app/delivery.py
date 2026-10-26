@@ -31,15 +31,26 @@ def enabled() -> bool:
     )
 
 
-def send_one(outbound_id: str) -> dict:
+def send_one(outbound_id: str, *, tenant_session_factory=None,
+             expected_tenant_id: str | None = None) -> dict:
+    if (tenant_session_factory is None) != (expected_tenant_id is None):
+        raise ValueError("Bounded tenant dispatch requires both trusted factory and tenant ID")
+    if os.getenv("TENANT_DB_ROUTING_MODE") == "strict":
+        # A tenant-scoped DB connection is not sufficient: the existing
+        # sender still uses a single global Meta phone ID and access token.
+        # Strict-mode outbound must stay blocked until per-tenant provider
+        # identity and secrets are attested by a trusted control plane.
+        return {"status":"blocked","reason":"Tenant-specific Meta sender credentials not bound"}
+    make_session=tenant_session_factory or SessionLocal
     if not enabled():
         return {'status':'blocked','reason':'Provider eligibility/outbound processing not approved'}
-    with SessionLocal() as db:
+    with make_session() as db:
         # Locks the row on PostgreSQL; the conditional UPDATE below also
         # protects the claim when a database ignores SELECT FOR UPDATE.
-        msg = db.scalar(select(OutboundMessage).where(
-            OutboundMessage.id == outbound_id
-        ).with_for_update())
+        predicates=[OutboundMessage.id == outbound_id]
+        if expected_tenant_id is not None:
+            predicates.append(OutboundMessage.tenant_id == expected_tenant_id)
+        msg = db.scalar(select(OutboundMessage).where(*predicates).with_for_update())
         if not msg:
             return {'status':'not_found'}
         if msg.status != 'approved':
@@ -106,6 +117,7 @@ def send_one(outbound_id: str) -> dict:
         with SessionLocal() as db:
             db.execute(update(OutboundMessage).where(
                 OutboundMessage.id == outbound_id,
+                OutboundMessage.tenant_id == expected_tenant_id if expected_tenant_id is not None else OutboundMessage.tenant_id == OutboundMessage.tenant_id,
                 OutboundMessage.status == 'sending'
             ).values(status='needs_reconciliation', last_error_code='PROVIDER_OUTCOME_UNKNOWN'))
             db.commit()
@@ -113,7 +125,8 @@ def send_one(outbound_id: str) -> dict:
 
     with SessionLocal() as db:
         row = db.scalar(select(OutboundMessage).where(
-            OutboundMessage.id == outbound_id
+            OutboundMessage.id == outbound_id,
+            OutboundMessage.tenant_id == expected_tenant_id if expected_tenant_id is not None else OutboundMessage.tenant_id == OutboundMessage.tenant_id
         ).with_for_update())
         if row and row.status == 'sending':
             row.status = 'sent'

@@ -78,7 +78,15 @@ async def receive(request:Request,db:Session=Depends(get_db)):
     if not isinstance(payload,dict) or payload.get('object')!='whatsapp_business_account':
         raise HTTPException(422,'Unsupported webhook object')
     if not isinstance(payload.get('entry',[]),list):raise HTTPException(422,'Invalid webhook entries')
-    tenant=db.scalar(select(Tenant).where(Tenant.slug==os.environ['WHATSAPP_TENANT_SLUG']))
+    if "verified_tenant_id" in db.info:
+        from types import SimpleNamespace
+        # The gateway already verified the Meta HMAC and the trusted account.
+        # Never read global tenants under a restricted runtime role.
+        if db.info.get("verified_whatsapp_phone")!=os.environ["WHATSAPP_PHONE_NUMBER_ID"]:
+            raise HTTPException(403,"Configured WhatsApp account mismatches routing identity")
+        tenant=SimpleNamespace(id=db.info["verified_tenant_id"],slug=os.environ["WHATSAPP_TENANT_SLUG"])
+    else:
+        tenant=db.scalar(select(Tenant).where(Tenant.slug==os.environ['WHATSAPP_TENANT_SLUG']))
     if not tenant:raise HTTPException(503,'Configured tenant not provisioned')
     accepted=duplicates=quarantined=receipts=0
     seen=set()

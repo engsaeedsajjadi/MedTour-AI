@@ -20,7 +20,9 @@ def issue(patient_id:str,purpose:str,db:Session=Depends(get_db),user:User=Depend
     patient=db.scalar(select(Patient).where(Patient.tenant_id==user.tenant_id,Patient.id==patient_id))
     if not patient:raise HTTPException(404,'Patient not found')
     if purpose not in PURPOSES:raise HTTPException(422,'Unknown consent purpose')
-    token=secrets.token_urlsafe(40)
+    signer=db.info.get("tenant_route_keyring")
+    token=(signer.issue(purpose="consent",tenant_id=user.tenant_id,ttl_seconds=1800)
+       if signer else secrets.token_urlsafe(40))
     c=PatientConsentChallenge(tenant_id=user.tenant_id,patient_id=patient.id,purpose=purpose,
         token_hash=hashlib.sha256(token.encode()).hexdigest(),issued_by=user.id,
         expires_at=datetime.now(timezone.utc)+timedelta(minutes=30))
