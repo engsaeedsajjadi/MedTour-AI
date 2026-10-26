@@ -166,6 +166,7 @@ def configure(agent_key:str,body:AgentConfig,db:Session=Depends(get_db),
     else:
         p.enabled=body.enabled;p.provider_mode=body.provider_mode
         p.daily_run_limit=body.daily_run_limit;p.updated_by=user.id
+    db.flush()
     db.add(Audit(tenant_id=user.tenant_id,user_id=user.id,event="ai_agent_policy_changed",
         entity_type="AIAgentPolicy",entity_id=p.id))
     db.commit()
