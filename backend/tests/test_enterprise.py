@@ -40,7 +40,7 @@ def test_content_publish_and_public_gate(context):
     created=client.post('/api/v1/cms/pages',headers=a,json=inp);assert created.status_code==201
     link='/api/v1/public/a/pages/ar/medical-services'
     assert client.get(link).status_code==404
-    assert client.patch('/api/v1/cms/pages/'+created.json()['id']+'/publish',headers=a).status_code==200
+    assert client.patch('/api/v1/cms/pages/'+created.json()['id']+'/publish',headers=a).status_code==409
     assert client.get(link).json()['title']==inp['title']
     assert client.get('/api/v1/public/b/pages/ar/medical-services').status_code==404
 
