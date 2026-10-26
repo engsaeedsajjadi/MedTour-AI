@@ -177,6 +177,23 @@ class AIOrchestrationEvent(TenantEntity,Base):
     detail_code:Mapped[str]=mapped_column(String(80),nullable=False)
     __table_args__=(Index("ix_ai_orchestration_events_run","tenant_id","run_id","created_at"),)
 
+class VoiceSampleJob(TenantEntity,Base):
+    """Only hashes and review metadata. No raw audio or transcript content."""
+    __tablename__="voice_sample_jobs"
+    request_key:Mapped[str]=mapped_column(String(100),nullable=False)
+    kind:Mapped[str]=mapped_column(String(12),nullable=False)
+    locale:Mapped[str]=mapped_column(String(10),nullable=False)
+    source_format:Mapped[str]=mapped_column(String(16),nullable=False)
+    audio_sha256:Mapped[str]=mapped_column(String(64),nullable=False)
+    transcript_sha256:Mapped[str|None]=mapped_column(String(64),nullable=True)
+    duration_ms:Mapped[int]=mapped_column(Integer,nullable=False)
+    status:Mapped[str]=mapped_column(String(32),nullable=False)
+    author_id:Mapped[str]=mapped_column(ForeignKey("users.id"),nullable=False)
+    reviewer_id:Mapped[str|None]=mapped_column(ForeignKey("users.id"),nullable=True)
+    review_reference:Mapped[str|None]=mapped_column(String(100),nullable=True)
+    __table_args__=(UniqueConstraint("tenant_id","request_key"),
+        Index("ix_voice_samples_tenant_state","tenant_id","status","created_at"),)
+
 class MessageEvent(TenantEntity,Base):
     __tablename__='message_events'
     event_id:Mapped[str]=mapped_column(String(150))

@@ -200,3 +200,6 @@ Section 23: [Tenant-scoped CMS versions, separate legal/medical/translation revi
 
 
 Section 24: [Bounded, tenant-opt-in administrative AI agent orchestration, read-only tool registry and manual approval](docs/SECTION_24_AI_ORCHESTRATION_FA.md). UI /ai-orchestration; no patient PHI, automatic medical decision, live speech or automatic outbound messages.
+
+
+Section 25: [Synthetic STT/TTS preview, five languages, bounded WAV/OGG media validation, human transcript review and external provider activation](docs/SECTION_25_VOICE_STT_TTS_FA.md). Portal /voice. Automatic encrypted WhatsApp/Telegram voice ingestion and real patient speech remain disabled.
