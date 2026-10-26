@@ -61,10 +61,14 @@ with db.begin() as conn:
         for table in tables:
             conn.execute(text(f'GRANT SELECT,INSERT,UPDATE,DELETE ON public."{table}" TO {roles[i]}'))
 class FakeEpoch:
+    active=True
+    offline=False
     def read(self,tenant_id):
-        return EpochState(1,True) if tenant_id in tenants else None
+        if self.offline:raise ConnectionError("Synthetic epoch control unavailable")
+        return EpochState(1,True) if self.active and tenant_id in tenants else None
 
-registry=StagedCoordinatedTenantRegistry(reader=FakeEpoch(),max_tenants=2,pool_size=1)
+epoch=FakeEpoch()
+registry=StagedCoordinatedTenantRegistry(reader=epoch,max_tenants=2,pool_size=1)
 provisioned={}
 for i in range(2):
     config=TenantPrincipalConfig(tenant_id=tenants[i],slug=f"cutover-{chr(97+i)}",
@@ -76,6 +80,12 @@ keyring=TenantRouteKeyring({"synthetic":secrets.token_bytes(32)},"synthetic")
 gateway=StrictTenantGateway(registry=registry,provisioned=provisioned,keyring=keyring,
      meta_app_secret=os.environ["META_APP_SECRET"],whatsapp_approved=True)
 with TestClient(gateway) as client:
+    preflight=client.options("/api/v1/auth/login",headers={
+        "Origin":"http://localhost:3000",
+        "Access-Control-Request-Method":"POST",
+        "Access-Control-Request-Headers":"content-type"})
+    assert preflight.status_code==200,preflight.text
+    assert preflight.headers["access-control-allow-origin"]=="http://localhost:3000"
     headers={}
     for i in range(2):
         result=client.post("/api/v1/auth/login",json={
@@ -157,6 +167,13 @@ with TestClient(gateway) as client:
     assert received.json()["routed_to_human"]==0
     assert client.post("/api/v1/webhooks/whatsapp",content=payload,headers={
        "content-type":"application/json","X-Hub-Signature-256":"sha256="+"0"*64}).status_code==403
+    # A cross-worker epoch cutover MUST deny existing staff JWT routes
+    # before entering an old or privileged connection.
+    epoch.active=False
+    assert client.get("/api/v1/patients",headers=headers[0]).status_code==503
+    assert client.get("/api/v1/patients",headers=headers[1]).status_code==503
+    epoch.offline=True
+    assert client.get("/api/v1/patients",headers=headers[0]).status_code==503
 
 gateway.close()
 db.dispose()
