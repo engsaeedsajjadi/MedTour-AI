@@ -184,8 +184,7 @@ def login(body:LoginIn,request:Request,response:Response,db:Session=Depends(get_
     if not tenant:raise HTTPException(401,'Invalid credentials')
     user=db.scalar(select(User).where(User.tenant_id==tenant.id,User.email==body.email.lower().strip(),User.active==True))
     if not user or not password_verify(body.password,user.password_hash):raise HTTPException(401,'Invalid credentials')
-    from .identity_access import password_login,require_bound_physician
-    require_bound_physician(db,user)
+    from .identity_access import password_login
     pending=password_login(db,user)
     response.headers["Cache-Control"]="no-store"
     if pending:
