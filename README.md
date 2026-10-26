@@ -206,3 +206,6 @@ Section 25: [Synthetic STT/TTS preview, five languages, bounded WAV/OGG media va
 
 
 Section 26: [Tenant-scoped PostgreSQL composite FK hardening, private database principal mapping, RLS policy staging and CI restricted-role probe](docs/SECTION_26_MULTITENANT_RLS_FA.md). Live get_db remains shared; RLS is NOT automatically enabled in the operational DB. Not production-ready.
+
+
+Section 26 continuation: [Strict synthetic-only FastAPI and Worker tenant-principal RLS cutover pilot](docs/SECTION_26_RUNTIME_CUTOVER_FA.md). Real backend routes are exercised against two PostgreSQL FORCE RLS logins in disposable GitHub CI. Live Compose and legacy shared get_db have NOT been migrated or permitted for real patient PHI.
