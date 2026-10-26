@@ -188,7 +188,10 @@ def login(body:LoginIn,request:Request,db:Session=Depends(get_db)):
     from .staff_mfa import ensure_enrolled_gate
     ensure_enrolled_gate(db,user,body.totp_code)
     from .session_api import issue_refresh
-    return {'access_token':token_for(user,mfa_verified=True),'refresh_token':issue_refresh(db,user),'token_type':'bearer','role':user.role,'tenant_id':user.tenant_id}
+    from .staff_mfa import row_for
+    enrollment=row_for(db,user.tenant_id,user.id)
+    assured=bool(enrollment and enrollment.enabled)
+    return {'access_token':token_for(user,mfa_verified=assured),'refresh_token':issue_refresh(db,user),'token_type':'bearer','role':user.role,'tenant_id':user.tenant_id}
 
 @app.get('/api/v1/auth/me')
 def me(user:User=Depends(current_user)):
