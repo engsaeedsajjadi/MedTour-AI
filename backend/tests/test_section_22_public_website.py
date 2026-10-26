@@ -98,7 +98,7 @@ def test_bootstrap_idempotent_preserves_edits(context):
         "title":"Synthetic approved informational about",
         "body":"Synthetic, legally and medically unverified informational text.",
         "expected_version":1,"reason":"Approved draft rewrite before staged specialist review"})
-    assert edited.status_code==200,edited.text
+    assert edited.status_code==201,edited.text
     assert bootstrap(client,admin).json()["created"]==0
     assert client.get(BASE+"/cms/workflow/pages/"+one["id"]+"/versions",headers=admin).json()["items"][0]["title"]=="Synthetic approved informational about"
     assert client.get(BASE+"/cms/public-site/drafts/"+one["id"],headers=auth("b")).status_code==404
