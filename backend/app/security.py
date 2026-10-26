@@ -40,13 +40,6 @@ def current_user(credentials:HTTPAuthorizationCredentials|None=Depends(BEARER),d
         data=jwt.decode(credentials.credentials, secret(), algorithms=['HS256'],options={'require':['exp','sub','tid','jti']})
         user=db.query(User).filter(User.id==data['sub'],User.tenant_id==data['tid'],User.active==True).first()
         if not user or user.role!=data.get('role') or user.auth_version!=data.get('av',0): raise ValueError('stale or invalid identity')
-        if user.role=="physician":
-            from .enterprise_models import PhysicianAccount
-            link=db.query(PhysicianAccount.id).filter(
-                PhysicianAccount.tenant_id==user.tenant_id,
-                PhysicianAccount.user_id==user.id,
-                PhysicianAccount.active.is_(True)).first()
-            if not link:raise HTTPException(403,'Physician identity is not linked to an active account')
         revoked=db.query(RevokedAccess.id).filter(RevokedAccess.tenant_id==user.tenant_id,
             RevokedAccess.jti_hash==hashlib.sha256(data['jti'].encode()).hexdigest()).first()
         if revoked: raise ValueError('Access token has been revoked')
