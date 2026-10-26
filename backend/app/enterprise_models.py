@@ -278,6 +278,7 @@ class RefreshSession(TenantEntity,Base):
     revoked_at:Mapped[datetime|None]=mapped_column(DateTime(timezone=True),nullable=True)
     last_rotated_at:Mapped[datetime|None]=mapped_column(DateTime(timezone=True),nullable=True)
     family_id:Mapped[str]=mapped_column(String(36),index=True)
+    mfa_verified:Mapped[bool]=mapped_column(Boolean,nullable=False,default=False)
 
 class RevokedAccess(TenantEntity,Base):
     __tablename__='revoked_access'
