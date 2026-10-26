@@ -17,7 +17,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .database import get_db
-from .models import User,Audit
+from .models import User,Audit,Tenant
 from .enterprise_models import AIAgentPolicy,AIOrchestrationRun,AIOrchestrationEvent,KnowledgeArticle
 from .security import roles
 from .receptionist import RESPONSES
@@ -152,6 +152,8 @@ class AgentConfig(BaseModel):
 def configure(agent_key:str,body:AgentConfig,db:Session=Depends(get_db),
               user:User=Depends(ADMIN)):
     if agent_key not in AGENTS:raise HTTPException(404,"Agent unavailable")
+    # Serialize policy edits with run creation for this tenant.
+    db.scalar(select(Tenant.id).where(Tenant.id==user.tenant_id).with_for_update())
     if body.enabled:
         allowed_env()
         if body.provider_mode=="approved_provider" and not provider_available():
@@ -189,6 +191,9 @@ def run(body:RunIn,db:Session=Depends(get_db),user:User=Depends(STAFF)):
     # arguments, arbitrary URLs or uploads. No egress to patient record tools.
     if body.workflow not in AGENTS[body.agent_key]["workflows"]:
         raise HTTPException(422,"Workflow unavailable for this agent")
+    # PostgreSQL tenant row lock makes daily-budget checks and request
+    # idempotency atomic across workers and across enabled agents.
+    db.scalar(select(Tenant.id).where(Tenant.id==user.tenant_id).with_for_update())
     policy=is_policy_enabled(db,user.tenant_id,body.agent_key)
     content_hash=fingerprint(body.agent_key,body.workflow,body.locale,policy.provider_mode)
     previous=db.scalar(select(AIOrchestrationRun).where(
