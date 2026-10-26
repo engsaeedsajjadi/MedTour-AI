@@ -111,7 +111,9 @@ def status(db:Session=Depends(get_db),user:User=Depends(current_user)):
         "independently_verified_identity":False}
 
 @router.post("/mfa/enroll")
-def enroll(db:Session=Depends(get_db),user:User=Depends(current_user)):
+def enroll(response:Response,db:Session=Depends(get_db),user:User=Depends(current_user)):
+    response.headers["Cache-Control"]="no-store, private"
+    response.headers["Pragma"]="no-cache"
     encryption_key()
     db.scalar(select(User.id).where(User.id==user.id,User.tenant_id==user.tenant_id).with_for_update())
     row=db.scalar(select(StaffTotp).where(StaffTotp.tenant_id==user.tenant_id,
@@ -160,7 +162,8 @@ class VerifyIn(BaseModel):
     code:str=Field(pattern=r"^[0-9]{6}$")
 
 @router.post("/mfa/verify")
-def verify(body:VerifyIn,db:Session=Depends(get_db)):
+def verify(body:VerifyIn,response:Response,db:Session=Depends(get_db)):
+    response.headers["Cache-Control"]="no-store, private"
     challenge=db.scalar(select(StaffMfaChallenge).where(
         StaffMfaChallenge.challenge_hash==hash_token(body.challenge_token)).with_for_update())
     if challenge is None:raise HTTPException(401,"Invalid MFA challenge")
@@ -242,3 +245,28 @@ def staff_active(staff_id:str,body:AccountChange,
             event="staff_account_state_changed",entity_type="User",entity_id=target.id))
         db.commit()
     return {"id":target.id,"active":target.active,"all_prior_sessions_invalidated":True}
+
+class RoleChange(BaseModel):
+    model_config=ConfigDict(extra="forbid")
+    role:Literal["operator","physician","auditor","hospital"]
+
+@router.put("/staff/{staff_id}/role")
+def staff_role(staff_id:str,body:RoleChange,db:Session=Depends(get_db),
+               actor:User=Depends(admin)):
+    # Intentionally no admin grants or reassignments via this endpoint.
+    # Organization super-admin provisioning needs stronger independent identity
+    # proof and should not be self-service in the current alpha.
+    target=db.scalar(select(User).where(
+        User.tenant_id==actor.tenant_id,User.id==staff_id).with_for_update())
+    if not target:raise HTTPException(404,"Staff account not found")
+    if target.id==actor.id or target.role=="admin":
+        raise HTTPException(409,"Admin role changes require an independent owner workflow")
+    if target.role!=body.role:
+        target.role=body.role
+        invalidate_sessions(db,target)
+        db.add(Audit(tenant_id=actor.tenant_id,user_id=actor.id,
+            event="staff_role_changed",entity_type="User",entity_id=target.id))
+        db.commit()
+    return {"id":target.id,"role":target.role,"sessions_revoked":True,
+            "physician_binding_required":target.role=="physician",
+            "clinical_privileges_granted":False}
