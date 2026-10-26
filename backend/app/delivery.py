@@ -35,8 +35,12 @@ def send_one(outbound_id: str, *, tenant_session_factory=None,
              expected_tenant_id: str | None = None) -> dict:
     if (tenant_session_factory is None) != (expected_tenant_id is None):
         raise ValueError("Bounded tenant dispatch requires both trusted factory and tenant ID")
-    if os.getenv("TENANT_DB_ROUTING_MODE") == "strict" and tenant_session_factory is None:
-        return {"status":"blocked","reason":"Shared runtime DB forbidden in strict tenant mode"}
+    if os.getenv("TENANT_DB_ROUTING_MODE") == "strict":
+        # A tenant-scoped DB connection is not sufficient: the existing
+        # sender still uses a single global Meta phone ID and access token.
+        # Strict-mode outbound must stay blocked until per-tenant provider
+        # identity and secrets are attested by a trusted control plane.
+        return {"status":"blocked","reason":"Tenant-specific Meta sender credentials not bound"}
     make_session=tenant_session_factory or SessionLocal
     if not enabled():
         return {'status':'blocked','reason':'Provider eligibility/outbound processing not approved'}
