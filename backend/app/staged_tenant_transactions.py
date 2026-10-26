@@ -24,6 +24,8 @@ from .enterprise_models import (
     PatientConsentChallenge,
     PortalAccess,
     RefreshSession,
+    StaffTotp,
+    PhysicianAccount,
 )
 from .models import Audit, Consent, Patient, User
 from .tenant_route_tokens import TenantRouteKeyring, token_sha256
@@ -146,8 +148,13 @@ class StagedTenantCredentialTransactions:
                         User.active.is_(True),
                     )
                 )
-                if user is None:
-                    return None
+                if user is None:return None
+                if user.role=="physician" and not db.scalar(select(PhysicianAccount.id).where(
+                    PhysicianAccount.tenant_id==tenant_id,
+                    PhysicianAccount.user_id==user.id,PhysicianAccount.active.is_(True))):return None
+                # Existing refresh token families issued before MFA enrollment
+                # are invalidated on enable. A staged login may not create new
+                # families for MFA-enabled users.
                 replacement = self._keyring.issue(
                     purpose="refresh", tenant_id=tenant_id,
                     ttl_seconds=7 * 24 * 3600, now=int(checked.timestamp()),
