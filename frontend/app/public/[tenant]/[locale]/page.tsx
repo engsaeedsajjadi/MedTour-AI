@@ -35,7 +35,7 @@ export default async function SiteHome({params}:{params:Promise<Params>}){
  const ui=UI[locale];
  const published=slugs.filter(s=>hasPage(manifest,s,locale));
  const words:Record<PublicLocale,string[]>={fa:['آگاهی','رضایت','همراهی'],
-  ar:['الوضوح','الموافقة','المتابعة'],en:['Clarity','Consent','Coordination']};
+  ar:['الوضوح','الموافقة','المتابعة'],ps:['روڼتيا','رضايت','همغږي'],prs:['شفافیت','رضایت','هماهنگی'],en:['Clarity','Consent','Coordination']};
  return <PublicShell tenant={tenant} locale={locale} manifest={manifest}>
   <section className="site-hero">
    <div className="site-wide site-hero-grid">
