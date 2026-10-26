@@ -78,6 +78,11 @@ CONTENT = {
 }
 
 def tenant_by_slug(db:Session,slug:str):
+    if "verified_tenant_id" in db.info:
+        if slug!=db.info.get("verified_public_slug"):
+            raise HTTPException(404,"Public site not found")
+        from types import SimpleNamespace
+        return SimpleNamespace(id=db.info["verified_tenant_id"],slug=slug)
     tenant=db.scalar(select(Tenant).where(Tenant.slug==slug))
     if not tenant:raise HTTPException(404,"Public site not found")
     return tenant
