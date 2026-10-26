@@ -163,7 +163,8 @@ class StagedPreAuthService:
                 user_id, user_role = user.id, user.role
                 db.commit()
                 signed_jwt = token_for(
-                    SimpleNamespace(id=user_id, tenant_id=tenant_id, role=user_role)
+                    SimpleNamespace(id=user_id, tenant_id=tenant_id, role=user_role),
+                    mfa_verified=True
                 )
                 return LoginResult(tenant_id, user_id, user_role, signed_jwt, raw)
         except (SQLAlchemyError, LookupError):
@@ -179,7 +180,8 @@ class StagedPreAuthService:
                 id=rotated.user_id,
                 tenant_id=rotated.tenant_id,
                 role=rotated.role,
-            )
+            ),
+            mfa_verified=True
         )
         return LoginResult(
             tenant_id=rotated.tenant_id,
