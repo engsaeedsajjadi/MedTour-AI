@@ -6,7 +6,7 @@ from app.staff_mfa import totp
 
 BASE="/api/v1/identity"
 def enroll(client,auth,Session):
-    os.environ["STAFF_MFA_ENCRYPTION_KEY"]=base64.urlsafe_b64encode(b"section27_synthetic_aes_key_32byt").decode()
+    os.environ["STAFF_MFA_ENCRYPTION_KEY"]=base64.urlsafe_b64encode(b"x"*32).decode()
     begin=client.post(BASE+"/mfa/setup",headers=auth)
     assert begin.status_code==200,begin.text
     seed=base64.b32decode(begin.json()["manual_secret"]+"="*(-len(begin.json()["manual_secret"])%8))
