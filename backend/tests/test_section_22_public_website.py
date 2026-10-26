@@ -18,8 +18,36 @@ def manifest(client,tenant="a"):
 def bootstrap(client,admin):
     return client.post(BASE+"/cms/public-site/bootstrap",headers=admin,json={})
 
+def _cms_specialists(client,admin):
+    cached=getattr(client,"_section22_cms_specialists",None)
+    if cached:return cached
+    result={}
+    pwd="SyntheticSection23ReviewerPassword"
+    for stage,role in (("translation","cms_translator"),
+                       ("medical","cms_medical_reviewer"),
+                       ("legal","cms_legal_reviewer")):
+        email="section22-"+stage+"@example.com"
+        created=client.post(BASE+"/cms/workflow/reviewers",headers=admin,
+            json={"email":email,"password":pwd,"role":role})
+        assert created.status_code==201,created.text
+        login=client.post(BASE+"/auth/login",json={"tenant_slug":"a",
+            "email":email,"password":pwd})
+        assert login.status_code==200,login.text
+        result[stage]={"Authorization":"Bearer "+login.json()["access_token"]}
+    setattr(client,"_section22_cms_specialists",result)
+    return result
+
 def publish(client,admin,record):
-    return client.patch(BASE+"/cms/pages/"+record["id"]+"/publish",headers=admin)
+    reviewers=_cms_specialists(client,admin)
+    page_id=record["id"]
+    submitted=client.post(BASE+"/cms/workflow/pages/"+page_id+"/submit",headers=admin)
+    assert submitted.status_code==200,submitted.text
+    for stage,headers in reviewers.items():
+        decision=client.post(BASE+"/cms/workflow/pages/"+page_id+"/reviews/"+stage,
+            headers=headers,json={"decision":"approved",
+                "evidence_reference":"SYNTH-SEC22-"+stage})
+        assert decision.status_code==200,decision.text
+    return client.patch(BASE+"/cms/pages/"+page_id+"/publish",headers=admin)
 
 def setting(client,admin,payload):
     return client.put(BASE+"/settings/public_portal",headers=admin,
@@ -66,19 +94,21 @@ def test_bootstrap_idempotent_preserves_edits(context):
     assert detail.status_code==200
     assert detail.json()["status"]=="draft"
     assert len(detail.json()["body"])>60
-    edited=client.patch(BASE+"/cms/public-site/drafts/"+one["id"],headers=admin,json={
+    edited=client.post(BASE+"/cms/workflow/pages/"+one["id"]+"/versions",headers=admin,json={
         "title":"Synthetic approved informational about",
-        "body":"Synthetic, legally and medically unverified informational text."})
-    assert edited.status_code==200,edited.text
+        "body":"Synthetic, legally and medically unverified informational text.",
+        "expected_version":1,"reason":"Approved draft rewrite before staged specialist review"})
+    assert edited.status_code==201,edited.text
     assert bootstrap(client,admin).json()["created"]==0
-    assert client.get(BASE+"/cms/public-site/drafts/"+one["id"],headers=admin).json()["title"]=="Synthetic approved informational about"
+    assert client.get(BASE+"/cms/workflow/pages/"+one["id"]+"/versions",headers=admin).json()["items"][0]["title"]=="Synthetic approved informational about"
     assert client.get(BASE+"/cms/public-site/drafts/"+one["id"],headers=auth("b")).status_code==404
     operator=auth("a","operator@example.test")
     assert bootstrap(client,operator).status_code==403
     assert client.patch(BASE+"/cms/public-site/drafts/"+one["id"],headers=operator,json={
         "title":"Unauthorized edit","body":"Content"}).status_code==403
-    assert client.patch(BASE+"/cms/public-site/drafts/"+one["id"],headers=admin,json={
-        "title":"Should reject","body":"Text","patient_id":"SENSITIVE"}).status_code==422
+    assert client.post(BASE+"/cms/workflow/pages/"+one["id"]+"/versions",headers=admin,json={
+        "title":"Should reject","body":"Text","expected_version":2,
+        "reason":"Synthetic invalid edit","patient_id":"SENSITIVE"}).status_code==422
     pub=publish(client,admin,one)
     assert pub.status_code==200
     assert client.patch(BASE+"/cms/public-site/drafts/"+one["id"],headers=admin,json={

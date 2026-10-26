@@ -547,3 +547,6 @@ app.include_router(portal_identity_router)
 
 from .public_site import router as public_site_router
 app.include_router(public_site_router)
+
+from .cms_workflow import router as cms_workflow_router
+app.include_router(cms_workflow_router)

@@ -13,9 +13,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .database import get_db
-from .enterprise_models import ContentPage, TenantSetting
+from .enterprise_models import ContentPage, TenantSetting, CmsVersion
 from .models import Tenant, User, Audit
 from .security import roles
+from .cms_workflow import initialize_version
 
 router = APIRouter(prefix="/api/v1", tags=["multilingual public website"])
 LOCALES = ("fa", "ar", "en", "ps", "prs")
@@ -85,6 +86,7 @@ def public_rows(db:Session,tenant_id:str):
     return db.scalars(select(ContentPage).where(
         ContentPage.tenant_id==tenant_id,
         ContentPage.status=="published",
+        ContentPage.published_version_no.is_not(None),
         ContentPage.locale.in_(LOCALES),
         ContentPage.slug.in_(SLUGS),
     ).order_by(ContentPage.slug,ContentPage.locale)).all()
@@ -148,6 +150,7 @@ def bootstrap(db:Session=Depends(get_db),user:User=Depends(roles("admin"))):
             row=ContentPage(tenant_id=user.tenant_id,slug=slug,locale=loc,
                 title=title,body=body,status="draft")
             db.add(row);db.flush()
+            initialize_version(db,user,row,reason="public_template_initial")
             db.add(Audit(tenant_id=user.tenant_id,user_id=user.id,
                 event="public_website_template_drafted",
                 entity_type="ContentPage",entity_id=row.id))
@@ -176,14 +179,7 @@ def draft_edit(page_id:str,body:DraftEdit,db:Session=Depends(get_db),
     x=db.scalar(select(ContentPage).where(ContentPage.id==page_id,
         ContentPage.tenant_id==user.tenant_id).with_for_update())
     if not x:raise HTTPException(404,"CMS page not found")
-    if x.status!="draft":
-        raise HTTPException(409,"Unpublish before editing; review translation and legal text again")
-    x.title=body.title.strip()
-    x.body=body.body.strip()
-    db.add(Audit(tenant_id=user.tenant_id,user_id=user.id,event="public_website_draft_edited",
-        entity_type="ContentPage",entity_id=x.id))
-    db.commit()
-    return {"id":x.id,"slug":x.slug,"locale":x.locale,"status":x.status,"title":x.title}
+    raise HTTPException(409,"Legacy draft editing closed; use /cms/workflow/pages/{id}/versions with expected_version")
 
 @router.patch("/cms/public-site/pages/{page_id}/unpublish")
 def unpublish(page_id:str,db:Session=Depends(get_db),
@@ -192,7 +188,11 @@ def unpublish(page_id:str,db:Session=Depends(get_db),
         ContentPage.tenant_id==user.tenant_id).with_for_update())
     if not x:raise HTTPException(404,"CMS page not found")
     if x.status!="published":raise HTTPException(409,"Only published pages can be unpublished")
-    x.status="draft";x.approved_by=None
+    published_number=x.published_version_no
+    x.status="draft";x.approved_by=None;x.published_version_no=None
+    version=db.scalar(select(CmsVersion).where(CmsVersion.tenant_id==user.tenant_id,
+        CmsVersion.page_id==x.id,CmsVersion.version_no==published_number))
+    if version and version.status=="published":version.status="withdrawn"
     db.add(Audit(tenant_id=user.tenant_id,user_id=user.id,event="public_website_page_unpublished",
         entity_type="ContentPage",entity_id=x.id))
     db.commit()
