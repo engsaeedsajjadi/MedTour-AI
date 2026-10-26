@@ -78,5 +78,6 @@ jobs:
       - name: Real FastAPI strict tenant gateway against PostgreSQL RLS clone
         working-directory: backend
         env:
+          PYTHONPATH: .
           SECTION26_ISOLATED_PROBE: synthetic_only
         run: python tests/section26_strict_gateway_probe.py
