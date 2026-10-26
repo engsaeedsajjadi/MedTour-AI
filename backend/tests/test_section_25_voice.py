@@ -148,7 +148,7 @@ def test_wav_limits_and_content_sniffing(context,monkeypatch):
     assert upload(client,admin,payload=b"OggS"+b"x"*50,
                   content_type="audio/ogg").status_code==415
     assert upload(client,admin,payload=b"x"*1_000_001).status_code==413
-    assert upload(client,admin,payload=wav(seconds=31)).status_code==413
+    assert upload(client,admin,payload=wav(seconds=31)).status_code==422
     assert upload(client,admin,payload=wav(rate=16000,seconds=0)).status_code==422
     assert upload(client,admin,payload=wav(rate=11025)).status_code==415
     assert upload(client,admin,payload=wav()[:-100]).status_code==415
