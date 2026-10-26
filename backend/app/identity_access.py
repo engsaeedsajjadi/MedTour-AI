@@ -85,10 +85,10 @@ def tokens(db,user):
             ttl_seconds=7*86400)
         db.add(RefreshSession(tenant_id=user.tenant_id,user_id=user.id,
             refresh_hash=hash_token(refresh),family_id=str(uuid.uuid4()),
-            expires_at=now()+timedelta(days=7)))
+            expires_at=now()+timedelta(days=7),mfa_verified=True))
         db.commit()
     else:
-        refresh=issue_refresh(db,user)
+        refresh=issue_refresh(db,user,mfa_verified=True)
     return {"access_token":access,"refresh_token":refresh,"token_type":"bearer",
             "role":user.role,"tenant_id":user.tenant_id}
 
