@@ -5,7 +5,7 @@ Never email MFA secrets, put challenge credentials in logs or issue JWT after
 password-only login to an enrolled account.
 """
 from __future__ import annotations
-import base64,hashlib,hmac,os,secrets,struct,time,re
+import base64,hashlib,hmac,os,secrets,struct,time,re,uuid
 from datetime import datetime,timezone,timedelta
 from urllib.parse import quote
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -77,7 +77,18 @@ def invalidate_sessions(db:Session,user:User):
 
 def tokens(db,user):
     access=token_for(user)
-    refresh=issue_refresh(db,user)
+    signer=db.info.get("tenant_route_keyring")
+    if signer:
+        # In strict tenant-role mode the refresh token MUST carry an
+        # authenticated tenant routing hint before opening any DB connection.
+        refresh=signer.issue(purpose="refresh",tenant_id=user.tenant_id,
+            ttl_seconds=7*86400)
+        db.add(RefreshSession(tenant_id=user.tenant_id,user_id=user.id,
+            refresh_hash=hash_token(refresh),family_id=str(uuid.uuid4()),
+            expires_at=now()+timedelta(days=7)))
+        db.commit()
+    else:
+        refresh=issue_refresh(db,user)
     return {"access_token":access,"refresh_token":refresh,"token_type":"bearer",
             "role":user.role,"tenant_id":user.tenant_id}
 
