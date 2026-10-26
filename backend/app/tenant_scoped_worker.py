@@ -13,9 +13,6 @@ from .outbound_worker import poll_once
 
 def poll_provisioned_tenant(*,registry:StagedCoordinatedTenantRegistry,
                             tenant_id:str,batch_size:int=20,sender=None):
-    if sender is None:
-        return {"status":"provider_binding_required","processed":0,
-                "reason":"Strict mode cannot use global Meta credentials"}
     if not isinstance(registry,StagedCoordinatedTenantRegistry):
         raise ValueError("Only vetted epoch-guarded registry is allowed")
     # Acquiring here prevents malformed/unprovisioned/revoked tenant IDs from
@@ -23,6 +20,9 @@ def poll_provisioned_tenant(*,registry:StagedCoordinatedTenantRegistry,
     with registry.acquire_tenant(tenant_id) as lease:
         if lease.tenant_id!=tenant_id:
             raise PermissionError("Tenant lease mapping mismatch")
+    if sender is None:
+        return {"status":"provider_binding_required","processed":0,
+                "reason":"Strict mode cannot use global Meta credentials"}
     base=EpochGuardedSessionFactory(registry,tenant_id)
     @contextmanager
     def verified_session():
