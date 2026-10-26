@@ -2,7 +2,7 @@ from __future__ import annotations
 import os
 from datetime import datetime, timezone
 from typing import Literal
-from fastapi import FastAPI, Depends, HTTPException, Query, Request
+from fastapi import FastAPI, Depends, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sqlalchemy import select, func
@@ -178,12 +178,19 @@ def ready(db:Session=Depends(get_db)):
 
 
 @app.post('/api/v1/auth/login')
-def login(body:LoginIn,request:Request,db:Session=Depends(get_db)):
+def login(body:LoginIn,request:Request,response:Response,db:Session=Depends(get_db)):
     throttle((request.client.host if request.client else 'unknown')+':'+body.tenant_slug+':'+body.email.lower().strip())
     tenant=db.scalar(select(Tenant).where(Tenant.slug==body.tenant_slug))
     if not tenant:raise HTTPException(401,'Invalid credentials')
     user=db.scalar(select(User).where(User.tenant_id==tenant.id,User.email==body.email.lower().strip(),User.active==True))
     if not user or not password_verify(body.password,user.password_hash):raise HTTPException(401,'Invalid credentials')
+    from .identity_access import password_login,require_bound_physician
+    require_bound_physician(db,user)
+    pending=password_login(db,user)
+    response.headers["Cache-Control"]="no-store"
+    if pending:
+        response.status_code=202
+        return pending
     from .session_api import issue_refresh
     return {'access_token':token_for(user),'refresh_token':issue_refresh(db,user),'token_type':'bearer','role':user.role,'tenant_id':user.tenant_id}
 
@@ -553,3 +560,6 @@ app.include_router(cms_workflow_router)
 
 from .tenant_isolation_status import router as tenant_isolation_router
 app.include_router(tenant_isolation_router)
+
+from .identity_access import router as identity_access_router
+app.include_router(identity_access_router)
