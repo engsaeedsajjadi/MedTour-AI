@@ -27,7 +27,27 @@ def upgrade():
         sa.UniqueConstraint("tenant_id","user_id","case_id"))
     op.create_index("ix_doctor_case_grants_tenant_id","doctor_case_grants",["tenant_id"])
     op.create_index("ix_doctor_case_grants_case_id","doctor_case_grants",["case_id"])
+    for table in ("staff_mfa","doctor_case_grants"):
+        op.execute(f'ALTER TABLE public.{table} ADD CONSTRAINT mt27_uq_{table} UNIQUE (tenant_id,id)')
+        op.execute(f"""CREATE POLICY mt26_principal_isolation ON public.{table}
+            FOR ALL TO PUBLIC USING (tenant_id=medtour_principal_private.tenant_for_login())
+            WITH CHECK (tenant_id=medtour_principal_private.tenant_for_login())""")
+    for table,column,parent in (
+        ("staff_mfa","user_id","users"),
+        ("doctor_case_grants","user_id","users"),
+        ("doctor_case_grants","case_id","cases"),
+        ("doctor_case_grants","granted_by","users")):
+        op.execute(f"""ALTER TABLE public.{table} ADD CONSTRAINT mt27_fk_{table}_{column}
+          FOREIGN KEY (tenant_id,{column}) REFERENCES public.{parent}(tenant_id,id)
+          DEFERRABLE INITIALLY DEFERRED""")
 def downgrade():
+    for table,column in (("staff_mfa","user_id"),
+        ("doctor_case_grants","user_id"),("doctor_case_grants","case_id"),
+        ("doctor_case_grants","granted_by")):
+        op.execute(f'ALTER TABLE public.{table} DROP CONSTRAINT mt27_fk_{table}_{column}')
+    for table in ("staff_mfa","doctor_case_grants"):
+        op.execute(f'DROP POLICY mt26_principal_isolation ON public.{table}')
+        op.execute(f'ALTER TABLE public.{table} DROP CONSTRAINT mt27_uq_{table}')
     op.drop_index("ix_doctor_case_grants_case_id",table_name="doctor_case_grants")
     op.drop_index("ix_doctor_case_grants_tenant_id",table_name="doctor_case_grants")
     op.drop_table("doctor_case_grants")
