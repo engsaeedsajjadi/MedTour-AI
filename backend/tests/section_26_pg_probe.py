@@ -106,7 +106,29 @@ def main():
                     raise AssertionError("Cross-tenant insert unexpectedly accepted")
                 except sa.exc.DBAPIError:
                     pass
-                # All access to privileged registry is explicitly refused.
+                # A foreign-parent FK cannot be smuggled through a valid
+                # tenant_id by bypassing the ORM. This exercises the newly
+                # validated composite (tenant_id,patient_id) relationship.
+                try:
+                    with conn.begin():
+                        conn.execute(text("""
+                            INSERT INTO public.cases
+                            (id,tenant_id,patient_id,complaint,specialty,status,created_at)
+                            VALUES (:id,:tenant,:foreign,'','','new',now())
+                        """),{"id":str(uuid4()),"tenant":tenants[i],
+                               "foreign":patients[1-i]})
+                    raise AssertionError("Cross-tenant case FK unexpectedly accepted")
+                except sa.exc.DBAPIError:
+                    pass
+                # A valid same-tenant FK succeeds for restricted login role.
+                with conn.begin():
+                    conn.execute(text("""
+                        INSERT INTO public.cases
+                        (id,tenant_id,patient_id,complaint,specialty,status,created_at)
+                        VALUES (:id,:tenant,:patient,'','','new',now())
+                    """),{"id":str(uuid4()),"tenant":tenants[i],
+                           "patient":patients[i]})
+                                # All access to privileged registry is explicitly refused.
                 try:
                     with conn.begin():
                         conn.execute(text("SELECT id FROM public.tenants LIMIT 1"))
