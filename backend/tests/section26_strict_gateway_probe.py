@@ -167,6 +167,36 @@ with TestClient(gateway) as client:
     assert received.json()["routed_to_human"]==0
     assert client.post("/api/v1/webhooks/whatsapp",content=payload,headers={
        "content-type":"application/json","X-Hub-Signature-256":"sha256="+"0"*64}).status_code==403
+    # Real Worker polling, against exactly the same FORCE RLS principal
+    # roles used by HTTP. Inject a synthetic no-network sender; do not use
+    # the legacy global Meta sender or any real patient data.
+    from app.models import Conversation
+    from app.enterprise_models import OutboundMessage
+    from app import outbound_worker
+    from app.tenant_scoped_worker import poll_provisioned_tenant
+    with registry.acquire_tenant(tenants[0]) as lease:
+        with lease.session() as session_db:
+            conv=Conversation(tenant_id=tenants[0],patient_id=patient_a,channel="whatsapp")
+            session_db.add(conv);session_db.flush()
+            pending=OutboundMessage(tenant_id=tenants[0],patient_id=patient_a,
+                conversation_id=conv.id,idempotency_key="synthetic-tenant-rls-worker",
+                destination_channel="whatsapp",template_name="administrative_sample",
+                locale="fa",status="approved")
+            session_db.add(pending);session_db.commit()
+            approved_id=pending.id
+    outbound_worker.authorized=lambda:True
+    outbound_worker._heartbeat=lambda:None
+    observed=[]
+    synthetic_sender=lambda oid:observed.append(oid) or {"status":"synthetic_only"}
+    first=poll_provisioned_tenant(registry=registry,tenant_id=tenants[0],
+        batch_size=10,sender=synthetic_sender)
+    assert first["processed"]==1 and observed==[approved_id],first
+    observed.clear()
+    second=poll_provisioned_tenant(registry=registry,tenant_id=tenants[1],
+        batch_size=10,sender=synthetic_sender)
+    assert second["processed"]==0 and observed==[],second
+    assert poll_provisioned_tenant(registry=registry,tenant_id=tenants[0],
+        sender=None)["status"]=="provider_binding_required"
     # A cross-worker epoch cutover MUST deny existing staff JWT routes
     # before entering an old or privileged connection.
     epoch.active=False
