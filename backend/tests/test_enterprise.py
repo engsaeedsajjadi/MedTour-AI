@@ -41,7 +41,7 @@ def test_content_publish_and_public_gate(context):
     link='/api/v1/public/a/pages/ar/medical-services'
     assert client.get(link).status_code==404
     assert client.patch('/api/v1/cms/pages/'+created.json()['id']+'/publish',headers=a).status_code==409
-    assert client.get(link).json()['title']==inp['title']
+    assert client.get(link).status_code==404
     assert client.get('/api/v1/public/b/pages/ar/medical-services').status_code==404
 
 def test_knowledge_requires_supervisor(context):
