@@ -35,6 +35,7 @@ class RotatedRefresh:
     user_id: str
     role: str
     refresh_token: str
+    mfa_verified: bool = False
 
 
 @dataclass(frozen=True)
@@ -163,7 +164,10 @@ class StagedTenantCredentialTransactions:
                         expires_at=checked + timedelta(days=7),
                     )
                 )
+                from .staff_mfa import row_for
+                enrollment=row_for(db,tenant_id,user.id)
                 result = RotatedRefresh(
+                    mfa_verified=bool(enrollment and enrollment.enabled),
                     tenant_id=tenant_id,
                     user_id=user.id,
                     role=user.role,

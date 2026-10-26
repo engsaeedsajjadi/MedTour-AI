@@ -111,7 +111,7 @@ class StagedPreAuthService:
         if isinstance(password, str) and len(password) <= 1024:
             password_verify(password, self._dummy_hash)
 
-    def login(self, tenant_slug: str, email: str, password: str) -> LoginResult | None:
+    def login(self, tenant_slug: str, email: str, password: str, totp_code: str | None = None) -> LoginResult | None:
         """Check supplied slug against server registry and actual role, then staff."""
         if (
             not isinstance(tenant_slug, str)
@@ -144,6 +144,11 @@ class StagedPreAuthService:
                     return None
                 if not password_verify(password, user.password_hash):
                     return None
+                from .staff_mfa import verify,row_for
+                if not verify(db,user,totp_code):
+                    return None
+                enrollment=row_for(db,tenant_id,user.id)
+                assured=bool(enrollment and enrollment.enabled)
                 now = datetime.now(timezone.utc)
                 raw = self._keyring.issue(
                     purpose="refresh", tenant_id=tenant_id,
@@ -160,7 +165,8 @@ class StagedPreAuthService:
                 user_id, user_role = user.id, user.role
                 db.commit()
                 signed_jwt = token_for(
-                    SimpleNamespace(id=user_id, tenant_id=tenant_id, role=user_role)
+                    SimpleNamespace(id=user_id, tenant_id=tenant_id, role=user_role),
+                    mfa_verified=assured
                 )
                 return LoginResult(tenant_id, user_id, user_role, signed_jwt, raw)
         except (SQLAlchemyError, LookupError):
@@ -176,7 +182,8 @@ class StagedPreAuthService:
                 id=rotated.user_id,
                 tenant_id=rotated.tenant_id,
                 role=rotated.role,
-            )
+            ),
+            mfa_verified=rotated.mfa_verified
         )
         return LoginResult(
             tenant_id=rotated.tenant_id,

@@ -10,6 +10,7 @@ from .database import get_db
 from .security import current_user,token_for,secret
 from .models import User,Audit
 from .enterprise_models import RefreshSession,RevokedAccess
+from .staff_mfa import row_for
 
 router=APIRouter(prefix='/api/v1/auth',tags=['staff sessions'])
 
@@ -44,7 +45,8 @@ def refresh(body:RefreshIn,db:Session=Depends(get_db)):
     newer=RefreshSession(tenant_id=user.tenant_id,user_id=user.id,refresh_hash=hash_token(raw),
         family_id=previous.family_id,expires_at=now+timedelta(days=7))
     db.add(newer);db.commit()
-    return {'access_token':token_for(user),'refresh_token':raw,'token_type':'bearer','expires_in':1800}
+    return {'access_token':token_for(user,mfa_verified=bool(
+        (enrollment:=row_for(db,user.tenant_id,user.id)) and enrollment.enabled)),'refresh_token':raw,'token_type':'bearer','expires_in':1800}
 
 @router.post('/logout')
 def logout(authorization:str|None=Header(None),user:User=Depends(current_user),db:Session=Depends(get_db)):

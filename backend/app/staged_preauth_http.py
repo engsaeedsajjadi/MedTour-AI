@@ -18,6 +18,7 @@ class LoginPayload(BaseModel):
     tenant_slug: str = Field(min_length=1, max_length=100)
     email: str = Field(min_length=3, max_length=250)
     password: str = Field(min_length=1, max_length=1024)
+    totp_code: str | None = Field(default=None, min_length=6, max_length=6)
 
 
 class RefreshPayload(BaseModel):
@@ -33,7 +34,7 @@ def staged_preauth_router(service: StagedPreAuthService) -> APIRouter:
     def login(request: Request, body: LoginPayload):
         source = request.client.host if request.client else "unknown"
         throttle(source + ":" + body.tenant_slug + ":" + body.email.lower().strip())
-        result = service.login(body.tenant_slug, body.email, body.password)
+        result = service.login(body.tenant_slug, body.email, body.password, body.totp_code)
         if result is None:
             raise HTTPException(401, "Invalid credentials")
         return {
