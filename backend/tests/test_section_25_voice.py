@@ -158,9 +158,11 @@ def test_wav_limits_and_content_sniffing(context,monkeypatch):
 def test_opus_decoder_is_bounded_and_optional(monkeypatch):
     import app.voice_processing as audio
     fake=b"OggS"+b"\x00"*30+b"OpusHead"+b"synthetic"*10
+    real_converter=audio.convert_opus
     monkeypatch.setattr(audio,"convert_opus",lambda _:wav())
     payload,ms,kind=decode_voice(fake)
     assert payload.startswith(b"RIFF") and ms==1000 and kind=="ogg_opus"
+    monkeypatch.setattr(audio,"convert_opus",real_converter)
     monkeypatch.setattr(audio.shutil,"which",lambda x:None)
     with pytest.raises(HTTPException) as err:
         audio.convert_opus(fake)
