@@ -90,7 +90,6 @@ def require_bound_physician(db,user):
     if not bound:raise HTTPException(403,"Physician identity must be bound to its own active account")
 
 def password_login(db:Session,user:User):
-    require_bound_physician(db,user)
     factor=db.scalar(select(StaffTotp).where(
         StaffTotp.tenant_id==user.tenant_id,StaffTotp.user_id==user.id))
     if not factor or not factor.enabled:return None
@@ -181,7 +180,6 @@ def verify(body:VerifyIn,db:Session=Depends(get_db)):
         if challenge.attempts>=ATTEMPTS:challenge.used_at=now()
         db.commit()
         raise HTTPException(401,"Invalid MFA code")
-    require_bound_physician(db,user)
     factor.last_step=step
     challenge.used_at=now()
     db.execute(update(StaffMfaChallenge).where(
