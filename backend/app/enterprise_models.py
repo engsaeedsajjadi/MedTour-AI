@@ -143,6 +143,40 @@ class AILog(TenantEntity,Base):
     latency_ms:Mapped[int]=mapped_column(Integer,default=0)
     # Never persist prompts, PHI, raw responses, or access tokens here.
 
+class AIAgentPolicy(TenantEntity,Base):
+    __tablename__="ai_agent_policies"
+    agent_key:Mapped[str]=mapped_column(String(60),nullable=False)
+    enabled:Mapped[bool]=mapped_column(Boolean,nullable=False,default=False)
+    provider_mode:Mapped[str]=mapped_column(String(25),nullable=False,default="deterministic_demo")
+    daily_run_limit:Mapped[int]=mapped_column(Integer,nullable=False,default=20)
+    updated_by:Mapped[str]=mapped_column(ForeignKey("users.id"),nullable=False)
+    __table_args__=(UniqueConstraint("tenant_id","agent_key"),)
+
+class AIOrchestrationRun(TenantEntity,Base):
+    __tablename__="ai_orchestration_runs"
+    request_key:Mapped[str]=mapped_column(String(100),nullable=False)
+    agent_key:Mapped[str]=mapped_column(String(60),nullable=False)
+    workflow:Mapped[str]=mapped_column(String(60),nullable=False)
+    locale:Mapped[str]=mapped_column(String(10),nullable=False)
+    input_hash:Mapped[str]=mapped_column(String(64),nullable=False)
+    status:Mapped[str]=mapped_column(String(40),nullable=False,default="pending_human_review")
+    mode:Mapped[str]=mapped_column(String(25),nullable=False,default="deterministic_demo")
+    result_text:Mapped[str]=mapped_column(Text,nullable=False)
+    knowledge_ids_json:Mapped[str]=mapped_column(Text,nullable=False,default="[]")
+    authored_by:Mapped[str]=mapped_column(ForeignKey("users.id"),nullable=False)
+    reviewer_id:Mapped[str|None]=mapped_column(ForeignKey("users.id"),nullable=True)
+    decision_reference:Mapped[str|None]=mapped_column(String(100),nullable=True)
+    __table_args__=(UniqueConstraint("tenant_id","request_key"),
+        Index("ix_ai_orchestration_tenant_state","tenant_id","status","created_at"),)
+
+class AIOrchestrationEvent(TenantEntity,Base):
+    __tablename__="ai_orchestration_events"
+    run_id:Mapped[str]=mapped_column(ForeignKey("ai_orchestration_runs.id"),nullable=False)
+    actor_id:Mapped[str]=mapped_column(ForeignKey("users.id"),nullable=False)
+    action:Mapped[str]=mapped_column(String(80),nullable=False)
+    detail_code:Mapped[str]=mapped_column(String(80),nullable=False)
+    __table_args__=(Index("ix_ai_orchestration_events_run","tenant_id","run_id","created_at"),)
+
 class MessageEvent(TenantEntity,Base):
     __tablename__='message_events'
     event_id:Mapped[str]=mapped_column(String(150))
