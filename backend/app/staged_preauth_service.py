@@ -144,9 +144,11 @@ class StagedPreAuthService:
                     return None
                 if not password_verify(password, user.password_hash):
                     return None
-                from .staff_mfa import verify
+                from .staff_mfa import verify,row_for
                 if not verify(db,user,totp_code):
                     return None
+                enrollment=row_for(db,tenant_id,user.id)
+                assured=bool(enrollment and enrollment.enabled)
                 now = datetime.now(timezone.utc)
                 raw = self._keyring.issue(
                     purpose="refresh", tenant_id=tenant_id,
@@ -164,7 +166,7 @@ class StagedPreAuthService:
                 db.commit()
                 signed_jwt = token_for(
                     SimpleNamespace(id=user_id, tenant_id=tenant_id, role=user_role),
-                    mfa_verified=True
+                    mfa_verified=assured
                 )
                 return LoginResult(tenant_id, user_id, user_role, signed_jwt, raw)
         except (SQLAlchemyError, LookupError):
@@ -181,7 +183,7 @@ class StagedPreAuthService:
                 tenant_id=rotated.tenant_id,
                 role=rotated.role,
             ),
-            mfa_verified=True
+            mfa_verified=rotated.mfa_verified
         )
         return LoginResult(
             tenant_id=rotated.tenant_id,
