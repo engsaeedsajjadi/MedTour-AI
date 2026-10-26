@@ -203,3 +203,6 @@ Section 24: [Bounded, tenant-opt-in administrative AI agent orchestration, read-
 
 
 Section 25: [Synthetic STT/TTS preview, five languages, bounded WAV/OGG media validation, human transcript review and external provider activation](docs/SECTION_25_VOICE_STT_TTS_FA.md). Portal /voice. Automatic encrypted WhatsApp/Telegram voice ingestion and real patient speech remain disabled.
+
+
+Section 26: [Tenant-scoped PostgreSQL composite FK hardening, private database principal mapping, RLS policy staging and CI restricted-role probe](docs/SECTION_26_MULTITENANT_RLS_FA.md). Live get_db remains shared; RLS is NOT automatically enabled in the operational DB. Not production-ready.

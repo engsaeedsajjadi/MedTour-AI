@@ -550,3 +550,6 @@ app.include_router(public_site_router)
 
 from .cms_workflow import router as cms_workflow_router
 app.include_router(cms_workflow_router)
+
+from .tenant_isolation_status import router as tenant_isolation_router
+app.include_router(tenant_isolation_router)
