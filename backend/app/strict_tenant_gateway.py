@@ -47,7 +47,8 @@ class StrictTenantGateway:
                  keyring:TenantRouteKeyring,meta_app_secret:str,
                  whatsapp_approved:bool=False):
         if (os.getenv("APP_ENV")!="test" or os.getenv("DATABASE_URL")!="sqlite://"
-            or os.getenv("MEDTOUR_SYNTHETIC_CLONE")!="1"):
+            or os.getenv("MEDTOUR_SYNTHETIC_CLONE")!="1"
+            or os.getenv("TENANT_DB_ROUTING_MODE")!="strict"):
             raise RuntimeError("Strict tenant gateway pilot limited to synthetic clone")
         if not isinstance(registry,StagedCoordinatedTenantRegistry) or not isinstance(keyring,TenantRouteKeyring):
             raise ValueError("Trusted registry and independent MAC keyring required")
