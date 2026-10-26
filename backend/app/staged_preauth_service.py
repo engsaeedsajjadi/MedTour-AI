@@ -111,7 +111,7 @@ class StagedPreAuthService:
         if isinstance(password, str) and len(password) <= 1024:
             password_verify(password, self._dummy_hash)
 
-    def login(self, tenant_slug: str, email: str, password: str) -> LoginResult | None:
+    def login(self, tenant_slug: str, email: str, password: str, totp_code: str | None = None) -> LoginResult | None:
         """Check supplied slug against server registry and actual role, then staff."""
         if (
             not isinstance(tenant_slug, str)
@@ -143,6 +143,9 @@ class StagedPreAuthService:
                     self._check_dummy(password)
                     return None
                 if not password_verify(password, user.password_hash):
+                    return None
+                from .staff_mfa import verify
+                if not verify(db,user,totp_code):
                     return None
                 now = datetime.now(timezone.utc)
                 raw = self._keyring.issue(
