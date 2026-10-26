@@ -13,6 +13,7 @@ export default function AiOrchestrationPage(){
  const [task,setTask]=useState('general_information');
  const [locale,setLocale]=useState('fa');
  const [mode,setMode]=useState('deterministic_demo');
+ const [evidence,setEvidence]=useState('');
  const [error,setError]=useState('');
  const [notice,setNotice]=useState('');
  const [busy,setBusy]=useState(false);
@@ -74,10 +75,10 @@ export default function AiOrchestrationPage(){
     <p style={{whiteSpace:'pre-wrap'}}>{x.display_text}</p>
     <p>حالت اجرا: {x.mode} · پیام ارسال‌شده: خیر</p>
     {role==='admin'&&['pending_human_review','blocked_quality_gate'].includes(x.status)&&
-     <div style={{display:'flex',gap:10}}>
-      <button className="button" disabled={busy||x.status==='blocked_quality_gate'} onClick={()=>void action('/ai-orchestration/runs/'+x.id+'/review',{decision:'approve_internal',evidence_reference:'DEMO-REVIEW-12345'})}>تأیید داخلی</button>
-      <button className="button secondary" disabled={busy} onClick={()=>void action('/ai-orchestration/runs/'+x.id+'/review',{decision:'reject',evidence_reference:'DEMO-REJECT-12345'})}>رد</button>
-     </div>}
+     <div><label>مرجع بازبینی غیرحساس<input dir="ltr" maxLength={100} value={evidence} onChange={e=>setEvidence(e.target.value)}/></label><div style={{display:'flex',gap:10}}>
+      <button className="button" disabled={busy||evidence.length<6||x.status==='blocked_quality_gate'} onClick={()=>void action('/ai-orchestration/runs/'+x.id+'/review',{decision:'approve_internal',evidence_reference:evidence})}>تأیید داخلی</button>
+      <button className="button secondary" disabled={busy||evidence.length<6} onClick={()=>void action('/ai-orchestration/runs/'+x.id+'/review',{decision:'reject',evidence_reference:evidence})}>رد</button>
+     </div></div>}
    </article>)}
   </section>
  </Shell>;
