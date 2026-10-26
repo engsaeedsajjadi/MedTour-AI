@@ -48,22 +48,11 @@ export default function Cms(){
  async function bootstrap(){
   await submit('/cms/public-site/bootstrap',{method:'POST',body:'{}'});
  }
- async function publish(id:string){
-  if(!window.confirm('آیا همه ادعاهای پزشکی، ترجمه و متن حقوقی توسط افراد مسئول بررسی شده‌اند؟ انتشار صرفاً تأیید اداری است.'))return;
-  await submit('/cms/pages/'+id+'/publish',{method:'PATCH'});
- }
+ async function publish(id:string){window.location.assign('/cms-workflow?page='+encodeURIComponent(id));}
  async function unpublish(id:string){await submit('/cms/public-site/pages/'+id+'/unpublish',{method:'PATCH'});}
- async function editDraft(id:string){
-  try{
-   const x=await request<CmsDetail>('/cms/public-site/drafts/'+id);
-   if(x.status!=='draft')throw new Error('ابتدا صفحه را از انتشار خارج کنید.');
-   setEditing(x);
-  }catch(e){setError((e as Error).message);}
- }
+ async function editDraft(id:string){window.location.assign('/cms-workflow?page='+encodeURIComponent(id));}
  async function saveEdit(e:React.FormEvent){e.preventDefault();if(!editing)return;
-  await submit('/cms/public-site/drafts/'+editing.id,{method:'PATCH',
-   body:JSON.stringify({title:editing.title,body:editing.body})});
-  setEditing(null);
+  window.location.assign('/cms-workflow?page='+encodeURIComponent(editing.id));
  }
  return <Shell title="وب‌سایت عمومی چندزبانه">
   <div className="infoBanner">محتوای پیش‌نویس هرگز عمومی نیست. فعال‌سازی سئو به انتشار تمام صفحات اصلی به پنج زبان، بررسی حقوقی اعلام‌شده توسط سازمان و تنظیم صریح نیاز دارد. این تأیید به معنی بررسی مستقل قانون یا پزشک نیست.</div>
@@ -122,7 +111,7 @@ export default function Cms(){
       <button className="button secondary" disabled={busy} onClick={()=>void unpublish(String(x.id))}>لغو انتشار</button>:
       <div style={{display:'flex',gap:8}}>
        <button className="button secondary" disabled={busy} onClick={()=>void editDraft(String(x.id))}>ویرایش</button>
-       <button className="button" disabled={busy} onClick={()=>void publish(String(x.id))}>انتشار با تأیید مدیر</button>
+       <button className="button" disabled={busy} onClick={()=>void publish(String(x.id))}>گردش‌کار بررسی و انتشار</button>
       </div>}
      </td>
     </tr>)}</tbody>
