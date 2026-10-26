@@ -250,7 +250,8 @@ class StagedPreAuthService:
                     now=int(moment.timestamp()))
                 db.add(RefreshSession(tenant_id=hint.tenant_id,user_id=user.id,
                     refresh_hash=token_sha256(replacement),
-                    family_id=str(uuid4()),expires_at=moment+timedelta(days=7)))
+                    family_id=str(uuid4()),expires_at=moment+timedelta(days=7),
+                    mfa_verified=True))
                 uid,role,version=user.id,user.role,user.auth_version
                 db.commit()
                 jwt_access=token_for(SimpleNamespace(
