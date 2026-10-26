@@ -74,6 +74,7 @@ def test_stt_five_languages_never_stores_audio_or_text(context,monkeypatch):
         res=upload(client,admin,locale=loc,key=f"VOICE-SAMPLE-{i:03}")
         assert res.status_code==201,res.text
         j=res.json()
+        assert res.headers["cache-control"].startswith("no-store")
         assert j["locale"]==loc
         assert j["draft_text"] and j["status"]=="pending_human_review"
         assert j["source_format"]=="wav"
