@@ -23,7 +23,7 @@ from .security import roles
 from .receptionist import RESPONSES
 from .ai import provider_available,draft as provider_draft
 
-router=APIRouter(prefix="/api/v1/ai-orchestration",tags=["administrative AI orchestration"])
+router=APIRouter(prefix="/ai-orchestration",tags=["administrative AI orchestration"])
 ADMIN=roles("admin")
 STAFF=roles("admin","operator")
 LOCALES=("fa","ar","en","ps","prs")
