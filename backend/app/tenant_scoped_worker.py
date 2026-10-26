@@ -5,6 +5,8 @@ No global SessionLocal, tenant identifiers from message payload or dynamic
 DB URLs are accepted. Each transaction obtains an epoch-checked lease.
 """
 from __future__ import annotations
+from contextlib import contextmanager
+from .strict_tenant_gateway import StrictTenantGateway
 from .staged_epoch_preauth_bridge import EpochGuardedSessionFactory
 from .staged_tenant_epoch_control import StagedCoordinatedTenantRegistry
 from .outbound_worker import poll_once
@@ -18,6 +20,11 @@ def poll_provisioned_tenant(*,registry:StagedCoordinatedTenantRegistry,
     with registry.acquire_tenant(tenant_id) as lease:
         if lease.tenant_id!=tenant_id:
             raise PermissionError("Tenant lease mapping mismatch")
-    factory=EpochGuardedSessionFactory(registry,tenant_id)
-    return poll_once(session_factory=factory,tenant_id=tenant_id,
+    base=EpochGuardedSessionFactory(registry,tenant_id)
+    @contextmanager
+    def verified_session():
+        with base() as db:
+            StrictTenantGateway._prove_connection(db,tenant_id)
+            yield db
+    return poll_once(session_factory=verified_session,tenant_id=tenant_id,
                      batch_size=batch_size,sender=sender)
