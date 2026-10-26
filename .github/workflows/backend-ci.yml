@@ -69,3 +69,9 @@ jobs:
           assert response.status_code == 200, response.text
           print("PostgreSQL 17 + Alembic", required_revision(), "+ Redis 7 integration PASS")
           PY
+
+      - name: Probe Section 26 authenticated PostgreSQL RLS tenant isolation
+        working-directory: backend
+        env:
+          SECTION26_ISOLATED_PROBE: synthetic_only
+        run: python tests/section_26_pg_probe.py
