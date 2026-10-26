@@ -544,3 +544,6 @@ app.include_router(international_agents_router)
 
 from .portal_identity import router as portal_identity_router
 app.include_router(portal_identity_router)
+
+from .public_site import router as public_site_router
+app.include_router(public_site_router)
