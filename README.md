@@ -191,3 +191,6 @@ Section 20 international agent governance: [docs/SECTION_20_INTERNATIONAL_AGENTS
 
 
 Section 21: [Development-only patient portal OTP invitation, consent and session security](docs/SECTION_21_PATIENT_PORTAL_FA.md). Real patient identity verification and production PHI remain disabled.
+
+
+Section 22: [Three-language public website (FA/AR/EN), draft templates, published-only SEO and legal readiness gates](docs/SECTION_22_MULTILINGUAL_WEBSITE_FA.md). Admin preview at /cms; public pages at /public/{tenant}/{locale}. Real legal notices, professional translations and clinical/partner verification remain external gates.
