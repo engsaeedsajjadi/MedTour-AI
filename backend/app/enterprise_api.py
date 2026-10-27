@@ -284,7 +284,7 @@ def finance_list(db:Session=Depends(get_db),user:User=Depends(ADMIN)):
              'currency':x.currency,'source_reference':x.source_reference} for x in xs]
 
 class ConfigIn(BaseModel):
-    value:dict[str,Any]
+    value:Any
 
 @router.get('/settings')
 def settings(db:Session=Depends(get_db),user:User=Depends(ADMIN)):
