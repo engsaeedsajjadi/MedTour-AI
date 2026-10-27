@@ -562,3 +562,6 @@ app.include_router(tenant_isolation_router)
 
 from .identity_governance import router as identity_governance_router
 app.include_router(identity_governance_router)
+
+from .reporting_analytics import router as reporting_analytics_router
+app.include_router(reporting_analytics_router)
