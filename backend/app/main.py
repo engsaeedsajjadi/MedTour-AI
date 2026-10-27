@@ -562,3 +562,7 @@ app.include_router(tenant_isolation_router)
 
 from .identity_governance import router as identity_governance_router
 app.include_router(identity_governance_router)
+
+from .api_contract import router as api_contract_router, correlation_middleware
+app.include_router(api_contract_router)
+app.middleware('http')(correlation_middleware)
