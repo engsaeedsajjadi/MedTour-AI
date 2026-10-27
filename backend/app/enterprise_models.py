@@ -177,6 +177,22 @@ class AIOrchestrationEvent(TenantEntity,Base):
     detail_code:Mapped[str]=mapped_column(String(80),nullable=False)
     __table_args__=(Index("ix_ai_orchestration_events_run","tenant_id","run_id","created_at"),)
 
+class StaffMFA(TenantEntity,Base):
+    __tablename__="staff_mfa"
+    user_id:Mapped[str]=mapped_column(ForeignKey("users.id"),nullable=False)
+    secret_encrypted:Mapped[str]=mapped_column(Text,nullable=False)
+    enabled:Mapped[bool]=mapped_column(Boolean,default=False,nullable=False)
+    last_counter:Mapped[int]=mapped_column(BigInteger,default=-1,nullable=False)
+    __table_args__=(UniqueConstraint("tenant_id","user_id"),)
+
+class DoctorCaseGrant(TenantEntity,Base):
+    __tablename__="doctor_case_grants"
+    user_id:Mapped[str]=mapped_column(ForeignKey("users.id"),nullable=False)
+    case_id:Mapped[str]=mapped_column(ForeignKey("cases.id"),nullable=False)
+    granted_by:Mapped[str]=mapped_column(ForeignKey("users.id"),nullable=False)
+    revoked_at:Mapped[datetime|None]=mapped_column(DateTime(timezone=True),nullable=True)
+    __table_args__=(UniqueConstraint("tenant_id","user_id","case_id"),)
+
 class VoiceSampleJob(TenantEntity,Base):
     """Only hashes and review metadata. No raw audio or transcript content."""
     __tablename__="voice_sample_jobs"
