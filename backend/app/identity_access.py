@@ -8,6 +8,7 @@ from __future__ import annotations
 import base64,hashlib,hmac,os,secrets,struct,time,re,uuid
 from datetime import datetime,timezone,timedelta
 from urllib.parse import quote
+from typing import Literal
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from fastapi import APIRouter,Depends,HTTPException,Request,Response
 from pydantic import BaseModel,Field,ConfigDict
