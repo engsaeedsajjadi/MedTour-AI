@@ -18,7 +18,9 @@ def validate_setting(key:str,value:object)->object:
             raise HTTPException(422,"Unknown or privileged feature flag")
         if any(type(enabled) is not bool for enabled in value.values()):
             raise HTTPException(422,"Feature flags must be boolean")
-        return value
+        if not isinstance(value,dict):
+        raise HTTPException(422,'Setting value must be an object')
+    return value
     if key=="enabled_languages":
         if not isinstance(value,list) or not value or len(value)>len(LOCALES):
             raise HTTPException(422,"Invalid language list")
@@ -31,7 +33,8 @@ def validate_setting(key:str,value:object)->object:
         return value
     if key=="public_portal":
         # This setting is informational only. It cannot override access controls.
-        if not isinstance(value,dict) or set(value)!={"show_public_link"} or type(value["show_public_link"]) is not bool:
-            raise HTTPException(422,"Only the display preference is configurable")
+        allowed={"show_public_link","search_indexing_enabled","legal_content_reviewed"}
+        if not isinstance(value,dict) or not set(value).issubset(allowed) or any(type(v) is not bool for v in value.values()):
+            raise HTTPException(422,"Only reviewed public-site display/indexing preferences are configurable")
         return value
     return value
