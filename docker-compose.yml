@@ -64,6 +64,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     restart: on-failure
     healthcheck:
       test: ["CMD", "python", "-m", "app.worker_healthcheck"]
