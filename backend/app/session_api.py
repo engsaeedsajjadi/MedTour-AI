@@ -9,16 +9,17 @@ from sqlalchemy.orm import Session
 from .database import get_db
 from .security import current_user,token_for,secret
 from .models import User,Audit
-from .enterprise_models import RefreshSession,RevokedAccess
+from .enterprise_models import RefreshSession,RevokedAccess,StaffTotp
 
 router=APIRouter(prefix='/api/v1/auth',tags=['staff sessions'])
 
 def hash_token(raw:str):return hashlib.sha256(raw.encode()).hexdigest()
 
-def issue_refresh(db:Session,user:User):
+def issue_refresh(db:Session,user:User,*,mfa_verified:bool=False):
     raw=secrets.token_urlsafe(48)
     session=RefreshSession(tenant_id=user.tenant_id,user_id=user.id,refresh_hash=hash_token(raw),
-        family_id=str(__import__('uuid').uuid4()),expires_at=datetime.now(timezone.utc)+timedelta(days=7))
+        family_id=str(__import__('uuid').uuid4()),expires_at=datetime.now(timezone.utc)+timedelta(days=7),
+        mfa_verified=mfa_verified)
     db.add(session);db.commit()
     return raw
 
@@ -38,11 +39,20 @@ def refresh(body:RefreshIn,db:Session=Depends(get_db)):
     if expiration<=datetime.now(timezone.utc):raise HTTPException(401,'Refresh expired')
     user=db.scalar(select(User).where(User.tenant_id==previous.tenant_id,User.id==previous.user_id,User.active==True))
     if not user:raise HTTPException(401,'Account disabled')
+    factor=db.scalar(select(StaffTotp.id).where(StaffTotp.tenant_id==user.tenant_id,
+        StaffTotp.user_id==user.id,StaffTotp.enabled.is_(True)))
+    if factor and not previous.mfa_verified:
+        db.execute(update(RefreshSession).where(
+            RefreshSession.tenant_id==user.tenant_id,
+            RefreshSession.family_id==previous.family_id).values(revoked_at=datetime.now(timezone.utc)))
+        db.commit()
+        raise HTTPException(401,'Second factor required')
     now=datetime.now(timezone.utc)
     previous.revoked_at=now;previous.last_rotated_at=now
     raw=secrets.token_urlsafe(48)
     newer=RefreshSession(tenant_id=user.tenant_id,user_id=user.id,refresh_hash=hash_token(raw),
-        family_id=previous.family_id,expires_at=now+timedelta(days=7))
+        family_id=previous.family_id,expires_at=now+timedelta(days=7),
+        mfa_verified=previous.mfa_verified)
     db.add(newer);db.commit()
     return {'access_token':token_for(user),'refresh_token':raw,'token_type':'bearer','expires_in':1800}
 

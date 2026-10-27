@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "release": "medtour-enterprise-final-acceptance",
+  "environment": "development",
+  "production_authorized": false,
+  "checks": [
+    "merged_and_reviewed_code",
+    "postgres_migrations_and_rollback",
+    "live_rls_isolation",
+    "patient_identity_security",
+    "privacy_and_cross_border_review",
+    "clinical_safety_signoff",
+    "provider_contracts_and_eligibility",
+    "telegram_whatsapp_consent_review",
+    "e2e_browser_and_api",
+    "performance_and_load_evidence",
+    "penetration_test",
+    "backup_restore_drill",
+    "observability_incident_runbooks",
+    "tenant_billing_and_entitlements",
+    "operator_training_and_pilot"
+  ],
+  "evidence": {}
+}
