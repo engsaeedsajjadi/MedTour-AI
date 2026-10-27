@@ -15,7 +15,7 @@ def test_finance_reconciliation_multi_currency_isolation(context):
         ("refund_issued",5000,"USD","refund-test-1"),
         ("service_expense",3000,"USD","expense-test-1"),
         ("payment_received",9000,"EUR","payment-eur-test-1")]:
-        response=client.post("/api/v1/enterprise/finance/entries",headers=a,json={
+        response=client.post("/api/v1/finance/entries",headers=a,json={
             "case_id":cid,"entry_type":kind,"currency":currency,
             "amount_minor":amount,"source_reference":reference})
         # Enterprise router prefix may vary; diagnostic assertion makes integration error explicit.
