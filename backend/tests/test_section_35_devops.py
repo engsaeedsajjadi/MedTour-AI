@@ -7,7 +7,7 @@ from scripts.verify_compose import inspect
 def sample():
     return {"services":{
       "db":{"healthcheck":{"test":["CMD","true"]},"ports":[{"published":"5544","host_ip":"127.0.0.1"}]},
-      "redis":{"healthcheck":{"test":["CMD","true"]}]},
+      "redis":{"healthcheck":{"test":["CMD","true"]}},
       "migrate":{"command":["python","-m","alembic","upgrade","head"]},
       "api":{"command":["uvicorn","app.main:app"],"ports":[{"published":"8000","host_ip":"127.0.0.1"}],
              "depends_on":{"migrate":{"condition":"service_completed_successfully"}}},
