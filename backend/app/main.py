@@ -2,7 +2,7 @@ from __future__ import annotations
 import os
 from datetime import datetime, timezone
 from typing import Literal
-from fastapi import FastAPI, Depends, HTTPException, Query, Request
+from fastapi import FastAPI, Depends, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sqlalchemy import select, func
@@ -42,7 +42,6 @@ class LoginIn(BaseModel):
     tenant_slug:str
     email:str
     password:str
-    totp_code:str|None=None
 class PatientIn(BaseModel):
     full_name:str=Field(min_length=2,max_length=200)
     country:str=Field(max_length=100,default='')
@@ -179,19 +178,20 @@ def ready(db:Session=Depends(get_db)):
 
 
 @app.post('/api/v1/auth/login')
-def login(body:LoginIn,request:Request,db:Session=Depends(get_db)):
+def login(body:LoginIn,request:Request,response:Response,db:Session=Depends(get_db)):
     throttle((request.client.host if request.client else 'unknown')+':'+body.tenant_slug+':'+body.email.lower().strip())
     tenant=db.scalar(select(Tenant).where(Tenant.slug==body.tenant_slug))
     if not tenant:raise HTTPException(401,'Invalid credentials')
     user=db.scalar(select(User).where(User.tenant_id==tenant.id,User.email==body.email.lower().strip(),User.active==True))
     if not user or not password_verify(body.password,user.password_hash):raise HTTPException(401,'Invalid credentials')
-    from .staff_mfa import ensure_enrolled_gate
-    ensure_enrolled_gate(db,user,body.totp_code)
+    from .identity_access import password_login
+    pending=password_login(db,user)
+    response.headers["Cache-Control"]="no-store"
+    if pending:
+        response.status_code=202
+        return pending
     from .session_api import issue_refresh
-    from .staff_mfa import row_for
-    enrollment=row_for(db,user.tenant_id,user.id)
-    assured=bool(enrollment and enrollment.enabled)
-    return {'access_token':token_for(user,mfa_verified=assured),'refresh_token':issue_refresh(db,user),'token_type':'bearer','role':user.role,'tenant_id':user.tenant_id}
+    return {'access_token':token_for(user),'refresh_token':issue_refresh(db,user),'token_type':'bearer','role':user.role,'tenant_id':user.tenant_id}
 
 @app.get('/api/v1/auth/me')
 def me(user:User=Depends(current_user)):
@@ -560,5 +560,33 @@ app.include_router(cms_workflow_router)
 from .tenant_isolation_status import router as tenant_isolation_router
 app.include_router(tenant_isolation_router)
 
+from .identity_access import router as identity_access_router
+app.include_router(identity_access_router)
+
+
+# Consolidated section 28-41 routers. Sensitive actions retain their own
+# authentication, tenancy and human-approval dependencies.
 from .identity_governance import router as identity_governance_router
 app.include_router(identity_governance_router)
+
+from .privacy_governance import router as privacy_governance_router
+app.include_router(privacy_governance_router)
+
+from .finance_reconciliation import router as finance_reconciliation_router
+app.include_router(finance_reconciliation_router)
+
+from .workflow_notifications import router as workflow_notification_router
+app.include_router(workflow_notification_router)
+
+from .reporting_analytics import router as reporting_analytics_router
+app.include_router(reporting_analytics_router)
+
+from .api_contract import router as api_contract_router, correlation_middleware
+app.include_router(api_contract_router)
+app.middleware('http')(correlation_middleware)
+
+from .saas_subscription import router as saas_subscription_router
+app.include_router(saas_subscription_router)
+
+from .operations_metrics import router as operations_metrics_router
+app.include_router(operations_metrics_router)

@@ -267,6 +267,25 @@ class CaseTimeline(TenantEntity,Base):
     event:Mapped[str]=mapped_column(String(120))
     details:Mapped[str]=mapped_column(String(500),default='')
 
+class StaffTotp(TenantEntity,Base):
+    __tablename__ = "staff_totp"
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"),nullable=False)
+    encrypted_secret: Mapped[str] = mapped_column(Text,nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean,nullable=False,default=False)
+    setup_expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),nullable=False)
+    last_step: Mapped[int] = mapped_column(Integer,nullable=False,default=-1)
+    __table_args__=(UniqueConstraint("tenant_id","user_id"),)
+
+class StaffMfaChallenge(TenantEntity,Base):
+    __tablename__ = "staff_mfa_challenges"
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"),nullable=False)
+    challenge_hash: Mapped[str] = mapped_column(String(64),nullable=False,unique=True)
+    auth_version: Mapped[int] = mapped_column(Integer,nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),nullable=False)
+    attempts: Mapped[int] = mapped_column(Integer,nullable=False,default=0)
+    used_at: Mapped[datetime|None] = mapped_column(DateTime(timezone=True),nullable=True)
+    __table_args__=(Index("ix_staff_mfa_tenant_account","tenant_id","user_id"),)
+
 class RefreshSession(TenantEntity,Base):
     __tablename__='refresh_sessions'
     user_id:Mapped[str]=mapped_column(ForeignKey('users.id'),index=True)
@@ -275,6 +294,7 @@ class RefreshSession(TenantEntity,Base):
     revoked_at:Mapped[datetime|None]=mapped_column(DateTime(timezone=True),nullable=True)
     last_rotated_at:Mapped[datetime|None]=mapped_column(DateTime(timezone=True),nullable=True)
     family_id:Mapped[str]=mapped_column(String(36),index=True)
+    mfa_verified:Mapped[bool]=mapped_column(Boolean,nullable=False,default=False)
 
 class RevokedAccess(TenantEntity,Base):
     __tablename__='revoked_access'

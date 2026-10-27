@@ -1,0 +1,33 @@
+name: Compose safety preflight
+on:
+  push:
+  pull_request:
+jobs:
+  verify-compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate synthetic local-only environment
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import secrets
+          values = {
+              "POSTGRES_PASSWORD": secrets.token_hex(24),
+              "JWT_SECRET": secrets.token_hex(32),
+              "DATABASE_URL": "postgresql+psycopg://medtour:synthetic@db:5432/medtour",
+              "REDIS_URL": "redis://redis:6379/0",
+              "APP_ENV": "development",
+          }
+          with Path(".env").open("w") as f:
+              for key,value in values.items():
+                  f.write(f"{key}={value}\n")
+          PY
+      - name: Validate resolved Compose and development network boundaries
+        shell: bash
+        run: |
+          docker compose config --format json | python scripts/verify_compose.py
+      - name: Clean synthetic environment
+        if: always()
+        run: rm -f .env

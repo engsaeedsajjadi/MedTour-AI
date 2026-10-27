@@ -4,3 +4,19 @@
 @media(max-width:760px){.appShell{display:block}.sidebar{position:relative;width:100%;height:auto;min-height:0}.brand{padding:13px 20px}.sidebar nav{display:flex;overflow-x:auto;gap:4px;padding:9px}.navGroupLabel,.sidebarBottom{display:none}.navItem{font-size:11px;white-space:nowrap;padding:10px}.navDot{display:none}.topbar{height:55px;padding:0 16px}.loggedIn{display:none}.content{padding:22px 13px}.pageHeader{align-items:flex-start;flex-direction:column}.pageHeader h1{font-size:24px}.welcome{padding:25px 18px}.statsGrid{gap:10px}.statCard{padding:17px}.statCard strong{font-size:30px}.formGrid{grid-template-columns:1fr}.loginScreen{grid-template-columns:1fr}.loginAside{padding:30px;min-height:260px}.loginAside h1{font-size:27px}.loginLogo,.languageRow{display:none}.loginContent{padding:33px 20px}}
 
 textarea{min-height:105px;resize:vertical;padding:12px;border:1px solid #ced9e0;border-radius:9px;font:inherit;max-width:100%}select{padding:10px;border:1px solid #ced9e0;border-radius:8px} .navItem{font-size:13px} .sidebar nav{overflow-y:auto;max-height:calc(100vh - 240px)}
+
+
+/* Section 34: keyboard accessibility and responsive navigation */
+.skipLink{position:fixed;z-index:9999;top:8px;right:8px;transform:translateY(-170%);padding:12px 18px;border-radius:8px;background:#fff;color:#092132;box-shadow:0 2px 12px #0004}
+.skipLink:focus{transform:none}
+:where(a,button,input,select,textarea):focus-visible{outline:3px solid #e0a42a;outline-offset:3px}
+.navItem[aria-current="page"]{border-inline-start:3px solid #16c4ad}
+@media(max-width:760px){
+ .sidebar nav{overflow-x:auto;overflow-y:hidden;max-height:none;scrollbar-width:thin}
+ .navItem{min-height:44px}
+ .topActions .logout{min-height:44px}
+ .pageHeader .environmentFlag{white-space:normal}
+}
+@media(prefers-reduced-motion:reduce){
+ *,*::before,*::after{scroll-behavior:auto!important;transition-duration:0.01ms!important;animation-duration:0.01ms!important}
+}
