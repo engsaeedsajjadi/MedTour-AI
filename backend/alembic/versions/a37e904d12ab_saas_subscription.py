@@ -2,7 +2,7 @@
 from alembic import op
 import sqlalchemy as sa
 revision="a37e904d12ab"
-down_revision="a27e793f06b1"
+down_revision="a28f406c12de"
 branch_labels=None
 depends_on=None
 def upgrade():
