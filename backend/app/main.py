@@ -562,3 +562,31 @@ app.include_router(tenant_isolation_router)
 
 from .identity_access import router as identity_access_router
 app.include_router(identity_access_router)
+
+
+# Consolidated section 28-41 routers. Sensitive actions retain their own
+# authentication, tenancy and human-approval dependencies.
+from .identity_governance import router as identity_governance_router
+app.include_router(identity_governance_router)
+
+from .privacy_governance import router as privacy_governance_router
+app.include_router(privacy_governance_router)
+
+from .finance_reconciliation import router as finance_reconciliation_router
+app.include_router(finance_reconciliation_router)
+
+from .workflow_notifications import router as workflow_notification_router
+app.include_router(workflow_notification_router)
+
+from .reporting_analytics import router as reporting_analytics_router
+app.include_router(reporting_analytics_router)
+
+from .api_contract import router as api_contract_router, correlation_middleware
+app.include_router(api_contract_router)
+app.middleware('http')(correlation_middleware)
+
+from .saas_subscription import router as saas_subscription_router
+app.include_router(saas_subscription_router)
+
+from .operations_metrics import router as operations_metrics_router
+app.include_router(operations_metrics_router)
