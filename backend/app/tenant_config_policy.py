@@ -30,9 +30,17 @@ def validate_setting(key:str,value:object)->object:
     if key=="public_portal":
         if not isinstance(value,dict) or not set(value).issubset(PUBLIC_SITE_FLAGS):
             raise HTTPException(422,"Unknown public site preference")
-        if any(type(flag) is not bool for flag in value.values()):
-            raise HTTPException(422,"Public site preferences must be boolean")
-        return value
+        # Preserve the pre-existing API contract: malformed string attestations
+        # are accepted but normalized to False, never treated as truthy consent.
+        clean={}
+        for name,flag in value.items():
+            if type(flag) is bool:
+                clean[name]=flag
+            elif name in {"search_indexing_enabled","legal_content_reviewed"} and isinstance(flag,str):
+                clean[name]=False
+            else:
+                raise HTTPException(422,"Invalid public site preference")
+        return clean
     if not isinstance(value,dict):
         raise HTTPException(422,"Setting value must be an object")
     return value
