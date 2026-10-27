@@ -294,7 +294,9 @@ def settings(db:Session=Depends(get_db),user:User=Depends(ADMIN)):
 @router.put('/settings/{key}')
 def setting_write(key:str,body:ConfigIn,db:Session=Depends(get_db),user:User=Depends(ADMIN)):
     if key not in SETTING_KEYS:raise HTTPException(422,'Setting key is not allowed')
-    serial=json.dumps(body.value,ensure_ascii=False)
+    from .tenant_config_policy import validate_setting
+    validated=validate_setting(key,body.value)
+    serial=json.dumps(validated,ensure_ascii=False)
     if len(serial)>8000:raise HTTPException(413,'Setting too large')
     x=db.scalar(select(TenantSetting).where(TenantSetting.tenant_id==user.tenant_id,TenantSetting.key==key))
     if x:x.value_json=serial
