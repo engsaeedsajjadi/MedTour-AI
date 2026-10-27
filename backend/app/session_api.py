@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from .database import get_db
 from .security import current_user,token_for,secret
 from .models import User,Audit
-from .enterprise_models import RefreshSession,RevokedAccess,StaffTotp
+from .enterprise_models import RefreshSession,RevokedAccess,StaffTotp,StaffMFA
 
 router=APIRouter(prefix='/api/v1/auth',tags=['staff sessions'])
 
@@ -41,7 +41,9 @@ def refresh(body:RefreshIn,db:Session=Depends(get_db)):
     if not user:raise HTTPException(401,'Account disabled')
     factor=db.scalar(select(StaffTotp.id).where(StaffTotp.tenant_id==user.tenant_id,
         StaffTotp.user_id==user.id,StaffTotp.enabled.is_(True)))
-    if factor and not previous.mfa_verified:
+    legacy=db.scalar(select(StaffMFA.id).where(StaffMFA.tenant_id==user.tenant_id,
+        StaffMFA.user_id==user.id,StaffMFA.enabled.is_(True)))
+    if (factor or legacy) and not previous.mfa_verified:
         db.execute(update(RefreshSession).where(
             RefreshSession.tenant_id==user.tenant_id,
             RefreshSession.family_id==previous.family_id).values(revoked_at=datetime.now(timezone.utc)))
@@ -54,7 +56,7 @@ def refresh(body:RefreshIn,db:Session=Depends(get_db)):
         family_id=previous.family_id,expires_at=now+timedelta(days=7),
         mfa_verified=previous.mfa_verified)
     db.add(newer);db.commit()
-    return {'access_token':token_for(user),'refresh_token':raw,'token_type':'bearer','expires_in':1800}
+    return {'access_token':token_for(user,mfa_verified=bool(previous.mfa_verified)),'refresh_token':raw,'token_type':'bearer','expires_in':1800}
 
 @router.post('/logout')
 def logout(authorization:str|None=Header(None),user:User=Depends(current_user),db:Session=Depends(get_db)):
