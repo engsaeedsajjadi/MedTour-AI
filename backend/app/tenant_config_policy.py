@@ -1,26 +1,22 @@
-"""Section 38: fail-closed tenant configuration rules.
+"""Section 38: bounded, server-validated tenant configuration.
 
-The tenant settings UI may not grant access to medical/AI/payment providers,
-production safety flags, security bypasses, or privileged runtime configuration.
+Display choices are never authorization to process PHI, activate payments or
+use unapproved providers. Public-site attestations are not legal approval.
 """
 from __future__ import annotations
 from fastapi import HTTPException
 
 LOCALES={"fa","en","ar","ps","prs"}
-# Display-only flags: never consumed to authorize an API, PHI or external action.
 SAFE_FLAGS={"show_operations_summary","show_help_tips","compact_dashboard"}
+PUBLIC_SITE_FLAGS={"show_public_link","search_indexing_enabled","legal_content_reviewed"}
 
 def validate_setting(key:str,value:object)->object:
     if key=="feature_flags":
-        if not isinstance(value,dict):
-            raise HTTPException(422,"Feature flags must be an object")
-        if not set(value).issubset(SAFE_FLAGS):
+        if not isinstance(value,dict) or not set(value).issubset(SAFE_FLAGS):
             raise HTTPException(422,"Unknown or privileged feature flag")
         if any(type(enabled) is not bool for enabled in value.values()):
             raise HTTPException(422,"Feature flags must be boolean")
-        if not isinstance(value,dict):
-        raise HTTPException(422,'Setting value must be an object')
-    return value
+        return value
     if key=="enabled_languages":
         if not isinstance(value,list) or not value or len(value)>len(LOCALES):
             raise HTTPException(422,"Invalid language list")
@@ -32,9 +28,11 @@ def validate_setting(key:str,value:object)->object:
             raise HTTPException(422,"Invalid default locale")
         return value
     if key=="public_portal":
-        # This setting is informational only. It cannot override access controls.
-        allowed={"show_public_link","search_indexing_enabled","legal_content_reviewed"}
-        if not isinstance(value,dict) or not set(value).issubset(allowed) or any(type(v) is not bool for v in value.values()):
-            raise HTTPException(422,"Only reviewed public-site display/indexing preferences are configurable")
+        if not isinstance(value,dict) or not set(value).issubset(PUBLIC_SITE_FLAGS):
+            raise HTTPException(422,"Unknown public site preference")
+        if any(type(flag) is not bool for flag in value.values()):
+            raise HTTPException(422,"Public site preferences must be boolean")
         return value
+    if not isinstance(value,dict):
+        raise HTTPException(422,"Setting value must be an object")
     return value
