@@ -10,7 +10,7 @@ import sys
 def inspect(config: dict) -> list[str]:
     failures=[]
     services=config.get("services",{})
-    for required in ("db","redis","api","web"):
+    for required in ("db","redis","migrate","api","web"):
         if required not in services:
             failures.append(f"missing_service:{required}")
     for name in ("db","api","web"):
@@ -24,6 +24,11 @@ def inspect(config: dict) -> list[str]:
     if worker and "messaging" not in worker.get("profiles",[]):
         failures.append("worker_missing_opt_in_profile")
     api=services.get("api",{})
+    migration=services.get("migrate",{})
+    if not migration or "alembic" not in str(migration.get("command",[])):
+        failures.append("missing_one_shot_migration")
+    if api.get("depends_on",{}).get("migrate",{}).get("condition")!="service_completed_successfully":
+        failures.append("api_not_gated_on_migration")
     if "python -m alembic upgrade head" in " ".join(api.get("command",[]) if isinstance(api.get("command"),list) else [str(api.get("command",""))]):
         failures.append("migrations_run_in_api_startup_manual_release_gate")
     db=services.get("db",{})
