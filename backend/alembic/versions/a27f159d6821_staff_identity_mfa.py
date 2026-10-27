@@ -6,7 +6,7 @@ are migrated into user-visible artifacts.
 from alembic import op
 import sqlalchemy as sa
 revision="a27f159d6821"
-down_revision="a26d528e91c4"
+down_revision="a27e793f06b1"
 branch_labels=None
 depends_on=None
 
