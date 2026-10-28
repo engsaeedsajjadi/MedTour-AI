@@ -183,3 +183,64 @@ def test_standalone_public_entrypoint_only_exposes_telegram_route(setup):
     assert paths == {("/api/v1/webhooks/telegram", ("POST",))}
     for path in ("/docs", "/openapi.json", "/api/v1/patients", "/api/v1/auth/login"):
         assert public_client.get(path).status_code == 404
+
+
+# Telegram menu / human handoff regression tests, synthetic only.
+@pytest.mark.parametrize('command,expected', [
+    ('/help', 'Commands:'),
+    ('/privacy', 'medical records'),
+    ('/language', 'Available languages'),
+    ('/language fa', 'پاسپورت'),
+    ('/lang prs', 'اسناد طبی'),
+    ('/operator', 'human operator'),
+    ('/stop', 'not created a patient record'),
+])
+def test_public_menu_commands_do_not_store_or_echo_content(setup, command, expected):
+    client, owned, out = setup
+    response = post(client, update(text=command))
+    assert response.status_code == 200, response.text
+    assert response.json() == {'ok': True, 'sent_generic_notice': True}
+    assert len(out) == 1 and expected in out[0][1]
+    assert 'patient_id' not in out[0][1]
+
+
+def test_operator_contact_is_optional_and_url_is_public_only(setup, monkeypatch):
+    client, _, out = setup
+    monkeypatch.setenv('PUBLIC_OPERATOR_CONTACT_URL', 'https://example.invalid/contact')
+    assert post(client, update(text='/operator')).status_code == 200
+    assert 'https://example.invalid/contact' in out[-1][1]
+    assert 'private' in out[-1][1]
+    assert telegram.settings().operator_contact_url == 'https://example.invalid/contact'
+
+
+@pytest.mark.parametrize('unsafe_url', [
+    'http://example.invalid/contact',
+    'https://user:secret@example.invalid/',
+    'https://example.invalid/contact?patient=abc',
+    'https://example.invalid/#private',
+    'https://localhost/contact',
+    'https://example.invalid:8080/contact',
+])
+def test_unsafe_operator_contact_prevents_enabling_bot(setup, monkeypatch, unsafe_url):
+    client, _, out = setup
+    monkeypatch.setenv('PUBLIC_OPERATOR_CONTACT_URL', unsafe_url)
+    assert post(client, update(text='/operator')).status_code == 503
+    assert not out
+
+
+def test_unknown_commands_ignored_and_free_text_not_echoed(setup):
+    client, _, out = setup
+    assert post(client, update(text='/unrecognized')).json() == {'ok': True, 'ignored': True}
+    assert not out
+    sensitive = 'Synthetic medical details 4242 not to be repeated'
+    assert post(client, update(update_id=2, text=sensitive)).status_code == 200
+    assert len(out) == 1
+    assert sensitive not in out[0][1]
+
+
+def test_language_help_never_promises_consented_clinical_service(setup):
+    client, _, out = setup
+    assert post(client, update(text='/language xx')).status_code == 200
+    assert 'Available languages' in out[-1][1]
+    assert post(client, update(text='/help', update_id=2, lang='ar')).status_code == 200
+    assert 'الأوامر' in out[-1][1]
