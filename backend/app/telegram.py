@@ -192,8 +192,10 @@ def _safe_reply(update: dict, operator_contact_url: str | None = None) -> tuple[
             language = candidate
         else:
             return chat_id, _LANGUAGE_GUIDE + "\n\n" + _NOTICE[language]
-    if command in ("/language", "/lang") and len(words) == 1:
-        return chat_id, _LANGUAGE_GUIDE + "\n\n" + _NOTICE[language]
+    if command in ("/language", "/lang"):
+        if len(words) == 1:
+            return chat_id, _LANGUAGE_GUIDE + "\n\n" + _NOTICE[language]
+        return chat_id, _NOTICE[language] + "\n\n" + _HELP[language]
     if command in _INFORMATION[language]:
         return chat_id, _INFORMATION[language][command] + "\n\n" + _NOTICE[language]
     if command == "/operator":
