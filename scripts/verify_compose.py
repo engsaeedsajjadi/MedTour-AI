@@ -13,7 +13,7 @@ def inspect(config: dict) -> list[str]:
     for required in ("db","redis","migrate","api","web"):
         if required not in services:
             failures.append(f"missing_service:{required}")
-    for name in ("db","api","web"):
+    for name in ("db","api","web","telegram-gateway"):
         service=services.get(name,{})
         for port in service.get("ports",[]):
             if isinstance(port,str):
@@ -23,6 +23,19 @@ def inspect(config: dict) -> list[str]:
     worker=services.get("outbound-worker",{})
     if worker and "messaging" not in worker.get("profiles",[]):
         failures.append("worker_missing_opt_in_profile")
+    telegram=services.get("telegram-gateway")
+    if telegram is not None:
+        if "telegram" not in telegram.get("profiles",[]):
+            failures.append("telegram_gateway_not_opt_in")
+        cmd=str(telegram.get("command",[]))
+        if "app.telegram_entrypoint:app" not in cmd or "app.main:app" in cmd:
+            failures.append("telegram_gateway_not_isolated")
+        if not telegram.get("read_only",False):
+            failures.append("telegram_gateway_writable_fs")
+        env=telegram.get("environment",{})
+        keys=set(env) if isinstance(env,(dict,list)) else set()
+        if {"DATABASE_URL","POSTGRES_PASSWORD","JWT_SECRET"} & keys:
+            failures.append("telegram_gateway_receives_backend_credentials")
     api=services.get("api",{})
     migration=services.get("migrate",{})
     if not migration or "alembic" not in str(migration.get("command",[])):

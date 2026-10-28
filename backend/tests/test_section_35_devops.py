@@ -34,3 +34,25 @@ def test_worker_requires_opt_in():
     data=sample()
     data["services"]["outbound-worker"]["profiles"]=[]
     assert "worker_missing_opt_in_profile" in inspect(data)
+
+
+def test_optional_telegram_gateway_must_be_isolated_and_opt_in():
+    data=sample()
+    data["services"]["telegram-gateway"]={
+        "profiles":["telegram"],
+        "command":["uvicorn","app.telegram_entrypoint:app","--host","0.0.0.0"],
+        "read_only":True,
+        "environment":{"TELEGRAM_BOT_ENABLED":"false","REDIS_URL":"redis://redis:6379/0"},
+        "ports":[{"published":"8001","host_ip":"127.0.0.1"}],
+    }
+    assert inspect(data)==[]
+    data["services"]["telegram-gateway"]["ports"][0]["host_ip"]="0.0.0.0"
+    assert "public_host_port:telegram-gateway" in inspect(data)
+    data["services"]["telegram-gateway"]["ports"][0]["host_ip"]="127.0.0.1"
+    data["services"]["telegram-gateway"]["environment"]["DATABASE_URL"]="postgresql://unsafe"
+    assert "telegram_gateway_receives_backend_credentials" in inspect(data)
+    del data["services"]["telegram-gateway"]["environment"]["DATABASE_URL"]
+    data["services"]["telegram-gateway"]["command"]=["uvicorn","app.main:app"]
+    assert "telegram_gateway_not_isolated" in inspect(data)
+    data["services"]["telegram-gateway"]["profiles"]=[]
+    assert "telegram_gateway_not_opt_in" in inspect(data)
