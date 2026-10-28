@@ -56,3 +56,29 @@ def test_optional_telegram_gateway_must_be_isolated_and_opt_in():
     assert "telegram_gateway_not_isolated" in inspect(data)
     data["services"]["telegram-gateway"]["profiles"]=[]
     assert "telegram_gateway_not_opt_in" in inspect(data)
+
+
+def test_optional_local_poller_is_opt_in_and_isolated():
+    data=sample()
+    data["services"]["telegram-poller"]={
+        "profiles":["telegram-polling"],
+        "command":["python","-m","app.telegram_poller"],
+        "read_only":True,
+        "environment":{"TELEGRAM_POLLING_ENABLED":"false","REDIS_URL":"redis://redis:6379/0"},
+    }
+    assert inspect(data)==[]
+    service=data["services"]["telegram-poller"]
+    service["profiles"]=[]
+    assert "telegram_poller_not_opt_in" in inspect(data)
+    service["profiles"]=["telegram-polling"]
+    service["environment"]["JWT_SECRET"]="unsafe"
+    assert "telegram_poller_receives_backend_credentials" in inspect(data)
+    del service["environment"]["JWT_SECRET"]
+    service["ports"]=[{"published":"8005","host_ip":"127.0.0.1"}]
+    assert "telegram_poller_exposes_port" in inspect(data)
+    del service["ports"]
+    service["read_only"]=False
+    assert "telegram_poller_writable_fs" in inspect(data)
+    service["read_only"]=True
+    service["command"]=["uvicorn","app.main:app"]
+    assert "telegram_poller_wrong_entrypoint" in inspect(data)
