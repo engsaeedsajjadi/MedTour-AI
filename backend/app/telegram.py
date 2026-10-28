@@ -246,7 +246,7 @@ async def _finish(redis_url: str, key: str, owner: str, *, sent: bool) -> None:
 async def _send_message(token: str, chat_id: int, reply: str, privacy_url: str) -> None:
     payload = {
         "chat_id": chat_id,
-        "text": reply + "\n\nPrivacy notice: " + privacy_url,
+        "text": reply + ("\n\nPrivacy notice: " + privacy_url if privacy_url else ""),
         "disable_web_page_preview": True,
         "protect_content": True,
     }
