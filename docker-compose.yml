@@ -73,6 +73,27 @@ services:
       timeout: 5s
       start_period: 15s
       retries: 3
+  telegram-gateway:
+    profiles: ["telegram"]
+    build: ./backend
+    command: ["uvicorn", "app.telegram_entrypoint:app", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      TELEGRAM_BOT_ENABLED: ${TELEGRAM_BOT_ENABLED:-false}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
+      PUBLIC_PRIVACY_NOTICE_URL: ${PUBLIC_PRIVACY_NOTICE_URL:-}
+      PUBLIC_OPERATOR_CONTACT_URL: ${PUBLIC_OPERATOR_CONTACT_URL:-}
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "127.0.0.1:8001:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
   web:
     build: ./frontend
     environment:
