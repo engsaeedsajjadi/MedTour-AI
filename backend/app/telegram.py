@@ -56,6 +56,20 @@ class TelegramSettings:
     webhook_secret: str
     privacy_url: str
     redis_url: str
+    operator_contact_url: str | None = None
+
+
+def _public_https_url(value: str) -> bool:
+    if not value or len(value) > 512 or any(ord(ch) < 32 for ch in value):
+        return False
+    try:
+        parsed = urlsplit(value)
+        return (parsed.scheme == 'https' and bool(parsed.hostname)
+            and parsed.username is None and parsed.password is None
+            and parsed.port in (None, 443) and not parsed.query and not parsed.fragment
+            and parsed.hostname.lower() not in ('localhost', '127.0.0.1', '::1'))
+    except ValueError:
+        return False
 
 
 def settings() -> TelegramSettings | None:
@@ -65,18 +79,16 @@ def settings() -> TelegramSettings | None:
     secret = os.getenv("TELEGRAM_WEBHOOK_SECRET", "")
     privacy_url = os.getenv("PUBLIC_PRIVACY_NOTICE_URL", "")
     redis_url = os.getenv("REDIS_URL", "")
-    parsed = urlsplit(privacy_url)
+    operator_contact_url = os.getenv("PUBLIC_OPERATOR_CONTACT_URL", "")
     if (
         not _BOT_TOKEN.fullmatch(token)
         or not _SECRET.fullmatch(secret)
-        or parsed.scheme != "https"
-        or not parsed.netloc
-        or parsed.username is not None
-        or parsed.password is not None
+        or not _public_https_url(privacy_url)
+        or (operator_contact_url and not _public_https_url(operator_contact_url))
         or not redis_url.startswith(("redis://", "rediss://"))
     ):
         return None
-    return TelegramSettings(token, secret, privacy_url, redis_url)
+    return TelegramSettings(token, secret, privacy_url, redis_url, operator_contact_url or None)
 
 
 def enabled() -> bool:
@@ -94,8 +106,39 @@ def _language(message: dict) -> str:
     return base if base in _LANGS else "en"
 
 
-def _safe_reply(update: dict) -> tuple[int, str] | None:
-    """Return only (private chat id, generic notice); never inspect patient details."""
+_HELP = {
+    "fa": "دستورات: /start شروع، /language انتخاب زبان، /privacy حریم خصوصی، /operator ارتباط با اپراتور، /stop توقف راهنمایی.",
+    "ar": "الأوامر: /start بداية، /language اللغة، /privacy الخصوصية، /operator التواصل مع الموظف، /stop إيقاف الإرشادات.",
+    "en": "Commands: /start welcome, /language language choices, /privacy privacy, /operator human support, /stop stop guidance.",
+    "ps": "لارښوونې: /start پیل، /language ژبه، /privacy محرمیت، /operator کارکوونکی، /stop پای.",
+    "prs": "دستورها: /start آغاز، /language انتخاب زبان، /privacy حریم خصوصی، /operator کارمند، /stop پایان.",
+}
+
+_OPERATOR = {
+    "fa": "برای ارتباط با اپراتور انسانی و دریافت دعوت‌نامه خصوصی پرتال امن، از مسیر رسمی زیر استفاده کنید. اطلاعات پزشکی را اینجا ننویسید.",
+    "ar": "للتواصل مع موظف والحصول على دعوة خاصة للبوابة الآمنة، استخدم قناة التواصل الرسمية أدناه. لا ترسل بيانات طبية هنا.",
+    "en": "To contact a human operator and request a private secure-portal invitation, use the official contact channel below. Do not send medical information in Telegram.",
+    "ps": "له کارکوونکي سره د اړیکې او خوندي پورټل د بلنې لپاره لاندې رسمي لاره وکاروئ. طبي معلومات په ټېلېګرام کې مه لېږئ.",
+    "prs": "برای تماس با کارمند و دریافت دعوت‌نامه خصوصی پورتال مصون از راه رسمی زیر استفاده کنید. معلومات طبی را در تلگرام نفرستید.",
+}
+
+_STOP = {
+    "fa": "این ربات هیچ پرونده یا ثبت‌نامی از طریق تلگرام ایجاد نکرده است. برای راهنمایی دوباره /start را بفرستید.",
+    "ar": "لم ينشئ هذا الروبوت أي ملف طبي أو تسجيل عبر تيليجرام. أرسل /start للبدء مجددًا.",
+    "en": "This bot has not created a patient record or Telegram registration. Send /start to see general guidance again.",
+    "ps": "دې روباټ ستاسو طبي دوسیه یا ثبت‌نام نه دی جوړ کړی. د بیا پیل لپاره /start ولېږئ.",
+    "prs": "این ربات هیچ دوسیه طبی یا ثبت‌نامی از طریق تلگرام نساخته است. برای آغاز دوباره /start را بفرستید.",
+}
+
+_LANGUAGE_GUIDE = (
+    "Available languages / زبان‌ها / اللغات: "
+    "fa (فارسی), ar (العربية), en (English), ps (پښتو), prs (دری). "
+    "Use /language fa, /language ar, /language en, /language ps or /language prs."
+)
+
+
+def _safe_reply(update: dict, operator_contact_url: str | None = None) -> tuple[int, str] | None:
+    """Read command metadata only; never extract, record or echo patient content."""
     message = update.get("message")
     if not isinstance(message, dict):
         return None
@@ -108,21 +151,34 @@ def _safe_reply(update: dict) -> tuple[int, str] | None:
         or chat_id <= 0 or type(sender.get("id")) is not int
         or sender["id"] != chat_id or sender.get("is_bot") is True):
         return None
-
     language = _language(message)
-    text = message.get("text")
-    if isinstance(text, str) and len(text) <= 128 and text.startswith("/"):
-        words = text.split(maxsplit=1)
-        command = words[0].split("@", 1)[0].lower()
-        if command in {"/start", "/language", "/lang"} and len(words) > 1:
-            candidate = words[1].strip().lower()
-            if candidate in _LANGS:
-                language = candidate
-        elif command not in {"/start", "/language", "/lang", "/help", "/privacy"}:
-            return None
-    # Medical/free-form input is discarded; same generic warning only.
-    return chat_id, _NOTICE[language]
-
+    user_text = message.get("text")
+    if not isinstance(user_text, str) or not user_text.startswith("/") or len(user_text) > 128:
+        return chat_id, _NOTICE[language]
+    words = user_text.split(maxsplit=1)
+    command = words[0].split("@", 1)[0].lower()
+    if command in ("/start", "/language", "/lang") and len(words) > 1:
+        candidate = words[1].strip().lower()
+        if candidate in _LANGS:
+            language = candidate
+        else:
+            return chat_id, _LANGUAGE_GUIDE + "\n\n" + _NOTICE[language]
+    if command in ("/language", "/lang") and len(words) == 1:
+        return chat_id, _LANGUAGE_GUIDE + "\n\n" + _NOTICE[language]
+    if command == "/operator":
+        message_text = _OPERATOR[language]
+        if operator_contact_url:
+            message_text += "\n\n" + operator_contact_url
+        else:
+            message_text += "\n\n" + _NOTICE[language]
+        return chat_id, message_text
+    if command == "/stop":
+        return chat_id, _STOP[language]
+    if command == "/help":
+        return chat_id, _HELP[language] + "\n\n" + _NOTICE[language]
+    if command in ("/start", "/privacy"):
+        return chat_id, _NOTICE[language] + "\n\n" + _HELP[language]
+    return None
 
 def _dedup_key(update_id: int, key: str) -> str:
     digest = hmac.new(key.encode("ascii"), str(update_id).encode("ascii"), hashlib.sha256).hexdigest()
@@ -195,7 +251,7 @@ async def telegram_webhook(request: Request):
     if not 0 <= update_id <= 2**63 - 1:
         raise HTTPException(422, "Invalid update identifier")
 
-    reply = _safe_reply(update)
+    reply = _safe_reply(update, config.operator_contact_url)
     if reply is None:
         return {"ok": True, "ignored": True}
     key = _dedup_key(update_id, config.webhook_secret)
