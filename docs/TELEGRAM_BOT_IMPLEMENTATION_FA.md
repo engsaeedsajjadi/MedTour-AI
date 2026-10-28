@@ -43,3 +43,42 @@ docker compose --profile telegram up -d --build telegram-gateway
 - پاسخ‌های چندزبانه نیازمند بازبینی انسانی ترجمه هستند.
 - تست GitHub Actions جای آزمون BotFather/HTTPS/Redis واقعی و شرایط ارائه‌دهنده را نمی‌گیرد.
 - تست واقعی شبکه در مرحله بعد و فقط با داده مصنوعی و راهبری کارفرما انجام می‌شود.
+
+
+## اجرای مداوم محلی با Polling — فقط محیط توسعه و یک گفت‌وگوی مجاز
+
+یک سرویس مستقل `telegram-poller` در profile `telegram-polling` وجود دارد. این سرویس:
+- نیازمند `APP_ENV=development`، `TELEGRAM_POLLING_ENABLED=true` و `TELEGRAM_POLLING_TEST_MODE=true` است.
+- فقط به شناسه یک گفت‌وگوی خصوصی که با چالش تصادفی تأیید شده پاسخ می‌دهد؛ پیام‌های سایر کاربران را پاسخ نمی‌دهد.
+- برای پیام‌های عادی مانند «سلام» **فقط هشدار عمومی امن** می‌فرستد؛ ChatGPT، تشخیص، پرونده، رزرو یا سامانه پزشکی به آن وصل نیست.
+- به PostgreSQL یا اعتبارنامه‌های هسته دسترسی ندارد و هیچ پورتی روی میزبان باز نمی‌کند.
+- از Redis برای حفظ offset، جلوگیری از تکرار پیام و قفل یک دریافت‌کننده استفاده می‌کند.
+- بدون URL سیاست حریم خصوصی معتبر، فقط در حالت **development/test** پیام هشدار درون‌ساخت ارسال می‌کند و **هیچ URL ساختگی** اضافه نمی‌کند.
+
+۱. داخل ویندوز با **PowerShell** و بدون ارسال توکن در گفتگو، اسکریپت زیر را اجرا کنید:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "D:\Downloads\MedTour-AI-Integrated-1-to-45\scripts\setup-telegram-local-polling.ps1"
+```
+
+۲. اسکریپت BotFather Token را به‌صورت مخفی می‌گیرد و فقط پس از دریافت یک چالش جدید در گفت‌وگوی خصوصی، شناسه همان گفت‌وگو را در فایل `.env` محلی و خارج از Git ثبت می‌کند. **این کار توکن را به شکل متن در فایل `.env` و متغیرهای محیط Docker ذخیره می‌کند**؛ برای استفاده تجاری باید ابتدا توکن افشاشده را در BotFather تعویض کنید و مدیریت اسرار استقرار را تکمیل کنید.
+
+۳. اجرای سرویس مستقل:
+
+```powershell
+docker compose --profile telegram-polling up -d --build telegram-poller
+```
+
+۴. مشاهده وضعیت بدون نمایش توکن:
+
+```powershell
+docker compose --profile telegram-polling ps telegram-poller
+```
+
+۵. توقف:
+
+```powershell
+docker compose --profile telegram-polling stop telegram-poller
+```
+
+مهم: `getUpdates` و Webhook روی یک ربات نباید هم‌زمان فعال شوند؛ اگر Webhook موجود باشد، Poller شروع نمی‌شود. بیش از یک دریافت‌کننده Polling اجرا نکنید. به‌روزرسانی‌ها و پیام‌ها را برای استفاده عمومی باز نکنید. این قابلیت فقط راهنمای آزمایشی است و به معنی آمادگی تولید بالینی یا راه‌اندازی پایدار عمومی نیست.
