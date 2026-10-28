@@ -107,11 +107,11 @@ def _language(message: dict) -> str:
 
 
 _HELP = {
-    "fa": "دستورات: /start شروع، /language انتخاب زبان، /privacy حریم خصوصی، /operator ارتباط با اپراتور، /stop توقف راهنمایی.",
-    "ar": "الأوامر: /start بداية، /language اللغة، /privacy الخصوصية، /operator التواصل مع الموظف، /stop إيقاف الإرشادات.",
-    "en": "Commands: /start welcome, /language language choices, /privacy privacy, /operator human support, /stop stop guidance.",
-    "ps": "لارښوونې: /start پیل، /language ژبه، /privacy محرمیت، /operator کارکوونکی، /stop پای.",
-    "prs": "دستورها: /start آغاز، /language انتخاب زبان، /privacy حریم خصوصی، /operator کارمند، /stop پایان.",
+    "fa": "دستورات: /start شروع، /language انتخاب زبان، /privacy حریم خصوصی، /services خدمات، /process مراحل، /emergency اورژانس، /operator ارتباط با اپراتور، /stop توقف راهنمایی.",
+    "ar": "الأوامر: /start بداية، /language اللغة، /privacy الخصوصية، /services الخدمات، /process الخطوات، /emergency الطوارئ، /operator التواصل مع الموظف، /stop إيقاف الإرشادات.",
+    "en": "Commands: /start welcome, /language language choices, /privacy privacy, /services services, /process steps, /emergency emergency, /operator human support, /stop stop guidance.",
+    "ps": "لارښوونې: /start پیل، /language ژبه، /privacy محرمیت، /services خدمتونه، /process ګامونه، /emergency بیړنۍ مرستې، /operator کارکوونکی، /stop پای.",
+    "prs": "دستورها: /start آغاز، /language انتخاب زبان، /privacy حریم خصوصی، /services خدمات، /process مراحل، /emergency عاجل، /operator کارمند، /stop پایان.",
 }
 
 _OPERATOR = {
@@ -135,6 +135,35 @@ _LANGUAGE_GUIDE = (
     "fa (فارسی), ar (العربية), en (English), ps (پښتو), prs (دری). "
     "Use /language fa, /language ar, /language en, /language ps or /language prs."
 )
+
+
+_INFORMATION = {
+    "fa": {
+        "/services": "خدمات معرفی‌شده صرفاً هماهنگی انسانی پزشک و بیمارستان، نوبت، ویزا، اقامت و ترانسفر است. هیچ رزرو یا درمانی بدون تأیید رسمی انجام نمی‌شود.",
+        "/process": "مراحل: ۱) دریافت دعوت‌نامه خصوصی پرتال از اپراتور ۲) ثبت رضایت و مدارک فقط در پرتال امن ۳) بازبینی توسط مسئول انسانی ۴) هماهنگی خدمات پس از تأیید رسمی.",
+        "/emergency": "این ربات اورژانس نیست. در وضعیت فوری با خدمات اورژانس محلی تماس بگیرید.",
+    },
+    "ar": {
+        "/services": "الخدمات هي التنسيق البشري مع الأطباء والمستشفيات والمواعيد والتأشيرة والإقامة والنقل؛ لا يوجد حجز أو علاج مؤكد دون التحقق الرسمي.",
+        "/process": "الخطوات: ١) طلب دعوة خاصة للبوابة من الموظف ٢) إرسال الموافقة والوثائق عبر البوابة الآمنة فقط ٣) المراجعة البشرية ٤) تنسيق الخدمات بعد التأكيد الرسمي.",
+        "/emergency": "هذا الروبوت ليس خدمة طوارئ. اتصل بخدمات الطوارئ المحلية عند الضرورة.",
+    },
+    "en": {
+        "/services": "Staff may coordinate physician and hospital inquiries, appointments, visas, accommodation and transport. No treatment or booking is confirmed without independent verification.",
+        "/process": "Steps: 1) Request a private portal invitation from staff. 2) Submit consent and documents only in the secure portal. 3) Receive human review. 4) Arrange services after official confirmation.",
+        "/emergency": "This bot is not an emergency service. Contact local emergency services for urgent help.",
+    },
+    "ps": {
+        "/services": "کارکوونکي د ډاکټرانو، روغتونونو، وختونو، ویزې، استوګنې او ترانسپورت همغږي کولای شي. هېڅ خدمت له رسمي تایید پرته نه تضمینېږي.",
+        "/process": "ګامونه: ۱) له کارکوونکي د خصوصي پورټل بلنه وغواړئ ۲) رضايت او اسناد یوازې خوندي پورټل کې وسپارئ ۳) انساني ارزونه ۴) له رسمي تایید وروسته همغږي.",
+        "/emergency": "دا روباټ بیړنۍ مرستې نه وړاندې کوي. له سیمه‌ییزو بیړنیو خدمتونو سره اړیکه ونیسئ.",
+    },
+    "prs": {
+        "/services": "کارمندان می‌توانند هماهنگی پزشک، شفاخانه، وقت ملاقات، ویزه، اقامت و ترانسپورت را انجام دهند. هیچ خدمت بدون تأیید رسمی تضمین نیست.",
+        "/process": "مراحل: ۱) از کارمند دعوت‌نامه خصوصی پورتال بخواهید ۲) رضایت و اسناد را فقط در پورتال مصون ثبت کنید ۳) بازبینی انسانی ۴) هماهنگی پس از تأیید رسمی.",
+        "/emergency": "این ربات خدمات عاجل نیست. در حالت اضطرار با خدمات عاجل محلی تماس بگیرید.",
+    },
+}
 
 
 def _safe_reply(update: dict, operator_contact_url: str | None = None) -> tuple[int, str] | None:
@@ -165,6 +194,8 @@ def _safe_reply(update: dict, operator_contact_url: str | None = None) -> tuple[
             return chat_id, _LANGUAGE_GUIDE + "\n\n" + _NOTICE[language]
     if command in ("/language", "/lang") and len(words) == 1:
         return chat_id, _LANGUAGE_GUIDE + "\n\n" + _NOTICE[language]
+    if command in _INFORMATION[language]:
+        return chat_id, _INFORMATION[language][command] + "\n\n" + _NOTICE[language]
     if command == "/operator":
         message_text = _OPERATOR[language]
         if operator_contact_url:
@@ -236,9 +267,15 @@ async def telegram_webhook(request: Request):
     presented = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
     if not isinstance(presented, str) or not hmac.compare_digest(presented, config.webhook_secret):
         raise HTTPException(403, "Invalid webhook authentication")
-    raw = await request.body()
-    if len(raw) > _UPDATE_LIMIT:
-        raise HTTPException(413, "Telegram update exceeds allowed size")
+    # Stream with a hard byte limit: do not buffer arbitrary Telegram payloads.
+    chunks = []
+    size = 0
+    async for chunk in request.stream():
+        size += len(chunk)
+        if size > _UPDATE_LIMIT:
+            raise HTTPException(413, "Telegram update exceeds allowed size")
+        chunks.append(chunk)
+    raw = b"".join(chunks)
     if request.headers.get("content-type", "").split(";", 1)[0].strip().lower() != "application/json":
         raise HTTPException(415, "JSON required")
     try:
