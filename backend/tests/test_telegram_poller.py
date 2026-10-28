@@ -263,3 +263,102 @@ def test_language_preference_uses_hmac_scoped_to_allowlisted_chat(monkeypatch):
     assert str(cfg.chat_id) not in telegram_poller._locale_key(cfg)
     assert cfg.secret not in telegram_poller._locale_key(cfg)
     assert cfg.token not in telegram_poller._locale_key(cfg)
+
+
+def test_safe_error_codes_never_expose_telegram_token():
+    token = "123456789:" + "X" * 40
+    request = httpx.Request("POST", "https://api.telegram.org/bot" + token + "/getUpdates")
+    for error, expected in (
+        (httpx.ConnectTimeout("sensitive " + token, request=request), "telegram_connect_timeout"),
+        (httpx.ReadTimeout("sensitive " + token, request=request), "telegram_read_timeout"),
+        (httpx.ConnectError("sensitive " + token, request=request), "telegram_connect_error"),
+    ):
+        code = telegram_poller._safe_failure_code(error)
+        assert code == expected and token not in code
+    for status, expected, fatal in (
+        (429, "telegram_rate_limited", False),
+        (500, "telegram_server_error", False),
+        (401, "telegram_authorization_failed", True),
+        (409, "telegram_conflicting_receiver", True),
+    ):
+        response = httpx.Response(status, request=request)
+        error = httpx.HTTPStatusError("sensitive " + token, request=request, response=response)
+        assert telegram_poller._safe_failure_code(error) == expected
+        assert telegram_poller._fatal_telegram_error(error) is fatal
+
+
+def test_bounded_exponential_backoff():
+    assert telegram_poller._backoff_seconds(1, jitter=0) == 2.0
+    assert telegram_poller._backoff_seconds(2, jitter=0) == 4.0
+    assert telegram_poller._backoff_seconds(3, jitter=0.5) == 8.5
+    assert telegram_poller._backoff_seconds(100, jitter=1) == 20.0
+
+
+def test_local_poller_recovers_after_connect_timeout(monkeypatch, capsys):
+    import pytest
+
+    _env(monkeypatch)
+    requests = []
+
+    class WorkerRedis:
+        async def ping(self): return True
+        async def set(self, *args, **kwargs): return True
+        async def get(self, *args): return None
+        async def eval(self, script, *args): return 1
+        async def aclose(self): pass
+
+    class FlakyClient:
+        def __init__(self, **kwargs): pass
+        async def __aenter__(self): return self
+        async def __aexit__(self, *args): pass
+        async def post(self, url, json):
+            requests.append(url)
+            if len(requests) == 1:
+                raise httpx.ConnectTimeout("secret test", request=httpx.Request("POST", url))
+            return httpx.Response(
+                200, request=httpx.Request("POST", url),
+                json={"ok": True, "result": {"url": ""}}
+            )
+
+    async def cancel_after_recovery(*args):
+        raise asyncio.CancelledError()
+
+    async def no_sleep(*args):
+        return None
+
+    monkeypatch.setattr(telegram_poller.Redis, "from_url", lambda *args, **kwargs: WorkerRedis())
+    monkeypatch.setattr(telegram_poller.httpx, "AsyncClient", FlakyClient)
+    monkeypatch.setattr(telegram_poller, "poll_batch", cancel_after_recovery)
+    monkeypatch.setattr(telegram_poller.asyncio, "sleep", no_sleep)
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(telegram_poller.run())
+    log = capsys.readouterr().out
+    assert "WARN: telegram_connect_timeout; retry with backoff" in log
+    assert "PASS: local Telegram development poller started" in log
+    assert "123456789:" not in log
+    assert len(requests) == 2
+
+
+def test_local_poller_exits_on_invalid_bot_credentials(monkeypatch, capsys):
+    _env(monkeypatch)
+
+    class WorkerRedis:
+        async def ping(self): return True
+        async def set(self, *args, **kwargs): return True
+        async def get(self, *args): return None
+        async def eval(self, script, *args): return 1
+        async def aclose(self): pass
+
+    class DeniedClient:
+        def __init__(self, **kwargs): pass
+        async def __aenter__(self): return self
+        async def __aexit__(self, *args): pass
+        async def post(self, url, json):
+            return httpx.Response(401, request=httpx.Request("POST", url))
+
+    monkeypatch.setattr(telegram_poller.Redis, "from_url", lambda *args, **kwargs: WorkerRedis())
+    monkeypatch.setattr(telegram_poller.httpx, "AsyncClient", DeniedClient)
+    assert asyncio.run(telegram_poller.run()) == 2
+    output = capsys.readouterr().out
+    assert "FAIL: telegram_authorization_failed; polling stopped" in output
+    assert "123456789:" not in output
