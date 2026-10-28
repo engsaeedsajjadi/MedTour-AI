@@ -36,6 +36,20 @@ def inspect(config: dict) -> list[str]:
         keys=set(env) if isinstance(env,(dict,list)) else set()
         if {"DATABASE_URL","POSTGRES_PASSWORD","JWT_SECRET"} & keys:
             failures.append("telegram_gateway_receives_backend_credentials")
+    poller=services.get("telegram-poller")
+    if poller is not None:
+        if "telegram-polling" not in poller.get("profiles",[]):
+            failures.append("telegram_poller_not_opt_in")
+        if "app.telegram_poller" not in str(poller.get("command",[])):
+            failures.append("telegram_poller_wrong_entrypoint")
+        if not poller.get("read_only",False):
+            failures.append("telegram_poller_writable_fs")
+        if poller.get("ports",[]):
+            failures.append("telegram_poller_exposes_port")
+        poller_env=poller.get("environment",{})
+        poller_keys=set(poller_env) if isinstance(poller_env,(dict,list)) else set()
+        if {"DATABASE_URL","POSTGRES_PASSWORD","JWT_SECRET"} & poller_keys:
+            failures.append("telegram_poller_receives_backend_credentials")
     api=services.get("api",{})
     migration=services.get("migrate",{})
     if not migration or "alembic" not in str(migration.get("command",[])):
