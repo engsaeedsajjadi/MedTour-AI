@@ -94,6 +94,29 @@ services:
     cap_drop: ["ALL"]
     security_opt: ["no-new-privileges:true"]
     restart: unless-stopped
+  telegram-poller:
+    # DEVELOPMENT / ALLOWLISTED TEST ONLY; does not expose a port or clinical APIs.
+    profiles: ["telegram-polling"]
+    build: ./backend
+    command: ["python", "-m", "app.telegram_poller"]
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      TELEGRAM_POLLING_ENABLED: ${TELEGRAM_POLLING_ENABLED:-false}
+      TELEGRAM_POLLING_TEST_MODE: ${TELEGRAM_POLLING_TEST_MODE:-false}
+      TELEGRAM_POLLING_CHAT_ID: ${TELEGRAM_POLLING_CHAT_ID:-}
+      TELEGRAM_BOT_ENABLED: ${TELEGRAM_BOT_ENABLED:-false}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
+      PUBLIC_PRIVACY_NOTICE_URL: ${PUBLIC_PRIVACY_NOTICE_URL:-}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
   web:
     build: ./frontend
     environment:
