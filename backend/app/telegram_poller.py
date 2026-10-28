@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import hmac
 import os
 import secrets
 from dataclasses import dataclass
@@ -62,6 +63,62 @@ def _redacted_key(token: str, kind: str) -> str:
     return "medtour:telegram:dev-poller:" + kind + ":" + hashlib.sha256(token.encode("ascii")).hexdigest()
 
 
+
+
+_LOCALE_TTL_SECONDS = 30 * 24 * 60 * 60
+
+
+def _locale_key(cfg: PollingConfig) -> str:
+    """Redis key has no raw chat id or token; preference is only a language code."""
+    digest = hmac.new(cfg.secret.encode("ascii"), str(cfg.chat_id).encode("ascii"), hashlib.sha256).hexdigest()
+    return "medtour:telegram:dev-poller:locale:" + digest
+
+
+def _requested_locale(update: dict) -> str | None:
+    """Only explicitly supported Telegram commands can change a chosen language."""
+    message = update.get("message")
+    if not isinstance(message, dict):
+        return None
+    raw = message.get("text")
+    if not isinstance(raw, str) or len(raw) > 128:
+        return None
+    parts = raw.split(maxsplit=1)
+    if len(parts) != 2 or parts[0].split("@", 1)[0].lower() not in ("/start", "/language", "/lang"):
+        return None
+    candidate = parts[1].strip().lower()
+    return candidate if candidate in telegram._LANGS else None
+
+
+def _greeting_locale(update: dict) -> str | None:
+    """Conservative greeting-only hint; no free-text content is persisted."""
+    message = update.get("message")
+    if not isinstance(message, dict):
+        return None
+    raw = message.get("text")
+    if not isinstance(raw, str) or len(raw) > 64:
+        return None
+    greeting = raw.strip().lower()
+    if greeting in ("سلام", "درود"):
+        # The greeting is shared by Persian and Arabic. Respect Arabic UI.
+        return "ar" if telegram._language(message) == "ar" else "fa"
+    if greeting in ("مرحبا", "أهلا", "أهلاً"):
+        return "ar"
+    if greeting in ("hi", "hello"):
+        return "en"
+    if greeting == "سلامونه":
+        return "ps"
+    return None
+
+
+def _with_locale(update: dict, locale: str) -> dict:
+    """Copy only the necessary message metadata; never mutate Telegram update."""
+    message = update["message"]
+    sender = message["from"]
+    return {
+        **update,
+        "message": {**message, "from": {**sender, "language_code": locale}},
+    }
+
 async def _telegram_call(client: httpx.AsyncClient, cfg: PollingConfig, method: str, payload: dict) -> dict:
     response = await client.post(_endpoint(cfg.token, method), json=payload)
     response.raise_for_status()
@@ -98,10 +155,29 @@ async def poll_batch(client: httpx.AsyncClient, redis: Redis, cfg: PollingConfig
 
         safe = telegram._safe_reply(update)
         if safe is not None and safe[0] == cfg.chat_id:
+            locale_key = _locale_key(cfg)
+            saved = await redis.get(locale_key)
+            saved_locale = saved.decode("ascii") if isinstance(saved, bytes) else saved
+            if saved_locale not in telegram._LANGS:
+                saved_locale = None
+            explicit = _requested_locale(update)
+            greeting = _greeting_locale(update) if saved_locale is None else None
+            selected = explicit or saved_locale or greeting
+            localized = _with_locale(update, selected) if selected else update
+            safe = telegram._safe_reply(localized)
             key = telegram._dedup_key(update_id, cfg.secret)
             owner = secrets.token_urlsafe(24)
             claimed = await telegram._claim(cfg.redis_url, key, owner)
             if claimed:
+                # Store just a small locale code, not message text or patient data.
+                # Write before delivery so a Redis failure cannot cause a sent
+                # message with an unacknowledged language selection.
+                if (explicit or greeting) and (explicit or greeting) != saved_locale:
+                    try:
+                        await redis.set(locale_key, explicit or greeting, ex=_LOCALE_TTL_SECONDS)
+                    except Exception:
+                        await telegram._finish(cfg.redis_url, key, owner, sent=False)
+                        raise
                 try:
                     await telegram._send_message(cfg.token, cfg.chat_id, safe[1], cfg.privacy_url)
                 except (httpx.HTTPError, ValueError):

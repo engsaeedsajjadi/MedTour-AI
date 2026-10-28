@@ -58,9 +58,12 @@ def test_valid_local_allowlist(monkeypatch):
 class FakeRedis:
     def __init__(self):
         self.values = {}
-    async def set(self, key, value):
+    async def set(self, key, value, ex=None):
+        assert ex is None or ex > 0
         self.values[key] = value
         return True
+    async def get(self, key):
+        return self.values.get(key)
 
 
 class FakeHTTP:
@@ -76,10 +79,10 @@ class FakeHTTP:
         )
 
 
-def _update(update_id: int, chat_id: int, text: str):
+def _update(update_id: int, chat_id: int, text: str, lang: str = "fa"):
     return {"update_id": update_id, "message": {
         "chat": {"type": "private", "id": chat_id},
-        "from": {"id": chat_id, "language_code": "fa", "is_bot": False},
+        "from": {"id": chat_id, "language_code": lang, "is_bot": False},
         "text": text,
     }}
 
@@ -154,3 +157,109 @@ def test_no_privacy_url_does_not_invent_link(monkeypatch):
     monkeypatch.setattr(telegram.httpx, "AsyncClient", MockClient)
     asyncio.run(telegram._send_message("123456789:"+"A"*40, 12345, "generic", ""))
     assert recorded[0]["text"] == "generic"
+
+
+def test_selected_persian_survives_followup_with_english_telegram_ui(monkeypatch):
+    _env(monkeypatch)
+    cfg = telegram_poller.config_from_env()
+    deliveries = []
+    async def claim(*args):
+        return True
+    async def finish(*args, **kwargs):
+        assert kwargs["sent"] is True
+    async def send(token, chat, text, privacy):
+        deliveries.append(text)
+    monkeypatch.setattr(telegram, "_claim", claim)
+    monkeypatch.setattr(telegram, "_finish", finish)
+    monkeypatch.setattr(telegram, "_send_message", send)
+    redis = FakeRedis()
+    first = FakeHTTP([_update(101, 12345, "/start fa", "en")])
+    assert asyncio.run(telegram_poller.poll_batch(first, redis, cfg, 0)) == 102
+    second = FakeHTTP([_update(102, 12345, "Some safe synthetic free text", "en")])
+    assert asyncio.run(telegram_poller.poll_batch(second, redis, cfg, 102)) == 103
+    assert len(deliveries) == 2
+    assert all("پاسپورت" in reply for reply in deliveries)
+    locale_key = telegram_poller._locale_key(cfg)
+    assert redis.values[locale_key] == "fa"
+    assert redis.values[telegram_poller._redacted_key(cfg.token, "offset")] == "103"
+    assert all("Some safe synthetic free text" not in str(v) for v in redis.values.values())
+
+
+def test_farsi_greeting_when_telegram_ui_is_english(monkeypatch):
+    _env(monkeypatch)
+    cfg = telegram_poller.config_from_env()
+    delivered = []
+    async def claim(*args):
+        return True
+    async def finish(*args, **kwargs):
+        assert kwargs["sent"] is True
+    async def send(token, chat, text, privacy):
+        delivered.append(text)
+    monkeypatch.setattr(telegram, "_claim", claim)
+    monkeypatch.setattr(telegram, "_finish", finish)
+    monkeypatch.setattr(telegram, "_send_message", send)
+    redis = FakeRedis()
+    assert asyncio.run(telegram_poller.poll_batch(
+        FakeHTTP([_update(201, 12345, "سلام", "en")]), redis, cfg, 0
+    )) == 202
+    assert len(delivered) == 1 and "پاسپورت" in delivered[0]
+    assert redis.values[telegram_poller._locale_key(cfg)] == "fa"
+
+
+def test_explicit_language_switch_and_unauthorized_chat_isolation(monkeypatch):
+    _env(monkeypatch)
+    cfg = telegram_poller.config_from_env()
+    delivered = []
+    async def claim(*args):
+        return True
+    async def finish(*args, **kwargs):
+        assert kwargs["sent"] is True
+    async def send(token, chat, text, privacy):
+        delivered.append(text)
+    monkeypatch.setattr(telegram, "_claim", claim)
+    monkeypatch.setattr(telegram, "_finish", finish)
+    monkeypatch.setattr(telegram, "_send_message", send)
+    redis = FakeRedis()
+    updates = [
+        _update(301, 99999, "/language ar", "fa"),
+        _update(302, 12345, "/language fa", "en"),
+        _update(303, 12345, "/language ar", "en"),
+        _update(304, 12345, "hello", "en"),
+    ]
+    assert asyncio.run(telegram_poller.poll_batch(FakeHTTP(updates), redis, cfg, 0)) == 305
+    assert len(delivered) == 3
+    assert "پاسپورت" in delivered[0]
+    assert all("سجلات طبية" in text for text in delivered[1:])
+    assert redis.values[telegram_poller._locale_key(cfg)] == "ar"
+    assert all("99999" not in str(key) for key in redis.values)
+    assert all("hello" not in str(value) for value in redis.values.values())
+
+
+def test_invalid_language_command_does_not_replace_preference(monkeypatch):
+    _env(monkeypatch)
+    cfg = telegram_poller.config_from_env()
+    delivered = []
+    async def claim(*args):
+        return True
+    async def finish(*args, **kwargs):
+        pass
+    async def send(token, chat, text, privacy):
+        delivered.append(text)
+    monkeypatch.setattr(telegram, "_claim", claim)
+    monkeypatch.setattr(telegram, "_finish", finish)
+    monkeypatch.setattr(telegram, "_send_message", send)
+    redis = FakeRedis()
+    assert asyncio.run(telegram_poller.poll_batch(
+        FakeHTTP([_update(401, 12345, "/start fa", "en"),
+                  _update(402, 12345, "/language xx", "en")]), redis, cfg, 0
+    )) == 403
+    assert redis.values[telegram_poller._locale_key(cfg)] == "fa"
+    assert "پاسپورت" in delivered[-1]
+
+
+def test_language_preference_uses_hmac_scoped_to_allowlisted_chat(monkeypatch):
+    _env(monkeypatch)
+    cfg = telegram_poller.config_from_env()
+    assert str(cfg.chat_id) not in telegram_poller._locale_key(cfg)
+    assert cfg.secret not in telegram_poller._locale_key(cfg)
+    assert cfg.token not in telegram_poller._locale_key(cfg)
