@@ -244,3 +244,28 @@ def test_language_help_never_promises_consented_clinical_service(setup):
     assert 'Available languages' in out[-1][1]
     assert post(client, update(text='/help', update_id=2, lang='ar')).status_code == 200
     assert 'الأوامر' in out[-1][1]
+
+
+@pytest.mark.parametrize('command,needle', [
+    ('/services', 'booking'),
+    ('/process', 'secure portal'),
+    ('/emergency', 'local emergency'),
+])
+def test_patient_journey_commands_are_nonclinical(setup, command, needle):
+    client, _, out = setup
+    r = post(client, update(text=command))
+    assert r.status_code == 200
+    assert needle in out[-1][1]
+    assert 'medical records' in out[-1][1]
+    assert 'diagnosis' not in out[-1][1].lower()
+
+
+def test_media_is_not_processed_or_accepted_as_medical_input(setup):
+    client, _, out = setup
+    incoming = update(text=None)
+    incoming['message'].pop('text')
+    incoming['message']['document'] = {'file_id':'synthetic-sensitive-id'}
+    assert post(client, incoming).status_code == 200
+    assert len(out) == 1
+    assert 'synthetic-sensitive-id' not in out[-1][1]
+    assert 'Do not send' in out[-1][1]
