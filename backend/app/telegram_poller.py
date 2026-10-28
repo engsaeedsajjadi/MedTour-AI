@@ -55,6 +55,47 @@ def config_from_env() -> PollingConfig | None:
     return PollingConfig(token, int(raw_chat_id), redis_url, secret, privacy_url)
 
 
+def _safe_failure_code(error: Exception) -> str:
+    """Never log exception text or a Telegram URL containing the bot token."""
+    if isinstance(error, httpx.ConnectTimeout):
+        return "telegram_connect_timeout"
+    if isinstance(error, httpx.ReadTimeout):
+        return "telegram_read_timeout"
+    if isinstance(error, httpx.ConnectError):
+        return "telegram_connect_error"
+    if isinstance(error, httpx.TimeoutException):
+        return "telegram_other_timeout"
+    if isinstance(error, httpx.HTTPStatusError):
+        code = error.response.status_code
+        if code == 429:
+            return "telegram_rate_limited"
+        if code == 409:
+            return "telegram_conflicting_receiver"
+        if code in (401, 403):
+            return "telegram_authorization_failed"
+        if 500 <= code <= 599:
+            return "telegram_server_error"
+        return "telegram_unexpected_http_status"
+    if isinstance(error, httpx.HTTPError):
+        return "telegram_transport_error"
+    if isinstance(error, OSError):
+        return "network_or_redis_error"
+    return "polling_internal_error"
+
+
+def _fatal_telegram_error(error: Exception) -> bool:
+    """Do not retry endlessly with invalid credentials or another receiver."""
+    return (
+        isinstance(error, httpx.HTTPStatusError)
+        and error.response.status_code in (401, 403, 409)
+    )
+
+
+def _backoff_seconds(failures: int, *, jitter: float = 0.0) -> float:
+    """Bounded exponential delay; no busy-looping during Telegram outages."""
+    return min(20.0, float(2 ** min(max(failures, 1), 5)) + min(max(jitter, 0.0), 1.0))
+
+
 def _endpoint(token: str, method: str) -> str:
     return "https://api.telegram.org/bot" + token + "/" + method
 
@@ -137,7 +178,7 @@ async def poll_batch(client: httpx.AsyncClient, redis: Redis, cfg: PollingConfig
     """
     data = await _telegram_call(client, cfg, "getUpdates", {
         "offset": offset,
-        "limit": 50,
+        "limit": 2,
         "timeout": 20,
         "allowed_updates": ["message"],
     })
@@ -222,29 +263,45 @@ async def run() -> int:
         if not lease_acquired:
             print("FAIL: another local poller holds the Redis lease", flush=True)
             return 2
-        async with httpx.AsyncClient(timeout=httpx.Timeout(30.0), follow_redirects=False) as client:
-            info = await _telegram_call(client, cfg, "getWebhookInfo", {})
-            if info.get("result", {}).get("url"):
-                print("FAIL: webhook is active; polling will not run", flush=True)
-                return 2
-
+        # getUpdates uses a 20s long poll; a read timeout must be longer.
+        # Longer connect budget tolerates the intermittent Docker->Telegram timeouts.
+        timeout = httpx.Timeout(connect=18.0, read=35.0, write=12.0, pool=8.0)
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=False) as client:
             stored = await redis.get(_redacted_key(cfg.token, "offset"))
             offset = int(stored) if stored is not None else 0
-            print("PASS: local Telegram development poller started (allowlisted chat only)", flush=True)
-
+            verified_webhook = False
+            failures = 0
+            print("INFO: local Telegram poller starting; checking API connectivity", flush=True)
             while True:
                 try:
-                    # After a long poll (<= 20s), 90s lease is refreshed before next poll.
+                    # Refresh singleton lease even while reconnecting; do not allow
+                    # concurrent pollers when connectivity is intermittent.
                     if not await redis.eval(_LEASE_REFRESH, 1, lease_key, lease_owner):
                         print("FAIL: Telegram polling lease lost", flush=True)
                         return 2
+                    if not verified_webhook:
+                        info = await _telegram_call(client, cfg, "getWebhookInfo", {})
+                        if info.get("result", {}).get("url"):
+                            print("FAIL: webhook is active; polling will not run", flush=True)
+                            return 2
+                        verified_webhook = True
+                        print("PASS: local Telegram development poller started (allowlisted chat only)", flush=True)
                     offset = await poll_batch(client, redis, cfg, offset)
+                    if failures:
+                        print("PASS: Telegram API connection recovered", flush=True)
+                    failures = 0
                 except asyncio.CancelledError:
                     raise
-                except Exception:
-                    # Telegram request URLs carry secrets: never echo exceptions.
-                    print("WARN: polling or delivery failed; retrying safely", flush=True)
-                    await asyncio.sleep(5)
+                except Exception as error:
+                    # Never print exception text; it may include a bot token URL.
+                    reason = _safe_failure_code(error)
+                    if _fatal_telegram_error(error):
+                        print("FAIL: " + reason + "; polling stopped", flush=True)
+                        return 2
+                    failures += 1
+                    wait = _backoff_seconds(failures, jitter=secrets.randbelow(1000) / 1000.0)
+                    print("WARN: " + reason + "; retry with backoff", flush=True)
+                    await asyncio.sleep(wait)
     except (ConnectionError, OSError, ValueError):
         print("FAIL: Telegram polling infrastructure unavailable", flush=True)
         return 2

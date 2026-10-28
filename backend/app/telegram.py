@@ -251,7 +251,7 @@ async def _send_message(token: str, chat_id: int, reply: str, privacy_url: str) 
         "protect_content": True,
     }
     # No untrusted destination. Token is operator-provisioned. Never log URLs.
-    async with httpx.AsyncClient(timeout=8.0, follow_redirects=False) as client:
+    async with httpx.AsyncClient(timeout=httpx.Timeout(connect=18.0, read=20.0, write=12.0, pool=8.0), follow_redirects=False) as client:
         response = await client.post(
             "https://api.telegram.org/bot" + token + "/sendMessage", json=payload
         )
