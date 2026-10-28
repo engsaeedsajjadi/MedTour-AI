@@ -93,7 +93,7 @@ def _fatal_telegram_error(error: Exception) -> bool:
 
 def _backoff_seconds(failures: int, *, jitter: float = 0.0) -> float:
     """Bounded exponential delay; no busy-looping during Telegram outages."""
-    return min(60.0, float(2 ** min(max(failures, 1), 6)) + min(max(jitter, 0.0), 1.0))
+    return min(20.0, float(2 ** min(max(failures, 1), 5)) + min(max(jitter, 0.0), 1.0))
 
 
 def _endpoint(token: str, method: str) -> str:
@@ -178,7 +178,7 @@ async def poll_batch(client: httpx.AsyncClient, redis: Redis, cfg: PollingConfig
     """
     data = await _telegram_call(client, cfg, "getUpdates", {
         "offset": offset,
-        "limit": 3,
+        "limit": 2,
         "timeout": 20,
         "allowed_updates": ["message"],
     })
