@@ -32,18 +32,18 @@ def password_verify(password:str, stored:str)->bool:
 
 def token_for(user:User,*,mfa_verified:bool=False):
     now=datetime.now(timezone.utc)
-    return jwt.encode({'sub':user.id,'tid':user.tenant_id,'role':user.role,'mfa':mfa_verified,'iat':now,'exp':now+timedelta(minutes=30),'jti':secrets.token_urlsafe(12)},secret(),algorithm='HS256')
+    return jwt.encode({'sub':user.id,'tid':user.tenant_id,'role':user.role,'iat':now,'exp':now+timedelta(minutes=30),'jti':secrets.token_urlsafe(12),'av':getattr(user,'auth_version',0),'mfa':mfa_verified},secret(),algorithm='HS256')
 
 def current_user(credentials:HTTPAuthorizationCredentials|None=Depends(BEARER),db:Session=Depends(get_db)) -> User:
     if credentials is None: raise HTTPException(status_code=401,detail='Authentication required')
     try:
         data=jwt.decode(credentials.credentials, secret(), algorithms=['HS256'],options={'require':['exp','sub','tid','jti']})
         user=db.query(User).filter(User.id==data['sub'],User.tenant_id==data['tid'],User.active==True).first()
-        if not user or user.role!=data.get('role'): raise ValueError('stale or invalid identity')
+        if not user or user.role!=data.get('role') or user.auth_version!=data.get('av',0): raise ValueError('stale or invalid identity')
         from .staff_mfa import row_for
-        enrollment=row_for(db,user.tenant_id,user.id)
-        if enrollment and enrollment.enabled and data.get("mfa") is not True:
-            raise ValueError("MFA token assurance required")
+        legacy=row_for(db,user.tenant_id,user.id)
+        if legacy and legacy.enabled and data.get('mfa') is not True:
+            raise ValueError('Legacy MFA assurance required')
         revoked=db.query(RevokedAccess.id).filter(RevokedAccess.tenant_id==user.tenant_id,
             RevokedAccess.jti_hash==hashlib.sha256(data['jti'].encode()).hexdigest()).first()
         if revoked: raise ValueError('Access token has been revoked')

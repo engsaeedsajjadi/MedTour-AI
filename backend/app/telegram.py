@@ -56,6 +56,20 @@ class TelegramSettings:
     webhook_secret: str
     privacy_url: str
     redis_url: str
+    operator_contact_url: str | None = None
+
+
+def _public_https_url(value: str) -> bool:
+    if not value or len(value) > 512 or any(ord(ch) < 32 for ch in value):
+        return False
+    try:
+        parsed = urlsplit(value)
+        return (parsed.scheme == 'https' and bool(parsed.hostname)
+            and parsed.username is None and parsed.password is None
+            and parsed.port in (None, 443) and not parsed.query and not parsed.fragment
+            and parsed.hostname.lower() not in ('localhost', '127.0.0.1', '::1'))
+    except ValueError:
+        return False
 
 
 def settings() -> TelegramSettings | None:
@@ -65,18 +79,16 @@ def settings() -> TelegramSettings | None:
     secret = os.getenv("TELEGRAM_WEBHOOK_SECRET", "")
     privacy_url = os.getenv("PUBLIC_PRIVACY_NOTICE_URL", "")
     redis_url = os.getenv("REDIS_URL", "")
-    parsed = urlsplit(privacy_url)
+    operator_contact_url = os.getenv("PUBLIC_OPERATOR_CONTACT_URL", "")
     if (
         not _BOT_TOKEN.fullmatch(token)
         or not _SECRET.fullmatch(secret)
-        or parsed.scheme != "https"
-        or not parsed.netloc
-        or parsed.username is not None
-        or parsed.password is not None
+        or not _public_https_url(privacy_url)
+        or (operator_contact_url and not _public_https_url(operator_contact_url))
         or not redis_url.startswith(("redis://", "rediss://"))
     ):
         return None
-    return TelegramSettings(token, secret, privacy_url, redis_url)
+    return TelegramSettings(token, secret, privacy_url, redis_url, operator_contact_url or None)
 
 
 def enabled() -> bool:
@@ -94,8 +106,68 @@ def _language(message: dict) -> str:
     return base if base in _LANGS else "en"
 
 
-def _safe_reply(update: dict) -> tuple[int, str] | None:
-    """Return only (private chat id, generic notice); never inspect patient details."""
+_HELP = {
+    "fa": "دستورات: /start شروع، /language انتخاب زبان، /privacy حریم خصوصی، /services خدمات، /process مراحل، /emergency اورژانس، /operator ارتباط با اپراتور، /stop توقف راهنمایی.",
+    "ar": "الأوامر: /start بداية، /language اللغة، /privacy الخصوصية، /services الخدمات، /process الخطوات، /emergency الطوارئ، /operator التواصل مع الموظف، /stop إيقاف الإرشادات.",
+    "en": "Commands: /start welcome, /language language choices, /privacy privacy, /services services, /process steps, /emergency emergency, /operator human support, /stop stop guidance.",
+    "ps": "لارښوونې: /start پیل، /language ژبه، /privacy محرمیت، /services خدمتونه، /process ګامونه، /emergency بیړنۍ مرستې، /operator کارکوونکی، /stop پای.",
+    "prs": "دستورها: /start آغاز، /language انتخاب زبان، /privacy حریم خصوصی، /services خدمات، /process مراحل، /emergency عاجل، /operator کارمند، /stop پایان.",
+}
+
+_OPERATOR = {
+    "fa": "برای ارتباط با اپراتور انسانی و دریافت دعوت‌نامه خصوصی پرتال امن، از مسیر رسمی زیر استفاده کنید. اطلاعات پزشکی را اینجا ننویسید.",
+    "ar": "للتواصل مع موظف والحصول على دعوة خاصة للبوابة الآمنة، استخدم قناة التواصل الرسمية أدناه. لا ترسل بيانات طبية هنا.",
+    "en": "To contact a human operator and request a private secure-portal invitation, use the official contact channel below. Do not send medical information in Telegram.",
+    "ps": "له کارکوونکي سره د اړیکې او خوندي پورټل د بلنې لپاره لاندې رسمي لاره وکاروئ. طبي معلومات په ټېلېګرام کې مه لېږئ.",
+    "prs": "برای تماس با کارمند و دریافت دعوت‌نامه خصوصی پورتال مصون از راه رسمی زیر استفاده کنید. معلومات طبی را در تلگرام نفرستید.",
+}
+
+_STOP = {
+    "fa": "این ربات هیچ پرونده یا ثبت‌نامی از طریق تلگرام ایجاد نکرده است. برای راهنمایی دوباره /start را بفرستید.",
+    "ar": "لم ينشئ هذا الروبوت أي ملف طبي أو تسجيل عبر تيليجرام. أرسل /start للبدء مجددًا.",
+    "en": "This bot has not created a patient record or Telegram registration. Send /start to see general guidance again.",
+    "ps": "دې روباټ ستاسو طبي دوسیه یا ثبت‌نام نه دی جوړ کړی. د بیا پیل لپاره /start ولېږئ.",
+    "prs": "این ربات هیچ دوسیه طبی یا ثبت‌نامی از طریق تلگرام نساخته است. برای آغاز دوباره /start را بفرستید.",
+}
+
+_LANGUAGE_GUIDE = (
+    "Available languages / زبان‌ها / اللغات: "
+    "fa (فارسی), ar (العربية), en (English), ps (پښتو), prs (دری). "
+    "Use /language fa, /language ar, /language en, /language ps or /language prs."
+)
+
+
+_INFORMATION = {
+    "fa": {
+        "/services": "خدمات معرفی‌شده صرفاً هماهنگی انسانی پزشک و بیمارستان، نوبت، ویزا، اقامت و ترانسفر است. هیچ رزرو یا درمانی بدون تأیید رسمی انجام نمی‌شود.",
+        "/process": "مراحل: ۱) دریافت دعوت‌نامه خصوصی پرتال از اپراتور ۲) ثبت رضایت و مدارک فقط در پرتال امن ۳) بازبینی توسط مسئول انسانی ۴) هماهنگی خدمات پس از تأیید رسمی.",
+        "/emergency": "این ربات اورژانس نیست. در وضعیت فوری با خدمات اورژانس محلی تماس بگیرید.",
+    },
+    "ar": {
+        "/services": "الخدمات هي التنسيق البشري مع الأطباء والمستشفيات والمواعيد والتأشيرة والإقامة والنقل؛ لا يوجد حجز أو علاج مؤكد دون التحقق الرسمي.",
+        "/process": "الخطوات: ١) طلب دعوة خاصة للبوابة من الموظف ٢) إرسال الموافقة والوثائق عبر البوابة الآمنة فقط ٣) المراجعة البشرية ٤) تنسيق الخدمات بعد التأكيد الرسمي.",
+        "/emergency": "هذا الروبوت ليس خدمة طوارئ. اتصل بخدمات الطوارئ المحلية عند الضرورة.",
+    },
+    "en": {
+        "/services": "Staff may coordinate physician and hospital inquiries, appointments, visas, accommodation and transport. No treatment or booking is confirmed without independent verification.",
+        "/process": "Steps: 1) Request a private portal invitation from staff. 2) Submit consent and documents only in the secure portal. 3) Receive human review. 4) Arrange services after official confirmation.",
+        "/emergency": "This bot is not an emergency service. Contact local emergency services for urgent help.",
+    },
+    "ps": {
+        "/services": "کارکوونکي د ډاکټرانو، روغتونونو، وختونو، ویزې، استوګنې او ترانسپورت همغږي کولای شي. هېڅ خدمت له رسمي تایید پرته نه تضمینېږي.",
+        "/process": "ګامونه: ۱) له کارکوونکي د خصوصي پورټل بلنه وغواړئ ۲) رضايت او اسناد یوازې خوندي پورټل کې وسپارئ ۳) انساني ارزونه ۴) له رسمي تایید وروسته همغږي.",
+        "/emergency": "دا روباټ بیړنۍ مرستې نه وړاندې کوي. له سیمه‌ییزو بیړنیو خدمتونو سره اړیکه ونیسئ.",
+    },
+    "prs": {
+        "/services": "کارمندان می‌توانند هماهنگی پزشک، شفاخانه، وقت ملاقات، ویزه، اقامت و ترانسپورت را انجام دهند. هیچ خدمت بدون تأیید رسمی تضمین نیست.",
+        "/process": "مراحل: ۱) از کارمند دعوت‌نامه خصوصی پورتال بخواهید ۲) رضایت و اسناد را فقط در پورتال مصون ثبت کنید ۳) بازبینی انسانی ۴) هماهنگی پس از تأیید رسمی.",
+        "/emergency": "این ربات خدمات عاجل نیست. در حالت اضطرار با خدمات عاجل محلی تماس بگیرید.",
+    },
+}
+
+
+def _safe_reply(update: dict, operator_contact_url: str | None = None) -> tuple[int, str] | None:
+    """Read command metadata only; never extract, record or echo patient content."""
     message = update.get("message")
     if not isinstance(message, dict):
         return None
@@ -108,21 +180,38 @@ def _safe_reply(update: dict) -> tuple[int, str] | None:
         or chat_id <= 0 or type(sender.get("id")) is not int
         or sender["id"] != chat_id or sender.get("is_bot") is True):
         return None
-
     language = _language(message)
-    text = message.get("text")
-    if isinstance(text, str) and len(text) <= 128 and text.startswith("/"):
-        words = text.split(maxsplit=1)
-        command = words[0].split("@", 1)[0].lower()
-        if command in {"/start", "/language", "/lang"} and len(words) > 1:
-            candidate = words[1].strip().lower()
-            if candidate in _LANGS:
-                language = candidate
-        elif command not in {"/start", "/language", "/lang", "/help", "/privacy"}:
-            return None
-    # Medical/free-form input is discarded; same generic warning only.
-    return chat_id, _NOTICE[language]
-
+    user_text = message.get("text")
+    if not isinstance(user_text, str) or not user_text.startswith("/") or len(user_text) > 128:
+        return chat_id, _NOTICE[language]
+    words = user_text.split(maxsplit=1)
+    command = words[0].split("@", 1)[0].lower()
+    if command in ("/start", "/language", "/lang") and len(words) > 1:
+        candidate = words[1].strip().lower()
+        if candidate in _LANGS:
+            language = candidate
+        else:
+            return chat_id, _LANGUAGE_GUIDE + "\n\n" + _NOTICE[language]
+    if command in ("/language", "/lang"):
+        if len(words) == 1:
+            return chat_id, _LANGUAGE_GUIDE + "\n\n" + _NOTICE[language]
+        return chat_id, _NOTICE[language] + "\n\n" + _HELP[language]
+    if command in _INFORMATION[language]:
+        return chat_id, _INFORMATION[language][command] + "\n\n" + _NOTICE[language]
+    if command == "/operator":
+        message_text = _OPERATOR[language]
+        if operator_contact_url:
+            message_text += "\n\n" + operator_contact_url
+        else:
+            message_text += "\n\n" + _NOTICE[language]
+        return chat_id, message_text
+    if command == "/stop":
+        return chat_id, _STOP[language]
+    if command == "/help":
+        return chat_id, _HELP[language] + "\n\n" + _NOTICE[language]
+    if command in ("/start", "/privacy"):
+        return chat_id, _NOTICE[language] + "\n\n" + _HELP[language]
+    return None
 
 def _dedup_key(update_id: int, key: str) -> str:
     digest = hmac.new(key.encode("ascii"), str(update_id).encode("ascii"), hashlib.sha256).hexdigest()
@@ -157,12 +246,12 @@ async def _finish(redis_url: str, key: str, owner: str, *, sent: bool) -> None:
 async def _send_message(token: str, chat_id: int, reply: str, privacy_url: str) -> None:
     payload = {
         "chat_id": chat_id,
-        "text": reply + "\n\nPrivacy notice: " + privacy_url,
+        "text": reply + ("\n\nPrivacy notice: " + privacy_url if privacy_url else ""),
         "disable_web_page_preview": True,
         "protect_content": True,
     }
     # No untrusted destination. Token is operator-provisioned. Never log URLs.
-    async with httpx.AsyncClient(timeout=8.0, follow_redirects=False) as client:
+    async with httpx.AsyncClient(timeout=httpx.Timeout(connect=18.0, read=20.0, write=12.0, pool=8.0), follow_redirects=False) as client:
         response = await client.post(
             "https://api.telegram.org/bot" + token + "/sendMessage", json=payload
         )
@@ -180,9 +269,15 @@ async def telegram_webhook(request: Request):
     presented = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
     if not isinstance(presented, str) or not hmac.compare_digest(presented, config.webhook_secret):
         raise HTTPException(403, "Invalid webhook authentication")
-    raw = await request.body()
-    if len(raw) > _UPDATE_LIMIT:
-        raise HTTPException(413, "Telegram update exceeds allowed size")
+    # Stream with a hard byte limit: do not buffer arbitrary Telegram payloads.
+    chunks = []
+    size = 0
+    async for chunk in request.stream():
+        size += len(chunk)
+        if size > _UPDATE_LIMIT:
+            raise HTTPException(413, "Telegram update exceeds allowed size")
+        chunks.append(chunk)
+    raw = b"".join(chunks)
     if request.headers.get("content-type", "").split(";", 1)[0].strip().lower() != "application/json":
         raise HTTPException(415, "JSON required")
     try:
@@ -195,7 +290,7 @@ async def telegram_webhook(request: Request):
     if not 0 <= update_id <= 2**63 - 1:
         raise HTTPException(422, "Invalid update identifier")
 
-    reply = _safe_reply(update)
+    reply = _safe_reply(update, config.operator_contact_url)
     if reply is None:
         return {"ok": True, "ignored": True}
     key = _dedup_key(update_id, config.webhook_secret)

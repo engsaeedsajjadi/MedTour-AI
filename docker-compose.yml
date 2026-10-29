@@ -24,6 +24,14 @@ services:
       interval: 5s
       timeout: 3s
       retries: 15
+  migrate:
+    build: ./backend
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["python", "-m", "alembic", "upgrade", "head"]
+    restart: "no"
   api:
     build: ./backend
     env_file: .env
@@ -38,7 +46,9 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: ["sh", "-c", "python -m alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+      migrate:
+        condition: service_completed_successfully
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health/ready', timeout=3)"]
       interval: 10s
@@ -54,6 +64,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     restart: on-failure
     healthcheck:
       test: ["CMD", "python", "-m", "app.worker_healthcheck"]
@@ -61,6 +73,50 @@ services:
       timeout: 5s
       start_period: 15s
       retries: 3
+  telegram-gateway:
+    profiles: ["telegram"]
+    build: ./backend
+    command: ["uvicorn", "app.telegram_entrypoint:app", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      TELEGRAM_BOT_ENABLED: ${TELEGRAM_BOT_ENABLED:-false}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
+      PUBLIC_PRIVACY_NOTICE_URL: ${PUBLIC_PRIVACY_NOTICE_URL:-}
+      PUBLIC_OPERATOR_CONTACT_URL: ${PUBLIC_OPERATOR_CONTACT_URL:-}
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "127.0.0.1:8001:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+  telegram-poller:
+    # DEVELOPMENT / ALLOWLISTED TEST ONLY; does not expose a port or clinical APIs.
+    profiles: ["telegram-polling"]
+    build: ./backend
+    command: ["python", "-m", "app.telegram_poller"]
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      TELEGRAM_POLLING_ENABLED: ${TELEGRAM_POLLING_ENABLED:-false}
+      TELEGRAM_POLLING_TEST_MODE: ${TELEGRAM_POLLING_TEST_MODE:-false}
+      TELEGRAM_POLLING_CHAT_ID: ${TELEGRAM_POLLING_CHAT_ID:-}
+      TELEGRAM_BOT_ENABLED: ${TELEGRAM_BOT_ENABLED:-false}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
+      PUBLIC_PRIVACY_NOTICE_URL: ${PUBLIC_PRIVACY_NOTICE_URL:-}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
   web:
     build: ./frontend
     environment:

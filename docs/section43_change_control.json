@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "production_authorized": false,
+  "required_checks": [
+    "scope_review",
+    "backend_tests",
+    "frontend_build",
+    "migration_review",
+    "tenant_security_review",
+    "privacy_review",
+    "rollback_plan"
+  ],
+  "change_rules": [
+    "preserve_existing_features",
+    "synthetic_test_data_only",
+    "no_production_migration_without_restore_drill",
+    "review_all_open_pr_dependencies",
+    "independent_clinical_and_security_approval_before_patient_data"
+  ]
+}
