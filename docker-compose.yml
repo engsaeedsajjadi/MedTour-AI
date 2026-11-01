@@ -134,7 +134,8 @@ services:
       INTERNAL_API_URL: http://api:8000
       PUBLIC_SITE_URL: ${PUBLIC_SITE_URL:-}
     ports:
-      - "127.0.0.1:3000:3000"
+      # Change WEB_PORT in .env when 3000 is taken (also add that origin to CORS_ORIGINS).
+      - "127.0.0.1:${WEB_PORT:-3000}:3000"
     depends_on:
       api:
         condition: service_healthy
