@@ -3,7 +3,7 @@ import {useEffect,useState} from 'react';
 import Shell from '@/components/Shell';
 import ReadinessNotice from '@/components/ReadinessNotice';
 import {API_BASE,getSession,request} from '@/lib/api';
-import {fa,faError} from '@/lib/i18n';
+import {fa,faError,fmtDateTime} from '@/lib/i18n';
 type CaseRow={id:string;status:string;specialty:string};
 type MedicalDoc={id:string;filename:string;status:string;category:string;created_at:string};
 type RetentionDoc={id:string;filename:string;status:string;created_at:string;legal_hold:boolean;erased_at:string|null;erasure_due:boolean};
@@ -96,7 +96,7 @@ export default function Documents(){
    <p>فایل‌های قبلی پس از لغو رضایت مسدود می‌شوند و با رضایت جدید خودکار باز نمی‌گردند.</p>
    <div className="tableScroll"><table><thead><tr><th>نام فایل</th><th>وضعیت</th><th>تاریخ</th><th>دسترسی</th></tr></thead>
     <tbody>{documents.length===0?<tr><td colSpan={4}>فایل دارای دسترسی موجود نیست.</td></tr>:documents.map(d=><tr key={d.id}>
-     <td>{d.filename}</td><td>{fa(d.status)}</td><td>{new Date(d.created_at).toLocaleString('fa-IR')}</td>
+     <td>{d.filename}</td><td>{fa(d.status)}</td><td>{fmtDateTime(d.created_at)}</td>
      <td><button type="button" disabled={busy} onClick={()=>download(d)}>دریافت امن</button></td>
     </tr>)}</tbody></table></div>
   </section>
@@ -108,7 +108,7 @@ export default function Documents(){
    <div className="tableScroll"><table><thead><tr><th>نام فایل</th><th>وضعیت</th><th>توقیف قانونی</th><th>اقدام</th></tr></thead>
     <tbody>{!retention||retention.documents.length===0?<tr><td colSpan={4} className="empty">سندی در انتظار تصمیم نگهداری نیست.</td></tr>:retention.documents.map(d=><tr key={d.id}>
      <td dir="auto">{d.filename}</td><td>{fa(d.status)}</td><td>{d.legal_hold?'بله':'خیر'}</td>
-     <td style={{display:'flex',gap:8,flexWrap:'wrap'}}>{d.erased_at?'حذف شده در '+new Date(d.erased_at).toLocaleString('fa-IR'):<>
+     <td style={{display:'flex',gap:8,flexWrap:'wrap'}}>{d.erased_at?'حذف شده در '+fmtDateTime(d.erased_at):<>
       <button type="button" disabled={busy||reference.length<6} onClick={()=>void governance('/secure-documents/'+d.id+'/legal-hold',{reference,legal_hold:!d.legal_hold},d.legal_hold?'توقیف قانونی این سند برداشته شود؟':'این سند در توقیف قانونی قرار گیرد؟')}>{d.legal_hold?'رفع توقیف':'توقیف قانونی'}</button>
       {d.erasure_due&&<button type="button" className="button" disabled={busy||reference.length<6} onClick={()=>void governance('/secure-documents/'+d.id+'/erase',{reference},'این سند برای همیشه و بدون امکان بازگشت حذف می‌شود. ادامه می‌دهید؟')}>حذف رمزنگاری‌شده</button>}
      </>}</td>

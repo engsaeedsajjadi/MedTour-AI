@@ -2,8 +2,9 @@
 import {useEffect,useState} from 'react';
 import Link from 'next/link';
 import Shell from '@/components/Shell';
+import OrgList from '@/components/OrgList';
 import {request} from '@/lib/api';
-import {fa} from '@/lib/i18n';
+import {fa,fmtDateTime} from '@/lib/i18n';
 
 type Case={id:string;status:string};
 type Resource={id:string;kind:'vehicle'|'interpreter';label:string;city:string;seats:number;language:string|null};
@@ -104,7 +105,7 @@ export default function TravelCoordination(){
     <label>شروع<input type="datetime-local" value={start} onChange={e=>setStart(e.target.value)}/></label>
     <label>پایان<input type="datetime-local" value={end} onChange={e=>setEnd(e.target.value)}/></label>
     {windows.map(w=><div key={w.id} style={{padding:8,borderTop:'1px solid #d4dde7'}}>
-     <span>{new Date(w.starts_at).toLocaleString('fa-IR')} تا {new Date(w.ends_at).toLocaleString('fa-IR')} · {fa(w.status)}</span>
+     <span>{fmtDateTime(w.starts_at)} تا {fmtDateTime(w.ends_at)} · {fa(w.status)}</span>
     </div>)}
    </div>
   </section>
@@ -134,9 +135,9 @@ export default function TravelCoordination(){
   <section className="panel" style={{padding:20,marginTop:16}}>
    <h2>۳. تخصیص و تأیید ارائه‌دهنده</h2>
    <label>شماره مرجع (لاتین، حداقل ۶ نویسه)<input dir="ltr" value={reference} onChange={e=>setReference(e.target.value)}/></label>
-   <label>عنوان میز ارائه‌دهنده (فقط برای گزارش تماس)<input value={supplier} onChange={e=>setSupplier(e.target.value)} placeholder="مثلاً: واحد اعزام شرکت ترانسفر"/></label>
+   <label>عنوان میز ارائه‌دهنده (فقط برای گزارش تماس)<input dir="ltr" list="supplier-desks" value={supplier} onChange={e=>setSupplier(e.target.value)} placeholder="از فهرست تنظیمات انتخاب کنید"/><OrgList id="supplier-desks" kind="supplier_desks"/></label>
    {rows.map(x=><div key={x.id} style={{padding:'14px 0',borderTop:'1px solid #d4dde7'}}>
-    <strong>{label(x.kind)} · {label(x.status)} · {new Date(x.starts_at).toLocaleString('fa-IR')}</strong>
+    <strong>{label(x.kind)} · {label(x.status)} · {fmtDateTime(x.starts_at)}</strong>
     <p>منبع: {resources.find(r=>r.id===x.resource_id)?.label||x.resource_id.slice(0,8)} · اعزام خارجی تأییدشده: خیر</p>
     {role==='admin'&&<div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
      {x.status==='requested'&&<button disabled={busy||reference.length<6} onClick={()=>change(x.id,'allocate_internally')}>تخصیص داخلی</button>}
@@ -148,7 +149,7 @@ export default function TravelCoordination(){
      {['requested','internally_allocated'].includes(x.status)&&<button disabled={busy||reference.length<6} onClick={()=>change(x.id,'cancel')}>لغو داخلی</button>}
     </div>}
     <button disabled={busy} onClick={()=>void showHistory(x.id)}>تاریخچه</button>
-    {history[x.id]?.map((h,i)=><p key={i}>{new Date(h.at).toLocaleString('fa-IR')} · {fa(h.action)} · {label(h.before)} ← {label(h.after)} · {h.reference}</p>)}
+    {history[x.id]?.map((h,i)=><p key={i}>{fmtDateTime(h.at)} · {fa(h.action)} · {label(h.before)} ← {label(h.after)} · {h.reference}</p>)}
    </div>)}
   </section>
  </Shell>;

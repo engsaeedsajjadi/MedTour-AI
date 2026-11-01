@@ -3,7 +3,7 @@
 import {useCallback, useEffect, useState} from 'react';
 import Shell from '@/components/Shell';
 import {request} from '@/lib/api';
-import {fa} from '@/lib/i18n';
+import {fa,fmtDateTime} from '@/lib/i18n';
 
 type CaseRow = {id:string; patient_id:string; specialty:string; status:string};
 type Mission = {
@@ -123,7 +123,7 @@ export default function JourneyOperations() {
      <h3 style={{marginTop:20}}>سوابق تغییر مرحله</h3>
      <div className="tableScroll"><table><thead><tr><th>مرحله</th><th>مرجع اداری</th><th>زمان</th></tr></thead>
       <tbody>{history.length===0?<tr><td colSpan={3}>هنوز رویدادی ثبت نشده است.</td></tr>:
-       history.map(h=><tr key={h.id}><td>{h.current_status}</td><td>{h.evidence_reference}</td><td>{new Date(h.created_at).toLocaleString('fa-IR')}</td></tr>)}
+       history.map(h=><tr key={h.id}><td>{h.current_status}</td><td>{h.evidence_reference}</td><td>{fmtDateTime(h.created_at)}</td></tr>)}
       </tbody></table></div>
     </>}
    </>}

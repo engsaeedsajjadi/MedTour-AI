@@ -126,3 +126,58 @@ def test_bot_reads_operator_link_from_settings_with_env_fallback():
     assert asyncio.run(telegram.operator_contact_url("redis://x", "https://env.example/c", client=R(b"https://t.me/desk"))) == "https://t.me/desk"
     assert asyncio.run(telegram.operator_contact_url("redis://x", "https://env.example/c", client=R(None))) == "https://env.example/c"
     assert asyncio.run(telegram.operator_contact_url("redis://x", None, client=R(b"http://bad.example"))) is None
+
+
+def test_personal_display_preferences(context):
+    client, auth, _, _ = context
+    h = auth("a")
+    r = client.put("/api/v1/account/profile", headers=h, json={"calendar": "gregorian", "digits": "latin", "start_page": "cases"})
+    assert r.status_code == 200, r.text
+    assert (r.json()["calendar"], r.json()["digits"], r.json()["start_page"]) == ("gregorian", "latin", "cases")
+    for bad in ({"calendar": "lunar"}, {"digits": "roman"}, {"start_page": "../admin"}, {"start_page": "https://x"}):
+        assert client.put("/api/v1/account/profile", headers=h, json=bad).status_code == 422, bad
+
+
+def test_lists_for_visa_authorities_and_supplier_desks(context):
+    client, auth, _, _ = context
+    h = auth("a")
+    r = client.put("/api/v1/organization/profile", headers=h, json={**ORG,
+        "visa_authorities": ["Iran Embassy Kabul", "Iran Embassy Kabul", " Iran  Consulate Herat "],
+        "supplier_desks": ["Azadi Hotel Reservations"]})
+    assert r.status_code == 200, r.text
+    assert r.json()["profile"]["visa_authorities"] == ["Iran Embassy Kabul", "Iran Consulate Herat"]
+    assert client.put("/api/v1/organization/profile", headers=h, json={**ORG, "visa_authorities": ["سفارت"]}).status_code == 422
+
+
+def test_organization_can_require_two_step_sign_in_for_more_roles(context, monkeypatch):
+    client, auth, _, _ = context
+    admin, operator = auth("a"), auth("a", "operator@example.test")
+    monkeypatch.delenv("STAFF_MFA_REQUIRED", raising=False)
+    monkeypatch.delenv("MFA_ENCRYPTION_KEY", raising=False)
+    assert client.get("/api/v1/patients", headers=operator).status_code == 200
+    # Refused while the server has no key to protect the enrolment secrets.
+    assert client.put("/api/v1/organization/profile", headers=admin, json={**ORG, "two_factor_roles": ["operator"]}).status_code == 422
+    import base64, os
+    monkeypatch.setenv("MFA_ENCRYPTION_KEY", base64.urlsafe_b64encode(os.urandom(32)).decode())
+    assert client.put("/api/v1/organization/profile", headers=admin, json={**ORG, "two_factor_roles": ["operator"]}).status_code == 200
+    assert client.get("/api/v1/patients", headers=operator).json()["detail"] == "Two-factor authentication required"
+    assert client.get("/api/v1/auth/mfa/status", headers=operator).status_code == 200
+    assert client.get("/api/v1/patients", headers=admin).status_code == 200
+    # Another organization is unaffected.
+    assert client.get("/api/v1/patients", headers=auth("b")).status_code == 200
+
+
+def test_ai_status_never_reveals_the_key(context, monkeypatch):
+    client, auth, _, _ = context
+    monkeypatch.setenv("AI_API_KEY", "sk-test-SECRET-VALUE")
+    monkeypatch.setenv("AI_MODEL", "test-model")
+    r = client.get("/api/v1/organization/profile", headers=auth("a")).json()
+    ai = r["integrations"]["ai"]
+    assert ai["key_configured"] is True and ai["model"] == "test-model"
+    assert "SECRET" not in str(r)
+
+
+def test_quotation_pdf_uses_organization_name_without_test_wording():
+    from app.quotation_versions import pdf_bytes
+    data = pdf_bytes(["x", "line"], brand="Test Clinic International")
+    assert b"TEST ESTIMATE" not in data and b"DEVELOPMENT DATA" not in data

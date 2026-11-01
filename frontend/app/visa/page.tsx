@@ -2,8 +2,9 @@
 
 import {useEffect,useState} from 'react';
 import Shell from '@/components/Shell';
+import OrgList from '@/components/OrgList';
 import {request} from '@/lib/api';
-import {fa} from '@/lib/i18n';
+import {fa,fmtDateTime} from '@/lib/i18n';
 
 type CaseRow={id:string;patient_id:string;status:string};
 type CheckRow={item_key:string;status:string;review_reference:string|null};
@@ -93,7 +94,7 @@ export default function VisaCoordination(){
     <label>مرجع اداری غیرحساس (لاتین، حداقل ۶ نویسه)<input value={reference} minLength={6} maxLength={100}
      pattern="[A-Za-z0-9][A-Za-z0-9._:/-]{5,99}" onChange={e=>setReference(e.target.value)}/></label>
     <label>عنوان مرجع دریافت‌کننده (فقط برای گزارش دستی)<input value={authority} maxLength={100}
-     placeholder="مثلاً: بخش کنسولی سفارت" onChange={e=>setAuthority(e.target.value)}/></label>
+     list="visa-authorities" placeholder="از فهرست تنظیمات انتخاب کنید" onChange={e=>setAuthority(e.target.value)}/><OrgList id="visa-authorities" kind="visa_authorities"/></label>
     <label>نتیجه اعلام‌شده (تأیید مستقل نشده)<select value={outcome} onChange={e=>setOutcome(e.target.value)}>
      {['issued_reported','refused_reported','additional_information_reported'].map(x=><option key={x} value={x}>{title(x)}</option>)}
     </select></label>
@@ -103,7 +104,7 @@ export default function VisaCoordination(){
      <strong>پرونده {v.id.slice(0,8)} · {title(v.status)} · {v.origin_country} ← {v.destination_country}</strong>
      <small>تأیید رسمی صدور ویزا: خیر · اتصال دولتی: غیرفعال · آخرین مرجع اعلامی: {v.external_reference||'ندارد'}</small>
      {v.decision_reported&&<p>نتیجه ثبت‌شده: {title(v.decision_reported)} — اعتبارسنجی رسمی نشده است.</p>}
-     {v.next_action_due_at&&<p>پیگیری داخلی: {new Date(v.next_action_due_at).toLocaleString('fa-IR')}</p>}
+     {v.next_action_due_at&&<p>پیگیری داخلی: {fmtDateTime(v.next_action_due_at)}</p>}
      <div style={{display:'grid',gap:8}}>
       {v.checklist.map(c=><div key={c.item_key} style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
        <span>{title(c.item_key)}: {title(c.status)}</span>
@@ -134,7 +135,7 @@ export default function VisaCoordination(){
       <button disabled={busy} onClick={()=>void showHistory(v.id)}>نمایش تاریخچه</button>
      </div>
      {events[v.id]&&<div style={{borderTop:'1px solid #d4dde7',paddingTop:8}}>
-      {events[v.id].map(e=><p key={e.id}>{new Date(e.at).toLocaleString('fa-IR')} · {fa(e.action)} · {title(e.previous)} → {title(e.current)} · {e.reference}</p>)}
+      {events[v.id].map(e=><p key={e.id}>{fmtDateTime(e.at)} · {fa(e.action)} · {title(e.previous)} → {title(e.current)} · {e.reference}</p>)}
      </div>}
     </div>)}
   </section>

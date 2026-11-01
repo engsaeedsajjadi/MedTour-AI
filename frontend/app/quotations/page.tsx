@@ -5,7 +5,7 @@ import {useEffect,useState} from 'react';
 import Link from 'next/link';
 import Shell from '@/components/Shell';
 import {request,downloadPdf} from '@/lib/api';
-import {fa} from '@/lib/i18n';
+import {fa,fmtDateTime} from '@/lib/i18n';
 
 type Quote={id:string;case_id:string;currency:string;amount_minor:number;status:string};
 type CaseRow={id:string;status:string};
@@ -136,7 +136,7 @@ export default function Quotations(){
       <select value={line.fx_rate_id||''} onChange={e=>changeLine(i,{fx_rate_id:e.target.value||null})}>
        <option value="">انتخاب مدرک نرخ ارز</option>
        {fxOptions.map(r=><option key={r.id} value={r.id}>
-        {r.numerator}/{r.denominator} · {r.source_reference} · تا {new Date(r.expires_at).toLocaleString('fa-IR')}
+        {r.numerator}/{r.denominator} · {r.source_reference} · تا {fmtDateTime(r.expires_at)}
        </option>)}
       </select>
      </label>}

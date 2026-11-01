@@ -2,8 +2,9 @@
 import {useEffect,useState} from 'react';
 import Link from 'next/link';
 import Shell from '@/components/Shell';
+import OrgList from '@/components/OrgList';
 import {request} from '@/lib/api';
-import {fa} from '@/lib/i18n';
+import {fa,fmtDateTime} from '@/lib/i18n';
 
 type Hotel={id:string;name:string;city:string;status:string};
 type Capacity={id:string;room_type:string;proposed_rooms:number;starts_on:string;ends_on:string;status:string;reference:string};
@@ -128,7 +129,7 @@ export default function Accommodation(){
    <h2>۳. پیگیری و تأیید هتل</h2>
    <label>شماره مرجع (لاتین، حداقل ۶ نویسه؛ مثلاً شماره تأییدیه هتل)<input dir="ltr" value={reference} onChange={e=>setReference(e.target.value)}/></label>
    <label>نام مرجع ارائه‌دهنده برای گزارش تماس (حداقل ۶ حرف لاتین)
-    <input maxLength={100} value={supplier} onChange={e=>setSupplier(e.target.value)} placeholder="مثلاً: واحد رزرو هتل"/>
+    <input maxLength={100} dir="ltr" list="supplier-desks" value={supplier} onChange={e=>setSupplier(e.target.value)} placeholder="از فهرست تنظیمات انتخاب کنید"/><OrgList id="supplier-desks" kind="supplier_desks"/>
    </label>
    {stays.length===0?<p>برای این پرونده درخواستی موجود نیست یا رضایت فعال نیست.</p>:
     stays.map(s=><div key={s.id} style={{borderTop:'1px solid #d4dde7',padding:'14px 0',display:'grid',gap:10}}>
@@ -147,7 +148,7 @@ export default function Accommodation(){
        <button disabled={busy||reference.length<6} onClick={()=>transition(s.id,'cancel')}>لغو درخواست داخلی</button>}
      </div>}
      <button disabled={busy} onClick={()=>void historyFor(s.id)}>نمایش سوابق</button>
-     {history[s.id]?.map((e,i)=><p key={i}>{new Date(e.at).toLocaleString('fa-IR')} · {fa(e.action)} · {label(e.previous)} → {label(e.current)} · {e.reference}</p>)}
+     {history[s.id]?.map((e,i)=><p key={i}>{fmtDateTime(e.at)} · {fa(e.action)} · {label(e.previous)} → {label(e.current)} · {e.reference}</p>)}
     </div>)}
   </section>
  </Shell>;

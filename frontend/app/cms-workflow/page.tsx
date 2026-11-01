@@ -2,7 +2,7 @@
 import {useEffect,useState} from 'react';
 import Shell from '@/components/Shell';
 import {request} from '@/lib/api';
-import {fa} from '@/lib/i18n';
+import {fa,fmtDateTime} from '@/lib/i18n';
 
 type Stage='translation'|'medical'|'legal';
 type ReviewState='pending'|'approved'|'rejected';
@@ -182,7 +182,7 @@ export default function CmsWorkflow(){
   {current&&<section className="panel" style={{padding:20,marginBlock:16}}>
    <h2>۶. تاریخچه حسابرسی</h2>
    <div className="tableScroll"><table><thead><tr><th>زمان</th><th>عملیات</th><th>مرجع</th><th>بازیگر</th></tr></thead>
-    <tbody>{events.map(e=><tr key={e.id}><td>{new Date(e.created_at).toLocaleString('fa-IR')}</td>
+    <tbody>{events.map(e=><tr key={e.id}><td>{fmtDateTime(e.created_at)}</td>
      <td>{fa(e.action)}</td><td dir="ltr">{e.reference}</td><td>{e.actor_id.slice(0,8)}</td></tr>)}</tbody></table></div>
   </section>}
  </Shell>;

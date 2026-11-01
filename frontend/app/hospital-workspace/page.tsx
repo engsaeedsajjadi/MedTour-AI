@@ -2,7 +2,7 @@
 import {useEffect,useState} from 'react';
 import Shell from '@/components/Shell';
 import {request} from '@/lib/api';
-import {fa} from '@/lib/i18n';
+import {fa,fmtDateTime} from '@/lib/i18n';
 
 type Profile={hospital_id:string;name:string;city:string;evidence_status:string;
  regulator_license_verified:boolean;hospital_capacity_live_verified:boolean};
@@ -48,7 +48,7 @@ export default function HospitalWorkspace(){
     <section className="panel" style={{padding:20}}>
      <h2>بازه‌های ظرفیت پیشنهادی</h2>
      {slots.length===0?<p>ظرفیت پیشنهادی فعالی وجود ندارد.</p>:slots.map(x=>
-      <p key={x.id}>{fa(x.service_code)} · {x.proposed_units} واحد · از {new Date(x.starts_at).toLocaleString('fa-IR')} تا {new Date(x.ends_at).toLocaleString('fa-IR')}</p>)}
+      <p key={x.id}>{fa(x.service_code)} · {x.proposed_units} واحد · از {fmtDateTime(x.starts_at)} تا {fmtDateTime(x.ends_at)}</p>)}
      <p>این فهرست به‌صورت خودکار با تقویم و ظرفیت داخلی بیمارستان همگام نمی‌شود.</p>
     </section>
     <section className="panel" style={{padding:20}}>

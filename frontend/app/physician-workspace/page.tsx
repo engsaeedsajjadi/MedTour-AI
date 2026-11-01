@@ -3,7 +3,7 @@ import Link from 'next/link';
 import {useEffect,useState} from 'react';
 import Shell from '@/components/Shell';
 import {request} from '@/lib/api';
-import {fa} from '@/lib/i18n';
+import {fa,fmtDateTime,fmtDate} from '@/lib/i18n';
 
 type Me={
  physician_id:string;name:string;specialty:string;city:string;
@@ -40,7 +40,7 @@ export default function PhysicianWorkspace(){
     <h2>{me.name}</h2>
     <p>تخصص: {me.specialty} · شهر: {me.city}</p>
     <p>وضعیت فهرست: {me.directory_status} · وضعیت بررسی محلی مدرک: {fa(me.evidence_status)}</p>
-    <p>انقضای شواهد: {me.evidence_expiry?new Date(me.evidence_expiry).toLocaleDateString('fa-IR'):'نامشخص'}</p>
+    <p>انقضای شواهد: {me.evidence_expiry?fmtDate(me.evidence_expiry):'نامشخص'}</p>
     <p>استعلام مستقل مجوز: <strong>انجام نشده</strong></p>
     <p>درخواست بازبینی فرم پذیرش فقط از طریق <Link href="/intake-clinician">مسیر بازبینی انسانی محدود</Link> انجام می‌شود که کنترل مجوز و انتساب جداگانه دارد.</p>
    </section>
@@ -55,7 +55,7 @@ export default function PhysicianWorkspace(){
     <section className="panel" style={{padding:20}}>
      <h2>درخواست‌های نوبت</h2>
      {appointments.length===0?<p>درخواستی موجود نیست.</p>:appointments.map(x=><div key={x.id} style={{padding:9,borderBottom:'1px solid #d7dfe5'}}>
-      <strong>{new Date(x.requested_at).toLocaleString('fa-IR')}</strong>
+      <strong>{fmtDateTime(x.requested_at)}</strong>
       <p>وضعیت داخلی: {fa(x.status)} · شناسه {x.id.slice(0,10)}</p>
      </div>)}
      <p>وضعیت داخلی به معنی تأیید نوبت توسط پزشک یا مرکز درمانی نیست.</p>
@@ -63,7 +63,7 @@ export default function PhysicianWorkspace(){
     <section className="panel" style={{padding:20}}>
      <h2>بازه‌های پیشنهادی</h2>
      {slots.length===0?<p>بازه‌ای ثبت نشده است.</p>:slots.map(x=><p key={x.id}>
-      {new Date(x.starts_at).toLocaleString('fa-IR')} تا {new Date(x.ends_at).toLocaleString('fa-IR')} · پیشنهادی
+      {fmtDateTime(x.starts_at)} تا {fmtDateTime(x.ends_at)} · پیشنهادی
      </p>)}
      <p>این فهرست به‌صورت خودکار با تقویم مطب شما همگام نمی‌شود.</p>
     </section>

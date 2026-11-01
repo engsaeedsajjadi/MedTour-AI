@@ -2,6 +2,7 @@
 import {useEffect,useState} from 'react';
 import SettingsPageFrame from '@/components/SettingsPageFrame';
 import {request} from '@/lib/api';
+import {fmtDate} from '@/lib/i18n';
 
 type Hotel={id:string;name:string;city:string;status:string};
 type Capacity={id:string;room_type:string;proposed_rooms:number;starts_on:string;ends_on:string;status:string;reference:string};
@@ -52,7 +53,7 @@ export default function HotelSettings(){
    </form>
    <div className="tableScroll"><table><thead><tr><th>نوع اتاق</th><th>تعداد</th><th>از</th><th>تا</th><th>مرجع</th><th>وضعیت</th><th></th></tr></thead><tbody>
     {capacity.length===0?<tr><td className="empty" colSpan={7}>ظرفیتی ثبت نشده است.</td></tr>:capacity.map(c=><tr key={c.id}>
-     <td>{ROOM[c.room_type]||c.room_type}</td><td>{c.proposed_rooms.toLocaleString('fa-IR')}</td><td>{c.starts_on}</td><td>{c.ends_on}</td><td dir="ltr">{c.reference}</td>
+     <td>{ROOM[c.room_type]||c.room_type}</td><td>{c.proposed_rooms.toLocaleString('fa-IR')}</td><td>{fmtDate(c.starts_on)}</td><td>{fmtDate(c.ends_on)}</td><td dir="ltr">{c.reference}</td>
      <td><span className={'badge '+(c.status==='proposed'?'good':'muted')}>{STATUS[c.status]||c.status}</span></td>
      <td>{c.status==='proposed'&&<button type="button" className="button secondary" disabled={busy} onClick={()=>revoke(c.id)}>لغو</button>}</td></tr>)}
    </tbody></table></div>

@@ -3,7 +3,7 @@ import {useCallback,useEffect,useState} from 'react';
 import Link from 'next/link';
 import Shell from '@/components/Shell';
 import {request} from '@/lib/api';
-import {fa} from '@/lib/i18n';
+import {fa,fmtDateTime} from '@/lib/i18n';
 
 type Module = {key:string;label:string;route:string;status:string;master_section:number};
 type CaseRow = {id:string;specialty:string;status:string};
@@ -121,7 +121,7 @@ export default function EnterpriseModules() {
      <div className="tableScroll"><table><thead><tr><th>شناسه وظیفه</th><th>وضعیت</th><th>تاریخ ثبت</th><th>عملیات</th></tr></thead>
       <tbody>{workspace.tasks.length===0?<tr><td colSpan={4}>وظیفه‌ای ثبت نشده است.</td></tr>:workspace.tasks.map(t=><tr key={t.id}>
        <td><code>{t.id.slice(0,8)}…</code></td><td>{fa(t.status)}</td>
-       <td>{new Date(t.created_at).toLocaleString('fa-IR')}</td>
+       <td>{fmtDateTime(t.created_at)}</td>
        <td><button type="button" className="button secondary" disabled={updating} onClick={()=>changeTask(t.id,t.status)}>{t.status==='open'?'تکمیل':'بازگشایی'}</button></td>
       </tr>)}</tbody></table></div>
      {workspace.tasks_truncated&&<p>فقط ۱۰۰ وظیفه آخر نمایش داده می‌شود.</p>}

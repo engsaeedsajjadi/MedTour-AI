@@ -73,6 +73,10 @@ class ProfileIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     display_name: str = Field(default="", max_length=80)
     timezone: str = Field(default="Asia/Tehran", max_length=64)
+    calendar: Literal["jalali", "gregorian"] = "jalali"
+    digits: Literal["persian", "latin"] = "persian"
+    # Page opened after sign-in; empty means the default page of the user's role.
+    start_page: str = Field(default="", max_length=40, pattern=r"^([a-z][a-z-]{1,39})?$")
 
     @field_validator("display_name")
     @classmethod
@@ -106,7 +110,10 @@ def my_profile(db: Session = Depends(get_db), user: User = Depends(current_user)
     tenant = db.scalar(select(Tenant).where(Tenant.id == user.tenant_id))
     return {"email": user.email, "role": user.role, "organization_slug": tenant.slug if tenant else "",
             "display_name": prefs.get("display_name", ""), "timezone": prefs.get("timezone", "Asia/Tehran"),
-            "two_factor_enabled": bool(totp and totp.enabled), "two_factor_required": staff_mfa_required(user.role),
+            "calendar": prefs.get("calendar", "jalali"), "digits": prefs.get("digits", "persian"),
+            "start_page": prefs.get("start_page", ""),
+            "two_factor_enabled": bool(totp and totp.enabled),
+            "two_factor_required": staff_mfa_required(user.role) or organization_requires_mfa(db, user),
             "sessions": _sessions(db, user)}
 
 
@@ -156,6 +163,15 @@ class OrganizationIn(BaseModel):
     privacy_notice_version: str = Field(default="v1", min_length=1, max_length=40, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$")
     # Public link the Telegram bot's "contact operator" button opens (e.g. https://t.me/<operator>).
     telegram_operator_url: str = Field(default="", max_length=300)
+    # Name in Latin letters for PDF documents (PDFs use a Latin font).
+    latin_name: str = Field(default="", max_length=100, pattern=r"^([A-Za-z0-9][A-Za-z0-9 .,&'()/-]{1,99})?$")
+    quote_validity_days: int = Field(default=30, ge=1, le=180)
+    quote_footer_note: str = Field(default="", max_length=200, pattern=r"^[\x20-\x7E]*$")
+    # Names picked from lists instead of retyped for every case (Latin, as the records require).
+    visa_authorities: list[str] = Field(default_factory=list, max_length=30)
+    supplier_desks: list[str] = Field(default_factory=list, max_length=50)
+    # Extra staff roles that must use two-step sign-in (admin/operator may already be required by the server).
+    two_factor_roles: list[Literal["admin", "operator", "hospital", "physician", "doctor", "agent", "cms_editor"]] = Field(default_factory=list)
 
     @field_validator("contact_email")
     @classmethod
@@ -195,6 +211,23 @@ class OrganizationIn(BaseModel):
         if value not in available_timezones():
             raise ValueError("Unknown time zone")
         return value
+
+    @field_validator("visa_authorities", "supplier_desks")
+    @classmethod
+    def names(cls, value: list[str]) -> list[str]:
+        clean = []
+        for item in value:
+            item = " ".join(str(item).split())
+            if not re.fullmatch(r"[A-Za-z][A-Za-z0-9 ._/-]{5,99}", item):
+                raise ValueError("Each name: 6-100 Latin letters, digits, space . _ / -")
+            if item not in clean:
+                clean.append(item)
+        return clean
+
+    @field_validator("two_factor_roles")
+    @classmethod
+    def unique_roles(cls, value: list[str]) -> list[str]:
+        return sorted(set(value))
 
     @field_validator("enabled_languages")
     @classmethod
@@ -244,6 +277,23 @@ def publish_operator_url(url: str) -> bool:
         return False
 
 
+def _ai_status() -> dict:
+    """Non-secret view of the AI provider configuration; the key itself is never returned."""
+    from .ai import approved_provider_base_url, provider_available
+    from urllib.parse import urlsplit
+    base = approved_provider_base_url()
+    return {"provider_ready": provider_available(),
+            "provider_approved": os.getenv("AI_PROVIDER_APPROVED", "").lower() == "true",
+            "model": os.getenv("AI_MODEL", ""), "host": urlsplit(base).hostname if base else "",
+            "key_configured": bool(os.getenv("AI_API_KEY")),
+            "assistants_allowed_in_this_environment": os.getenv("APP_ENV", "development").lower() in ("development", "test")}
+
+
+def organization_requires_mfa(db: Session, user: User) -> bool:
+    """The organization may require two-step sign-in for more roles than the server does."""
+    return user.role in organization_profile(db, user.tenant_id).get("two_factor_roles", [])
+
+
 def _integrations(user: User, operator_url: str = "") -> dict:
     from . import otp_delivery
     from .secure_media import s3_ready
@@ -255,8 +305,11 @@ def _integrations(user: User, operator_url: str = "") -> dict:
         "patient_code_delivery": otp_delivery.provider() if otp_delivery.configured() else "not_configured",
         "secure_document_storage": "object_storage_scanned" if s3_ready() else "not_configured",
         "staff_two_factor_required": staff_mfa_required(user.role) or staff_mfa_required("admin"),
+        "ai": _ai_status(),
+        "whatsapp_outbound_approved": os.getenv("WHATSAPP_OUTBOUND_APPROVED", "").lower() == "true",
+        "voice_processing_approved": os.getenv("VOICE_PROCESSOR_APPROVED", "").lower() == "true",
         "environment": os.getenv("APP_ENV", "development"),
-        "managed_on_server": ["SMTP_PASSWORD", "TELEGRAM_BOT_TOKEN", "MEDICAL_MASTER_KEY", "MFA_ENCRYPTION_KEY"],
+        "managed_on_server": ["SMTP_PASSWORD", "TELEGRAM_BOT_TOKEN", "AI_API_KEY", "MEDICAL_MASTER_KEY", "MFA_ENCRYPTION_KEY"],
     }
 
 
@@ -275,6 +328,12 @@ def update_organization(body: OrganizationIn, db: Session = Depends(get_db), use
     value = body.model_dump()
     if value["default_language"] not in value["enabled_languages"]:
         raise HTTPException(422, "Default language must be one of the enabled languages")
+    if value["two_factor_roles"]:
+        from .identity_access import encryption_key
+        try:
+            encryption_key()
+        except HTTPException:
+            raise HTTPException(422, "Two-step sign-in cannot be required: the server's MFA_ENCRYPTION_KEY is not set") from None
     owner = bot_owner(db, user.tenant_id)
     if not owner:
         # Only the organization that owns this deployment's bot may point its button somewhere.

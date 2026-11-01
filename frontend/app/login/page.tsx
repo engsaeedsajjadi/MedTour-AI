@@ -1,18 +1,22 @@
 'use client';
 import {useState} from 'react';
-import {API_BASE} from '@/lib/api';
+import {API_BASE,request} from '@/lib/api';
 import {faError,faNetwork} from '@/lib/i18n';
-import {homeFor} from '@/lib/roles';
+import {allowedFor,homeFor} from '@/lib/roles';
+import {rememberDisplay} from '@/lib/preferences';
 type Tokens={access_token:string;refresh_token:string;role:string};
 type Challenge={mfa_required:true;challenge_token:string;expires_in:number};
 export default function Login(){
  const [tenant,setTenant]=useState('medtour-local'),[email,setEmail]=useState(''),[password,setPassword]=useState('');
  const [otp,setOtp]=useState(''),[challenge,setChallenge]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false);
- function enter(t:Tokens){
+ async function enter(t:Tokens){
   sessionStorage.setItem('medtour_tenant_slug',tenant);
   sessionStorage.setItem('medtour_token',t.access_token);
   sessionStorage.setItem('medtour_refresh',t.refresh_token);
-  window.location.replace(homeFor(String(t.role)));
+  // The start page chosen in Settings, when it is a page this role may open.
+  let target=homeFor(String(t.role));
+  try{const p=await request<{start_page:string;timezone:string;calendar:string;digits:string}>('/account/profile');rememberDisplay(p);if(p.start_page&&allowedFor(String(t.role),p.start_page))target='/'+p.start_page;}catch{}
+  window.location.replace(target);
  }
  async function submit(e:React.FormEvent){
   e.preventDefault();setBusy(true);setError('');

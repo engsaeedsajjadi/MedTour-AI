@@ -49,6 +49,11 @@ def staff_mfa_required(role:str|None=None)->bool:
     enabled=os.getenv('APP_ENV','development')=='production' or os.getenv('STAFF_MFA_REQUIRED','').lower()=='true'
     return enabled and (role is None or role in staff_mfa_roles())
 
+def _organization_requires_mfa(db,user)->bool:
+    from .account_settings import organization_requires_mfa
+    try:return organization_requires_mfa(db,user)
+    except Exception:return False
+
 def current_user(request:Request,credentials:HTTPAuthorizationCredentials|None=Depends(BEARER),db:Session=Depends(get_db)) -> User:
     if credentials is None: raise HTTPException(status_code=401,detail='Authentication required')
     try:
@@ -66,7 +71,8 @@ def current_user(request:Request,credentials:HTTPAuthorizationCredentials|None=D
         if revoked: raise ValueError('Access token has been revoked')
     except (jwt.PyJWTError, ValueError, KeyError):
         raise HTTPException(status_code=401,detail='Invalid or expired token')
-    if staff_mfa_required(user.role) and data.get('mfa') is not True and not request.url.path.startswith(MFA_EXEMPT_PREFIXES):
+    if data.get('mfa') is not True and not request.url.path.startswith(MFA_EXEMPT_PREFIXES) and (
+            staff_mfa_required(user.role) or _organization_requires_mfa(db,user)):
         # Signed in with a password only: allow enrolment/verification of the second factor, nothing else.
         raise HTTPException(status_code=403,detail='Two-factor authentication required')
     return user

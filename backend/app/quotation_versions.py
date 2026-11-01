@@ -240,18 +240,18 @@ def approve(version_id:str,body:ReviewIn,db:Session=Depends(get_db),user:User=De
     db.commit()
     return payload(x)
 
-def pdf_bytes(lines):
+def pdf_bytes(lines,brand="MedTour AI",footer_text="ESTIMATE - NOT A HOSPITAL INVOICE"):
     """Multi-page, text-sanitized A4 PDF with bounded wrapping and no medical notes."""
     buffer=BytesIO()
     document=SimpleDocTemplate(buffer,pagesize=A4,topMargin=48,bottomMargin=48,
                                 leftMargin=42,rightMargin=42,pageCompression=0,
-                                title="MedTour administrative quotation (test only)")
+                                title=brand+" - quotation")
     styles=getSampleStyleSheet()
     normal=ParagraphStyle("SafeQuoteBody",parent=styles["BodyText"],fontName="Helvetica",
         fontSize=9,leading=13,spaceAfter=7)
     header=ParagraphStyle("SafeQuoteHeader",parent=styles["Heading1"],fontName="Helvetica-Bold",
         fontSize=15,leading=21,textColor=colors.HexColor("#17314d"),spaceAfter=16)
-    story=[Paragraph("MEDTOUR AI - ADMINISTRATIVE QUOTATION",header)]
+    story=[Paragraph(escape(brand.upper()+" - QUOTATION"),header)]
     for i,line in enumerate(lines):
         if i == 0:continue
         # ASCII transliteration here remains deliberately conservative:
@@ -264,7 +264,7 @@ def pdf_bytes(lines):
         canvas.setStrokeColor(colors.HexColor("#d7e1ea"))
         canvas.line(42,38,A4[0]-42,38)
         canvas.setFont("Helvetica",8)
-        canvas.drawString(42,27,"INTERNAL TEST ESTIMATE - NOT A HOSPITAL INVOICE")
+        canvas.drawString(42,27,footer_text[:110])
         canvas.drawRightString(A4[0]-42,27,f"Page {doc.page}")
         canvas.restoreState()
     document.build(story,onFirstPage=footer,onLaterPages=footer)
@@ -277,10 +277,15 @@ def export_pdf(version_id:str,db:Session=Depends(get_db),user:User=Depends(staff
     if x is None:raise HTTPException(404,"Version not found")
     q,case=quote_case(db,user,x.quote_id)
     if x.status!="approved":raise HTTPException(409,"Only approved snapshots can be exported")
+    from .account_settings import organization_profile
+    org=organization_profile(db,user.tenant_id)
+    brand=org.get("latin_name") or "MedTour AI"
+    approved_at=(x.created_at or datetime.now(timezone.utc))
+    valid_until=(utc_time(approved_at)+timedelta(days=int(org.get("quote_validity_days") or 30))).date().isoformat()
     lines=[
-      "MEDTOUR AI - ADMINISTRATIVE QUOTATION",
-      "TEST / DEVELOPMENT DATA ONLY - NOT A PROVIDER INVOICE",
+      brand.upper()+" - QUOTATION",
       "Quote ID: "+q.id,"Version: "+str(x.version),
+      "Valid until: "+valid_until,
       "Currency: "+x.currency,"Case Reference: "+case.id,
       "Internal approval ref: "+str(x.approval_reference),
       "----------------------------------------",
@@ -293,9 +298,10 @@ def export_pdf(version_id:str,db:Session=Depends(get_db),user:User=Depends(staff
             lines.append("   Manual FX reference: "+row["fx_source_reference"])
             lines.append("   Source amount: "+str(row["source_total_minor"])+" "+row["source_currency"]+" minor units")
     lines+=["----------------------------------------","TOTAL: "+str(x.total_minor)+" "+x.currency+" minor units",
-            "Documented manual FX only when listed; no live-provider confirmation.",
-            "Not a clinical recommendation or payment confirmation."]
+            "Exchange rates, where listed, are documented manual rates.",
+            "This estimate is not a clinical recommendation, an invoice or a payment confirmation."]
+    if org.get("quote_footer_note"):lines.append(org["quote_footer_note"])
     if len(lines)>350:raise HTTPException(422,"Document exceeds bounded export limit")
-    return Response(pdf_bytes(lines),media_type="application/pdf",
+    return Response(pdf_bytes(lines,brand=brand),media_type="application/pdf",
         headers={"Content-Disposition":'attachment; filename="quotation-'+x.id+'.pdf"',
                  "Cache-Control":"no-store","X-Content-Type-Options":"nosniff"})

@@ -2,7 +2,7 @@
 import {useEffect,useState} from 'react';
 import Shell from '@/components/Shell';
 import {request} from '@/lib/api';
-import {fa} from '@/lib/i18n';
+import {fa,fmtDateTime} from '@/lib/i18n';
 
 type Patient={id:string;full_name:string;language:string};
 type CaseItem={id:string;patient_id:string;status:string;assigned_operator_id:string|null};
@@ -143,7 +143,7 @@ export default function PatientCRM(){
      pattern="[A-Za-z0-9][A-Za-z0-9._:/-]{5,99}" minLength={6} maxLength={100}/>
    </label>
    {items.length===0?<p>پیگیری بازی در این محدوده وجود ندارد.</p>:items.map(x=><div key={x.id} style={{padding:12,borderBottom:'1px solid #cdd7df'}}>
-    <strong>{x.case_id.slice(0,8)}</strong> — {x.reason_code} — {new Date(x.due_at).toLocaleString('fa-IR')}
+    <strong>{x.case_id.slice(0,8)}</strong> — {x.reason_code} — {fmtDateTime(x.due_at)}
     <button type="button" disabled={working||!followupReference} style={{margin:6}} onClick={()=>resolve(x.id,'complete')}>ثبت نتیجه</button>
     <button type="button" disabled={working} onClick={()=>resolve(x.id,'cancel')}>لغو</button>
    </div>)}

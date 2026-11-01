@@ -3,7 +3,7 @@ import Link from 'next/link';
 import {useEffect,useState} from 'react';
 import Shell from '@/components/Shell';
 import {request} from '@/lib/api';
-import {fa} from '@/lib/i18n';
+import {fa,fmtDate} from '@/lib/i18n';
 
 type Directory={
  physician_id:string;name:string;specialty:string;city:string;
@@ -85,7 +85,7 @@ export default function PhysicianAdministration(){
     </label>
     {chosen&&<p>
      وضعیت فهرست: {chosen.directory_status} · شواهد مجوز: <strong>{fa(chosen.evidence_status)}</strong>
-     {chosen.evidence_expiry?' · تاریخ انقضا: '+new Date(chosen.evidence_expiry).toLocaleDateString('fa-IR'):''}
+     {chosen.evidence_expiry?' · تاریخ انقضا: '+fmtDate(chosen.evidence_expiry):''}
      {' · '}حساب متصل: {chosen.linked_user_id?.slice(0,12)||'ندارد'}
     </p>}
     <p>شمار پزشکان در محدوده: {items.length} · احراز مستقل مجوز توسط مرجع تخصصی: خیر</p>

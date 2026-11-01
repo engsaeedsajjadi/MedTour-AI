@@ -1,4 +1,5 @@
 'use client';
+import {fmtDateTime} from '@/lib/i18n';
 import {useEffect,useState} from 'react';
 import Shell from '@/components/Shell';
 import {request} from '@/lib/api';
@@ -123,7 +124,7 @@ export default function Agents(){
   </section>}
   {selectedAgent&&<section className="panel" style={{padding:20,marginTop:16}}>
    <h2>۶. ردپای حسابرسی</h2>
-   {history.slice(0,30).map((h,i)=><p key={i}>{new Date(h.created_at).toLocaleString('fa-IR')} · {h.event} · {h.entity_kind}</p>)}
+   {history.slice(0,30).map((h,i)=><p key={i}>{fmtDateTime(h.created_at)} · {h.event} · {h.entity_kind}</p>)}
   </section>}
  </Shell>;
 }

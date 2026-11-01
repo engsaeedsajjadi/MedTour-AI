@@ -2,7 +2,7 @@
 import {useEffect,useState} from 'react';
 import Shell from '@/components/Shell';
 import {request} from '@/lib/api';
-import {fa} from '@/lib/i18n';
+import {fa,fmtDateTime} from '@/lib/i18n';
 type Case={id:string;status:string;specialty:string};
 type Doctor={id:string;full_name:string;specialty:string};
 type Booking={id:string;physician_id:string;starts_at:string;ends_at:string;status:string;external_booking_confirmed:boolean};
@@ -53,7 +53,7 @@ export default function Appointments(){
    <h2>نوبت‌های ثبت‌شده در سیستم داخلی</h2>
    <label>مرجع اداری بازبینی <input minLength={6} maxLength={100} value={ref} onChange={e=>setRef(e.target.value)}/></label>
    {rows.map(x=><div key={x.id} style={{padding:12,borderBottom:'1px solid #ddd'}}>
-    <p>پزشک {x.physician_id.slice(0,8)} · {new Date(x.starts_at).toLocaleString('fa-IR')} — {new Date(x.ends_at).toLocaleString('fa-IR')} · {fa(x.status)}</p>
+    <p>پزشک {x.physician_id.slice(0,8)} · {fmtDateTime(x.starts_at)} — {fmtDateTime(x.ends_at)} · {fa(x.status)}</p>
     {role==='admin'&&(x.status==='requested'||x.status==='internally_confirmed')&&<div style={{display:'flex',gap:8}}>
      {x.status==='requested'&&<button disabled={busy||ref.length<6} onClick={()=>void act('/appointment-calendar/requests/'+x.id+'/review',{action:'internally_confirmed',reference:ref})}>تأیید داخلی</button>}
      <button disabled={busy||ref.length<6} onClick={()=>void act('/appointment-calendar/requests/'+x.id+'/review',{action:'cancelled',reference:ref})}>لغو</button>
