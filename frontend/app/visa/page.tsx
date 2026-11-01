@@ -3,6 +3,7 @@
 import {useEffect,useState} from 'react';
 import Shell from '@/components/Shell';
 import {request} from '@/lib/api';
+import {fa} from '@/lib/i18n';
 
 type CaseRow={id:string;patient_id:string;status:string};
 type CheckRow={item_key:string;status:string;review_reference:string|null};
@@ -63,7 +64,7 @@ export default function VisaCoordination(){
  }
  return <Shell title="هماهنگی ویزای درمانی">
   <div className="infoBanner">
-   فقط داده ساختگی در محیط توسعه. هیچ درخواست ویزا به مرجع دولتی ارسال نمی‌شود؛ نتیجه‌های ثبت‌شده، گزارش انسانی و غیرقابل اتکا به‌عنوان تأیید رسمی هستند. شماره گذرنامه، تصویر مدرک، تاریخ تولد و شرح پزشکی را در فیلدهای مرجع وارد نکنید. چک‌لیست نمونه است و الزامات رسمی کشورها نیست.
+   فقط داده ساختگی در نسخه نمایشی. هیچ درخواست ویزا به مرجع دولتی ارسال نمی‌شود؛ نتیجه‌های ثبت‌شده، گزارش انسانی و غیرقابل اتکا به‌عنوان تأیید رسمی هستند. شماره گذرنامه، تصویر مدرک، تاریخ تولد و شرح پزشکی را در فیلدهای مرجع وارد نکنید. چک‌لیست نمونه است و الزامات رسمی کشورها نیست.
   </div>
   {error&&<div className="errorBox" role="alert">{error}</div>}
   {notice&&<div className="infoBanner" role="status">{notice}</div>}
@@ -72,7 +73,7 @@ export default function VisaCoordination(){
    <p>پیش‌نیاز: رضایت فعال بیمار برای «پذیرش اولیه» و «هماهنگی ویزا»؛ رضایت باید جداگانه و با اطلاع بیمار ثبت شود.</p>
    <div style={{display:'grid',gap:10,maxWidth:620}}>
     <label>پرونده<select value={id} onChange={e=>{setId(e.target.value);setEvents({});void load(e.target.value).catch(x=>setError((x as Error).message));}}>
-     <option value="">انتخاب پرونده</option>{cases.map(c=><option key={c.id} value={c.id}>{c.id.slice(0,8)} · {c.status}</option>)}
+     <option value="">انتخاب پرونده</option>{cases.map(c=><option key={c.id} value={c.id}>{c.id.slice(0,8)} · {fa(c.status)}</option>)}
     </select></label>
     <label>کد دوحرفی کشور مبدأ<input maxLength={2} value={origin} onChange={e=>setOrigin(e.target.value.toUpperCase())}/></label>
     <label>تاریخ پیشنهادی سفر (اختیاری)<input type="datetime-local" value={departure} onChange={e=>setDeparture(e.target.value)}/></label>
@@ -92,7 +93,7 @@ export default function VisaCoordination(){
     <label>مرجع اداری غیرحساس (لاتین، حداقل ۶ نویسه)<input value={reference} minLength={6} maxLength={100}
      pattern="[A-Za-z0-9][A-Za-z0-9._:/-]{5,99}" onChange={e=>setReference(e.target.value)}/></label>
     <label>عنوان مرجع دریافت‌کننده (فقط برای گزارش دستی)<input value={authority} maxLength={100}
-     placeholder="Synthetic Desk" onChange={e=>setAuthority(e.target.value)}/></label>
+     placeholder="میز ویزای آزمایشی" onChange={e=>setAuthority(e.target.value)}/></label>
     <label>نتیجه اعلام‌شده (تأیید مستقل نشده)<select value={outcome} onChange={e=>setOutcome(e.target.value)}>
      {['issued_reported','refused_reported','additional_information_reported'].map(x=><option key={x} value={x}>{title(x)}</option>)}
     </select></label>
@@ -133,7 +134,7 @@ export default function VisaCoordination(){
       <button disabled={busy} onClick={()=>void showHistory(v.id)}>نمایش تاریخچه</button>
      </div>
      {events[v.id]&&<div style={{borderTop:'1px solid #d4dde7',paddingTop:8}}>
-      {events[v.id].map(e=><p key={e.id}>{new Date(e.at).toLocaleString('fa-IR')} · {e.action} · {title(e.previous)} → {title(e.current)} · {e.reference}</p>)}
+      {events[v.id].map(e=><p key={e.id}>{new Date(e.at).toLocaleString('fa-IR')} · {fa(e.action)} · {title(e.previous)} → {title(e.current)} · {e.reference}</p>)}
      </div>}
     </div>)}
   </section>

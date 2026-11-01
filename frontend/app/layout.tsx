@@ -1,5 +1,6 @@
 import type {Metadata} from 'next';
 import {headers} from 'next/headers';
+import 'vazirmatn/Vazirmatn-Variable-font-face.css';
 import './styles.css';
 export const metadata:Metadata={title:'MedTour AI | پنل مدیریت گردشگری سلامت',description:'پلتفرم مدیریت هماهنگی بیماران بین‌المللی'};
 export default async function RootLayout({children}:{children:React.ReactNode}){

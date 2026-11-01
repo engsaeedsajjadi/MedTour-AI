@@ -2,6 +2,7 @@
 import Shell from '@/components/Shell';
 import {API_BASE,getSession,request} from '@/lib/api';
 import {useCallback,useEffect,useRef,useState} from 'react';
+import {fa,faError} from '@/lib/i18n';
 
 type Draft={id:string;locale:string;kind:string;status:string;duration_ms:number;
  transcript_sha256:string|null;source_format:string};
@@ -51,8 +52,8 @@ export default function VoiceMedia(){
    form.append('synthetic_sample_only','true');
    const resp=await fetch(API_BASE+'/api/v1/voice/transcribe',{
     method:'POST',headers:{Authorization:'Bearer '+getSession()},body:form,cache:'no-store'});
-   const data=await resp.json() as Transcript&{detail?:string};
-   if(!resp.ok)throw Error(data.detail||'Transcription failed');
+   const data=await resp.json().catch(()=>({})) as Transcript&{detail?:string};
+   if(!resp.ok)throw Error(faError(data.detail,resp.status));
    setTranscript(data.draft_text||'');
    setCreated(data.id);
    setNotice('پیش‌نویس فقط در همین تب نمایش داده شد. متن و صوت خام ذخیره نشدند؛ پیش از هر استفاده بررسی انسانی لازم است.');
@@ -69,7 +70,7 @@ export default function VoiceMedia(){
     body:JSON.stringify({locale,intent,synthetic_sample_only:true})});
    if(!res.ok){
     const x=await res.json().catch(()=>({detail:'تولید صوت ناموفق بود.'}));
-    throw Error(String(x.detail||'Speech synthesis failed'));
+    throw Error(faError(x.detail,res.status));
    }
    if(!res.headers.get('content-type')?.includes('audio/wav'))
     throw Error('فرمت خروجی مجاز نیست.');
@@ -95,7 +96,7 @@ export default function VoiceMedia(){
    await refresh();
   }catch(e){setError((e as Error).message);}finally{setBusy(false);}
  }
- return <Shell title="پیام صوتی چندزبانه — STT / TTS">
+ return <Shell title="پیام صوتی چندزبانه">
   <div className="infoBanner">
    <strong>فقط محیط آزمایش با فایل ساختگی.</strong> ارسال فایل پزشکی یا صدای واقعی بیمار مجاز نیست. این صفحه به واتساپ یا تلگرام متصل نیست؛ دریافت خودکار فایل صوتی و ارسال خودکار پاسخ غیرفعال‌اند. صوت خام و متن بازشناسی‌شده در پایگاه‌داده ذخیره نمی‌شوند. پشتو و دری بدون ارزیابی مستقل کیفیت گفتار قابل عرضه تجاری نیستند.
   </div>
@@ -105,10 +106,10 @@ export default function VoiceMedia(){
    <h2>۱. وضعیت پردازش و زبان‌ها</h2>
    <p>STT فعال و تأییدشده در پیکربندی: {ready?.stt_enabled_locales.join('، ')||'هیچ‌کدام'}</p>
    <p>TTS فعال و تأییدشده در پیکربندی: {ready?.tts_enabled_locales.join('، ')||'هیچ‌کدام'}</p>
-   <p>فرمت ورود: WAV تک‌کاناله PCM16 یا OGG/Opus · حداکثر ۱ مگابایت · حداکثر ۳۰ ثانیه</p>
+   <p>فرمت ورودی: فایل WAV تک‌کاناله یا OGG · حداکثر ۱ مگابایت · حداکثر ۳۰ ثانیه</p>
   </section>
   <section className="panel" style={{padding:20,marginTop:18}}>
-   <h2>۲. تبدیل صدای آزمایشی به متن (STT)</h2>
+   <h2>۲. تبدیل صدای آزمایشی به متن</h2>
    <form onSubmit={transcribe} className="formGrid">
     <label>زبان نمونه<select value={locale} onChange={e=>setLocale(e.target.value)}>
      {langs.map(([value,label])=><option value={value} key={value}>{label}</option>)}
@@ -129,9 +130,9 @@ export default function VoiceMedia(){
    </div>}
   </section>
   <section className="panel" style={{padding:20,marginTop:18}}>
-   <h2>۳. تولید صوت نمونه از پیام‌های اداری ثابت (TTS)</h2>
+   <h2>۳. تولید صوت نمونه از پیام‌های اداری ثابت</h2>
    <label>پیام ثابت<select value={intent} onChange={e=>setIntent(e.target.value)}>
-    {intents.map(value=><option key={value} value={value}>{value}</option>)}
+    {intents.map(value=><option key={value} value={value}>{fa(value)}</option>)}
    </select></label>
    <button className="button secondary" disabled={busy||!ready?.tts_enabled_locales.includes(locale)}
     onClick={()=>void generate()}>تولید و شنیدن نمونه صوت</button>

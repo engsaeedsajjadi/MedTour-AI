@@ -2,6 +2,7 @@
 import {useEffect,useState} from 'react';
 import Shell from '@/components/Shell';
 import {request} from '@/lib/api';
+import {fa} from '@/lib/i18n';
 
 type User={id:string;email:string;role:string;active:boolean};
 type Assigned={session_id:string;case_id:string;language:string;status:string};
@@ -76,7 +77,7 @@ export default function ReviewerWorkspace(){
  }
  return <Shell title="بازبینی پذیرش و ارجاع تخصصی">
   <div className="infoBanner">
-   فقط محیط توسعه با داده ساختگی. نقش پزشک یا بررسی محلی مدرک به‌تنهایی اعتبار حرفه‌ای مستقل را تأیید نمی‌کند. این پنل به اطلاعات پزشکی خام دسترسی نمی‌دهد؛ تصمیم‌ها باید در فرایند بالینی معتبر و خارج از این نسخه تأیید شوند.
+   نسخه نمایشی با داده ساختگی. نقش پزشک یا بررسی محلی مدرک به‌تنهایی اعتبار حرفه‌ای مستقل را تأیید نمی‌کند. این پنل به اطلاعات پزشکی خام دسترسی نمی‌دهد؛ تصمیم‌ها باید در فرایند بالینی معتبر و خارج از این نسخه تأیید شوند.
   </div>
   {loading&&<p>در حال بررسی نقش و مجوز...</p>}
   {error&&<p role="alert" className="errorBox">{error}</p>}
@@ -119,7 +120,7 @@ export default function ReviewerWorkspace(){
    <h2>فرم‌های منتسب‌شده به شما</h2>
    {mine.length===0?<p>پذیرش دارای مجوز و انتساب فعال یافت نشد.</p>:<form onSubmit={recommend} style={{display:'grid',gap:12,maxWidth:650}}>
     <label>شناسه فرم<select value={session} onChange={e=>setSession(e.target.value)} required style={{display:'block',width:'100%',padding:10}}>
-     {mine.map(x=><option key={x.session_id} value={x.session_id}>{x.case_id.slice(0,8)} — {x.language} — {x.status}</option>)}
+     {mine.map(x=><option key={x.session_id} value={x.session_id}>{x.case_id.slice(0,8)} — {x.language} — {fa(x.status)}</option>)}
     </select></label>
     <label>نوع توصیه اداری<select value={action} onChange={e=>setAction(e.target.value)} required style={{display:'block',width:'100%',padding:10}}>
      {choices.map(([key,title])=><option value={key} key={key}>{title}</option>)}</select></label>

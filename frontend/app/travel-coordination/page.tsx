@@ -2,6 +2,7 @@
 import {useEffect,useState} from 'react';
 import Shell from '@/components/Shell';
 import {request} from '@/lib/api';
+import {fa} from '@/lib/i18n';
 
 type Case={id:string;status:string};
 type Resource={id:string;kind:'vehicle'|'interpreter';label:string;city:string;seats:number;language:string|null};
@@ -90,7 +91,7 @@ export default function TravelCoordination(){
   catch(e){setError((e as Error).message);}
  }
  return <Shell title="ترانسفر، حمل‌ونقل و مترجم">
-  <div className="infoBanner">فقط داده ساختگی. منابع و ظرفیت‌ها پیشنهاد داخلی هستند؛ مجوز راننده/مترجم، اعزام، رزرو و حضور واقعی مستقلاً تأیید نشده‌اند. هیچ شماره پرواز، نام همراه، آدرس، گذرنامه یا اطلاعات درمانی در این صفحه وارد نکنید. رضایت جداگانه «transport_coordination» یا «interpreter_coordination» و پذیرش اولیه باید فعال باشد.</div>
+  <div className="infoBanner">فقط داده ساختگی. منابع و ظرفیت‌ها پیشنهاد داخلی هستند؛ مجوز راننده/مترجم، اعزام، رزرو و حضور واقعی مستقلاً تأیید نشده‌اند. هیچ شماره پرواز، نام همراه، آدرس، گذرنامه یا اطلاعات درمانی در این صفحه وارد نکنید. رضایت جداگانه «هماهنگی ترانسفر» یا «هماهنگی مترجم» و پذیرش اولیه باید فعال باشد.</div>
   {error&&<div className="errorBox" role="alert">{error}</div>}
   {notice&&<div className="infoBanner" role="status">{notice}</div>}
   {role==='admin'&&<section className="panel" style={{padding:20,marginTop:16}}>
@@ -103,7 +104,7 @@ export default function TravelCoordination(){
     <label>شهر<input value={city} onChange={e=>setCity(e.target.value)}/></label>
     {type==='vehicle'?<label>ظرفیت صندلی پیشنهادی<input type="number" min={1} max={8} value={seats} onChange={e=>setSeats(Number(e.target.value))}/></label>:
      <label>زبان مترجم<select value={language} onChange={e=>setLanguage(e.target.value)}>
-      {['fa','en','ar','ps','prs'].map(x=><option key={x} value={x}>{x}</option>)}
+      {['fa','en','ar','ps','prs'].map(x=><option key={x} value={x}>{fa(x)}</option>)}
      </select></label>}
     <button disabled={busy||labelResource.length<3||city.length<2} onClick={()=>void send(ROOT+'/resources',{
      kind:type,label:labelResource,city,seats:type==='vehicle'?seats:1,language:type==='interpreter'?language:null
@@ -124,7 +125,7 @@ export default function TravelCoordination(){
        starts_at:new Date(start).toISOString(),ends_at:new Date(end).toISOString(),reference
       })}>ثبت بازه پیشنهادی</button>}
     {windows.map(w=><div key={w.id} style={{padding:8,borderTop:'1px solid #d4dde7'}}>
-     <span>{new Date(w.starts_at).toLocaleString('fa-IR')} تا {new Date(w.ends_at).toLocaleString('fa-IR')} · {w.status}</span>
+     <span>{new Date(w.starts_at).toLocaleString('fa-IR')} تا {new Date(w.ends_at).toLocaleString('fa-IR')} · {fa(w.status)}</span>
      {role==='admin'&&w.status==='proposed'&&<button disabled={busy} onClick={()=>void send(ROOT+'/windows/'+w.id+'/revoke',{})}>لغو بازه آزاد</button>}
     </div>)}
    </div>
@@ -133,7 +134,7 @@ export default function TravelCoordination(){
    <h2>۳. درخواست برای پرونده بیمار</h2>
    <div style={{display:'grid',gap:10,maxWidth:610}}>
     <label>پرونده<select value={caseId} onChange={e=>{setCaseId(e.target.value);void loadCase(e.target.value).catch(x=>setError((x as Error).message));}}>
-     <option value="">انتخاب پرونده</option>{cases.map(x=><option key={x.id} value={x.id}>{x.id.slice(0,8)} · {x.status}</option>)}
+     <option value="">انتخاب پرونده</option>{cases.map(x=><option key={x.id} value={x.id}>{x.id.slice(0,8)} · {fa(x.status)}</option>)}
     </select></label>
     <label>نوع خدمت<select value={kind} onChange={e=>setKind(e.target.value)}>
      {kinds.map(x=><option key={x} value={x}>{label(x)}</option>)}
@@ -154,7 +155,7 @@ export default function TravelCoordination(){
   </section>
   <section className="panel" style={{padding:20,marginTop:16}}>
    <h2>۴. تخصیص و پیگیری انسانی</h2>
-   <label>عنوان میز ارائه‌دهنده (فقط برای گزارش تماس)<input value={supplier} onChange={e=>setSupplier(e.target.value)} placeholder="Synthetic Vendor Desk"/></label>
+   <label>عنوان میز ارائه‌دهنده (فقط برای گزارش تماس)<input value={supplier} onChange={e=>setSupplier(e.target.value)} placeholder="میز تأمین‌کننده آزمایشی"/></label>
    {rows.map(x=><div key={x.id} style={{padding:'14px 0',borderTop:'1px solid #d4dde7'}}>
     <strong>{label(x.kind)} · {label(x.status)} · {new Date(x.starts_at).toLocaleString('fa-IR')}</strong>
     <p>منبع: {resources.find(r=>r.id===x.resource_id)?.label||x.resource_id.slice(0,8)} · اعزام خارجی تأییدشده: خیر</p>
@@ -168,7 +169,7 @@ export default function TravelCoordination(){
      {['requested','internally_allocated'].includes(x.status)&&<button disabled={busy||reference.length<6} onClick={()=>change(x.id,'cancel')}>لغو داخلی</button>}
     </div>}
     <button disabled={busy} onClick={()=>void showHistory(x.id)}>تاریخچه</button>
-    {history[x.id]?.map((h,i)=><p key={i}>{new Date(h.at).toLocaleString('fa-IR')} · {h.action} · {label(h.before)} ← {label(h.after)} · {h.reference}</p>)}
+    {history[x.id]?.map((h,i)=><p key={i}>{new Date(h.at).toLocaleString('fa-IR')} · {fa(h.action)} · {label(h.before)} ← {label(h.after)} · {h.reference}</p>)}
    </div>)}
   </section>
  </Shell>;

@@ -3,6 +3,7 @@
 import {useEffect,useState} from 'react';
 import Shell from '@/components/Shell';
 import {request} from '@/lib/api';
+import {fa} from '@/lib/i18n';
 
 type Thread={
  conversation_id:string;patient_id:string;channel:string;language:string;
@@ -106,7 +107,7 @@ export default function Conversations(){
  }
  return <Shell title="صندوق مکالمات انسانی">
   <div className="infoBanner">
-   این صندوق، گفت‌وگوهای داخلی و بازبینی انسانی را برای داده‌های ساختگی مدیریت می‌کند. اتصال زنده Chatwoot/WhatsApp تأیید نشده است؛ اطلاعات پزشکی واقعی وارد نکنید. علامت فوریت فقط هشدار احتیاطی واژه‌ای است، نه تریاژ پزشکی.
+   این صندوق، گفت‌وگوهای داخلی و بازبینی انسانی را برای داده‌های ساختگی مدیریت می‌کند. اتصال زنده به واتس‌اپ و سامانه پشتیبانی تأیید نشده است؛ اطلاعات پزشکی واقعی وارد نکنید. علامت فوریت فقط هشدار احتیاطی واژه‌ای است، نه تریاژ پزشکی.
   </div>
   {error&&<p role="alert" className="errorBox">{error}</p>}
   {notice&&<p role="status" className="infoBanner">{notice}</p>}
@@ -191,7 +192,7 @@ export default function Conversations(){
       </div>
       <h3>تاریخچه اقدامات (بدون متن پزشکی)</h3>
       {events.length===0?<p>تاریخچه‌ای ثبت نشده است.</p>:events.map((ev,i)=>
-       <p key={i}><small>{ev.action} · {ev.from_status} ← {ev.to_status}
+       <p key={i}><small>{fa(ev.action)} · {ev.from_status} ← {ev.to_status}
         {ev.reference?' · '+ev.reference:''}</small></p>)}
      </div>
     </>}

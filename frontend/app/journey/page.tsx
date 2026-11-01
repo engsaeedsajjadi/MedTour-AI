@@ -3,6 +3,7 @@
 import {useCallback, useEffect, useState} from 'react';
 import Shell from '@/components/Shell';
 import {request} from '@/lib/api';
+import {fa} from '@/lib/i18n';
 
 type CaseRow = {id:string; patient_id:string; specialty:string; status:string};
 type Mission = {
@@ -78,7 +79,7 @@ export default function JourneyOperations() {
  ):[]);
  const needsSupervisor=target&&EVIDENCE.has(target);
  return <Shell title="مسیر عملیاتی پرونده">
-  <div className="infoBanner">این صفحه برای هماهنگی اداری در محیط توسعه است؛ تشخیص بالینی، رزرو واقعی، پذیرش بیمارستان یا مجوز ورود را تأیید نمی‌کند. از داده واقعی بیمار استفاده نکنید.</div>
+  <div className="infoBanner">این صفحه برای هماهنگی اداری در نسخه نمایشی است؛ تشخیص بالینی، رزرو واقعی، پذیرش بیمارستان یا مجوز ورود را تأیید نمی‌کند. از داده واقعی بیمار استفاده نکنید.</div>
   {error&&<p role="alert" className="errorBox">{error}</p>}
   {notice&&<p role="status" className="infoBanner">{notice}</p>}
   <section className="panel" style={{padding:20}}>
@@ -86,10 +87,10 @@ export default function JourneyOperations() {
    {loading?<p>در حال بارگذاری...</p>:cases.length===0?<p>ابتدا یک پرونده آزمایشی بسازید.</p>:<>
     <select aria-label="پرونده" value={selected} onChange={e=>setSelected(e.target.value)}
      style={{width:'100%',padding:10,marginBottom:14}}>
-     {cases.map(c=><option key={c.id} value={c.id}>{c.id.slice(0,8)} — {c.specialty||'بدون تخصص'} — {c.status}</option>)}
+     {cases.map(c=><option key={c.id} value={c.id}>{c.id.slice(0,8)} — {c.specialty||'بدون تخصص'} — {fa(c.status)}</option>)}
     </select>
     {!mission?<p>در حال دریافت وضعیت...</p>:<>
-     <p><strong>مرحله کنونی:</strong> {mission.status}</p>
+     <p><strong>مرحله کنونی:</strong> {fa(mission.status)}</p>
      {mission.signals.urgent_intake_detected&&<p role="alert" className="errorBox">هشدار احتمالی اورژانسی در پذیرش ثبت شده است؛ برای ارزیابی فوری به تیم درمان ارجاع دهید.</p>}
      <h3>شواهد موردنیاز</h3>
      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(230px,1fr))',gap:8,marginBottom:16}}>
@@ -105,7 +106,7 @@ export default function JourneyOperations() {
        <select value={target} onChange={e=>{setTarget(e.target.value);setReference('');}}
         style={{display:'block',width:'100%',padding:10}} required>
         <option value="">انتخاب مرحله</option>
-        {(NEXT[mission.status]||[]).map(s=><option key={s} value={s}>{s}</option>)}
+        {(NEXT[mission.status]||[]).map(s=><option key={s} value={s}>{fa(s)}</option>)}
        </select>
       </label>
       {needsSupervisor&&<label>مرجع تأیید انسانی مدیر (۶ تا ۱۰۰ کاراکتر؛ بدون اطلاعات پزشکی)

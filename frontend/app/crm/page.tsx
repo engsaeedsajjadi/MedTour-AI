@@ -2,6 +2,7 @@
 import {useEffect,useState} from 'react';
 import Shell from '@/components/Shell';
 import {request} from '@/lib/api';
+import {fa} from '@/lib/i18n';
 
 type Patient={id:string;full_name:string;language:string};
 type CaseItem={id:string;patient_id:string;status:string;assigned_operator_id:string|null};
@@ -69,7 +70,7 @@ export default function PatientCRM(){
    method:'POST',body:JSON.stringify(action==='cancel'?{action}:{
     action,outcome_code:outcome,reference:followupReference
    })
-  }),'نتیجه پیگیری در CRM و سابقه پرونده ثبت شد.');
+  }),'نتیجه پیگیری در سابقه بیمار و پرونده ثبت شد.');
   setFollowupReference('');
  }
  async function candidatesFor(){
@@ -89,8 +90,8 @@ export default function PatientCRM(){
   setReviewReference('');
  }
  const visibleCases=cases.filter(c=>c.patient_id===patientId);
- return <Shell title="Patient CRM — مدیریت ارتباط بیمار">
-  <div className="infoBanner">CRM فقط برای هماهنگی اداری و اطلاعات ساختگی است؛ تشخیص هویت، ادغام پرونده، ارسال پیام و تصمیم درمانی خودکار انجام نمی‌شود. تاریخ و ساعت پیگیری با منطقه زمانی دستگاه شما ثبت می‌شود.</div>
+ return <Shell title="مدیریت ارتباط با بیمار">
+  <div className="infoBanner">این بخش فقط برای هماهنگی اداری و اطلاعات ساختگی است؛ تشخیص هویت، ادغام پرونده، ارسال پیام و تصمیم درمانی خودکار انجام نمی‌شود. تاریخ و ساعت پیگیری با منطقه زمانی دستگاه شما ثبت می‌شود.</div>
   {error&&<div role="alert" className="errorBox">{error}</div>}
   {notice&&<div role="status" className="infoBanner">{notice}</div>}
   <section className="panel" style={{padding:20}}>
@@ -102,9 +103,9 @@ export default function PatientCRM(){
     </select>
    </label>
    <p>پرونده‌های مرتبط: {visibleCases.length}</p>
-   {visibleCases.map(c=><p key={c.id}>پرونده {c.id.slice(0,8)} — {c.status} — مسئول: {c.assigned_operator_id?.slice(0,8)||'تعیین‌نشده'}</p>)}
+   {visibleCases.map(c=><p key={c.id}>پرونده {c.id.slice(0,8)} — {fa(c.status)} — مسئول: {c.assigned_operator_id?.slice(0,8)||'تعیین‌نشده'}</p>)}
    {role==='admin'&&patientId&&<div style={{display:'flex',gap:10,flexWrap:'wrap',margin:'10px 0'}}>
-    <select value={assignee} onChange={e=>setAssignee(e.target.value)}>
+    <select aria-label="مسئول هماهنگی" value={assignee} onChange={e=>setAssignee(e.target.value)}>
      {people.map(x=><option key={x.id} value={x.id}>{x.email}</option>)}
     </select>
     <button type="button" disabled={working||!assignee} onClick={()=>
@@ -122,10 +123,10 @@ export default function PatientCRM(){
    <form onSubmit={schedule} style={{display:'grid',gap:12,maxWidth:680}}>
     <label>پرونده<select required value={caseId} onChange={e=>setCaseId(e.target.value)} style={{display:'block',width:'100%',padding:10}}>
      <option value="">انتخاب پرونده</option>
-     {cases.map(c=><option key={c.id} value={c.id}>{c.id.slice(0,8)} — {c.status}</option>)}
+     {cases.map(c=><option key={c.id} value={c.id}>{c.id.slice(0,8)} — {fa(c.status)}</option>)}
     </select></label>
     <label>دلیل اداری<select value={reason} onChange={e=>setReason(e.target.value)} style={{display:'block',width:'100%',padding:10}}>
-     {REASONS.map(x=><option key={x} value={x}>{x}</option>)}
+     {REASONS.map(x=><option key={x} value={x}>{fa(x)}</option>)}
     </select></label>
     <label>مسئول پیگیری<select value={assignee} onChange={e=>setAssignee(e.target.value)} style={{display:'block',width:'100%',padding:10}}>
      {(role==='admin'?people:[{id:myId,email:'خودم',role:'operator',active:true}]).map(x=><option key={x.id} value={x.id}>{x.email}</option>)}
@@ -135,7 +136,7 @@ export default function PatientCRM(){
    </form>
    <h3>پیگیری‌های باز (فقط موارد مجاز)</h3>
    <label>کد نتیجه دستی<select value={outcome} onChange={e=>setOutcome(e.target.value)}>
-    {OUTCOMES.map(x=><option key={x} value={x}>{x}</option>)}
+    {OUTCOMES.map(x=><option key={x} value={x}>{fa(x)}</option>)}
    </select></label>
    <label>مرجع انجام تماس (بدون نام یا متن پزشکی)
     <input value={followupReference} onChange={e=>setFollowupReference(e.target.value)}

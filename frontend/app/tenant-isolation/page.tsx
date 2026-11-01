@@ -20,13 +20,13 @@ export default function TenantIsolation(){
  }
  useEffect(()=>{void refresh();},[]);
  const values=[
-  ['جدول‌های Tenantدار',state?.tenant_scoped_tables??'-'],
+  ['جدول‌های تفکیک‌شده بر اساس سازمان',state?.tenant_scoped_tables??'-'],
   ['کلیدهای خارجی مرکب',state?.composite_tenant_fks??'-'],
-  ['جدول‌های دارای سیاست RLS',state?.rls_policy_tables??'-'],
-  ['جدول‌های FORCE RLS در دیتابیس فعلی',state?.rls_force_tables??'-']
+  ['جدول‌های دارای سیاست امنیت سطری',state?.rls_policy_tables??'-'],
+  ['جدول‌های دارای اجبار امنیت سطری در پایگاه داده',state?.rls_force_tables??'-']
  ];
  return <Shell title="ممیزی جداسازی سازمان‌ها">
-  <div className="infoBanner">وضعیت بخش ۲۶: ساختار کلیدهای مرکب و سیاست‌های RLS آماده شده‌اند، اما این صفحه مجوز استفاده از اطلاعات پزشکی واقعی یا استقرار تجاری نیست. فعال‌سازی RLS در دیتابیس فعلی باید تنها پس از انتقال کامل Login/Refresh، پرتال، وب‌هوک و Worker به نقش‌های مستقل Tenant انجام شود.</div>
+  <div className="infoBanner">ساختار کلیدهای مرکب و سیاست‌های امنیت سطری آماده شده‌اند، اما این صفحه مجوز استفاده از اطلاعات پزشکی واقعی یا استقرار تجاری نیست. فعال‌سازی امنیت سطری باید پس از انتقال کامل ورود، پرتال، وب‌هوک و پردازشگرهای پس‌زمینه به نقش‌های مستقل سازمان انجام شود.</div>
   {error&&<div className="errorBox" role="alert">{error}</div>}
   <section className="panel" style={{padding:20,marginTop:18}}>
    <h2>وضعیت دیتابیس فعلی</h2>
@@ -40,9 +40,9 @@ export default function TenantIsolation(){
     <h3 style={{marginTop:20}}>کنترل‌های اجرا</h3>
     <div style={{display:'grid',gap:8}}>
      <p>نقش دیتابیس غیرممتاز: <strong>{state?.runtime_role_nonprivileged?'بله':'خیر / اثبات نشده'}</strong></p>
-     <p>هویت Tenant مستقل از اتصال: <strong>{state?.authenticated_tenant_role?'تأیید شده':'هنوز متصل نشده'}</strong></p>
-     <p>مسیریابی تمام Endpointها: <strong>{state?.verified_end_to_end_routing?'تأیید شده':'ناقص'}</strong></p>
-     <p>آمادگی Production: <strong>{state?.production_ready?'تأیید شده':'خیر'}</strong></p>
+     <p>هویت سازمان مستقل از اتصال: <strong>{state?.authenticated_tenant_role?'تأیید شده':'هنوز متصل نشده'}</strong></p>
+     <p>مسیریابی امن همه مسیرهای API: <strong>{state?.verified_end_to_end_routing?'تأیید شده':'ناقص'}</strong></p>
+     <p>آمادگی برای استقرار نهایی: <strong>{state?.production_ready?'تأیید شده':'خیر'}</strong></p>
      <p>{state?.reason}</p>
     </div>
    </>}

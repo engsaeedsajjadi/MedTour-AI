@@ -4,6 +4,7 @@ import Link from 'next/link';
 import {useEffect,useState} from 'react';
 import Shell from '@/components/Shell';
 import {request} from '@/lib/api';
+import {fa} from '@/lib/i18n';
 
 type Stats={
  patients:number;cases:number;active_cases:number;staff_active:number;
@@ -132,7 +133,7 @@ export default function AdminCenter(){
      <tbody>{queue?.items.length?queue.items.map(x=><tr key={x.category+'-'+x.id}>
       <td>{x.priority==='urgent'?'فوری':x.priority==='high'?'بالا':'عادی'}</td>
       <td>{categories.find(c=>c[0]===x.category)?.[1]||x.category}</td>
-      <td>{x.case_id?.slice(0,8)||'—'}</td><td>{x.status}</td>
+      <td>{x.case_id?.slice(0,8)||'—'}</td><td>{fa(x.status)}</td>
       <td><Link href={x.destination}>بازکردن گردش‌کار مرتبط</Link></td>
      </tr>):<tr><td colSpan={5}>موردی در محدوده نمایش یافت نشد.</td></tr>}</tbody></table></div>
    </section>
@@ -159,7 +160,7 @@ export default function AdminCenter(){
      </tr>)}</tbody></table></div>
     {overview&&<div style={{marginTop:12,padding:14,border:'1px solid #ccd8df',borderRadius:8}}>
      <h3>نمای خلاصه پرونده {selectedCase.slice(0,12)}</h3>
-     <p>وضعیت: {overview.status} · مسئول: {overview.assigned_operator_id?.slice(0,8)||'تعیین‌نشده'}</p>
+     <p>وضعیت: {fa(overview.status)} · مسئول: {overview.assigned_operator_id?.slice(0,8)||'تعیین‌نشده'}</p>
      <p>رضایت پذیرش: {overview.intake_consent?'موجود':'ناموجود'} · رضایت ارتباطات: {overview.communication_consent?'موجود':'ناموجود'}</p>
      <p>پیگیری‌های باز: {overview.open_followups} · خدمات معلق: {overview.pending_operations}</p>
      <p>تأیید بالینی: انجام نشده · اطلاعات پزشکی خام: ارائه نشده</p>
@@ -172,7 +173,7 @@ export default function AdminCenter(){
     <div style={{display:'flex',flexWrap:'wrap',gap:10}}>
      <select aria-label="کارمند مورد نظر" value={target} onChange={e=>setTarget(e.target.value)}>
       <option value="">انتخاب حساب فعال</option>
-      {staff.filter(x=>x.active&&x.id!==selfId).map(x=><option key={x.id} value={x.id}>{x.email} ({x.role})</option>)}
+      {staff.filter(x=>x.active&&x.id!==selfId).map(x=><option key={x.id} value={x.id}>{x.email} ({fa(x.role)})</option>)}
      </select>
      <button type="button" disabled={!target||busy} onClick={()=>void deactivate()}>غیرفعال‌سازی با تأیید</button>
     </div>

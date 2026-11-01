@@ -2,6 +2,7 @@
 import {useEffect,useState} from 'react';
 import Shell from '@/components/Shell';
 import {request} from '@/lib/api';
+import {fa} from '@/lib/i18n';
 
 type Stage='translation'|'medical'|'legal';
 type ReviewState='pending'|'approved'|'rejected';
@@ -31,10 +32,10 @@ export default function CmsWorkflow(){
  const [versions,setVersions]=useState<Version[]>([]);
  const [events,setEvents]=useState<Event[]>([]);
  const [title,setTitle]=useState(''),[body,setBody]=useState('');
- const [reason,setReason]=useState('Update reviewed informational content');
+ const [reason,setReason]=useState('به‌روزرسانی محتوای اطلاع‌رسانی بازبینی‌شده');
  const [reviewEvidence,setReviewEvidence]=useState('');
  const [reviewDecision,setReviewDecision]=useState<'approved'|'rejected'>('approved');
- const [restoreReason,setRestoreReason]=useState('Restored previous snapshot for fresh independent review');
+ const [restoreReason,setRestoreReason]=useState('بازگردانی نسخه قبلی برای بازبینی مستقل جدید');
  const [reviewerEmail,setReviewerEmail]=useState('');
  const [reviewerPassword,setReviewerPassword]=useState('');
  const [reviewerRole,setReviewerRole]=useState('cms_translator');
@@ -94,7 +95,7 @@ export default function CmsWorkflow(){
    expected_version:latest.version_no,reason:restoreReason});
  }
  const status=(x:string)=>labels[x]||x;
- return <Shell title="نسخه‌بندی و تأیید سازمانی CMS">
+ return <Shell title="نسخه‌بندی و تأیید سازمانی محتوا">
   <div className="infoBanner">
    بخش ۲۳: هر تغییر یک نسخه مستقل تولید می‌کند. انتشار فقط پس از تأیید سه شخص متفاوت با نقش‌های ترجمه، بازبین پزشکی و بازبین حقوقی مجاز است. صلاحیت حرفه‌ای آن‌ها هنوز توسط سامانه یا مرجع خارجی تأیید نشده و این نسخه برای اطلاعات واقعی بیمار طراحی نشده است.
   </div>
@@ -117,7 +118,7 @@ export default function CmsWorkflow(){
   </section>
   {current&&<section className="panel" style={{padding:20,marginBlock:16}}>
    <h2>۲. نسخه‌های تغییرناپذیر و مقایسه</h2>
-   <p>عنوان، متن، نویسنده، دلیل تغییر و اثر SHA-256 هر نسخه برای حسابرسی حفظ می‌شوند.</p>
+   <p>عنوان، متن، نویسنده، دلیل تغییر و اثر انگشت رمزنگاری هر نسخه برای حسابرسی حفظ می‌شوند.</p>
    {latest&&<div style={{display:'grid',gap:10}}>
     <p>نسخه جدیدتر: <strong>v{latest.version_no}</strong> · اثر محتوا: <code style={{overflowWrap:'anywhere'}}>{latest.content_hash}</code></p>
     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(270px,1fr))',gap:15}}>
@@ -182,7 +183,7 @@ export default function CmsWorkflow(){
    <h2>۶. تاریخچه حسابرسی</h2>
    <div className="tableScroll"><table><thead><tr><th>زمان</th><th>عملیات</th><th>مرجع</th><th>بازیگر</th></tr></thead>
     <tbody>{events.map(e=><tr key={e.id}><td>{new Date(e.created_at).toLocaleString('fa-IR')}</td>
-     <td>{e.action}</td><td dir="ltr">{e.reference}</td><td>{e.actor_id.slice(0,8)}</td></tr>)}</tbody></table></div>
+     <td>{fa(e.action)}</td><td dir="ltr">{e.reference}</td><td>{e.actor_id.slice(0,8)}</td></tr>)}</tbody></table></div>
   </section>}
  </Shell>;
 }

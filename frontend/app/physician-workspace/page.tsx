@@ -3,6 +3,7 @@ import Link from 'next/link';
 import {useEffect,useState} from 'react';
 import Shell from '@/components/Shell';
 import {request} from '@/lib/api';
+import {fa} from '@/lib/i18n';
 
 type Me={
  physician_id:string;name:string;specialty:string;city:string;
@@ -38,7 +39,7 @@ export default function PhysicianWorkspace(){
    <section className="panel" style={{padding:20}}>
     <h2>{me.name}</h2>
     <p>تخصص: {me.specialty} · شهر: {me.city}</p>
-    <p>وضعیت فهرست: {me.directory_status} · وضعیت بررسی محلی مدرک: {me.evidence_status}</p>
+    <p>وضعیت فهرست: {me.directory_status} · وضعیت بررسی محلی مدرک: {fa(me.evidence_status)}</p>
     <p>انقضای شواهد: {me.evidence_expiry?new Date(me.evidence_expiry).toLocaleDateString('fa-IR'):'نامشخص'}</p>
     <p>استعلام مستقل مجوز: <strong>انجام نشده</strong></p>
     <p>درخواست بازبینی فرم پذیرش فقط از طریق <Link href="/intake-clinician">مسیر بازبینی انسانی محدود</Link> انجام می‌شود که کنترل مجوز و انتساب جداگانه دارد.</p>
@@ -48,14 +49,14 @@ export default function PhysicianWorkspace(){
      <h2>ارجاع‌های مختص پزشک</h2>
      {referrals.length===0?<p>ارجاعی موجود نیست.</p>:referrals.map(x=><div key={x.id} style={{padding:9,borderBottom:'1px solid #d7dfe5'}}>
       <strong>کد ارجاع {x.id.slice(0,12)}</strong>
-      <p>پرونده اداری {x.case_reference.slice(0,10)} · وضعیت: {x.status}</p>
+      <p>پرونده اداری {x.case_reference.slice(0,10)} · وضعیت: {fa(x.status)}</p>
      </div>)}
     </section>
     <section className="panel" style={{padding:20}}>
      <h2>درخواست‌های نوبت</h2>
      {appointments.length===0?<p>درخواستی موجود نیست.</p>:appointments.map(x=><div key={x.id} style={{padding:9,borderBottom:'1px solid #d7dfe5'}}>
       <strong>{new Date(x.requested_at).toLocaleString('fa-IR')}</strong>
-      <p>وضعیت داخلی: {x.status} · شناسه {x.id.slice(0,10)}</p>
+      <p>وضعیت داخلی: {fa(x.status)} · شناسه {x.id.slice(0,10)}</p>
      </div>)}
      <p>وضعیت داخلی به معنی تأیید نوبت توسط پزشک یا مرکز درمانی نیست.</p>
     </section>

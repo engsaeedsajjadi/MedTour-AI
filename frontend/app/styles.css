@@ -20,3 +20,84 @@ textarea{min-height:105px;resize:vertical;padding:12px;border:1px solid #ced9e0;
 @media(prefers-reduced-motion:reduce){
  *,*::before,*::after{scroll-behavior:auto!important;transition-duration:0.01ms!important;animation-duration:0.01ms!important}
 }
+
+
+/* Commercial presentation pass: grouped navigation, role chip, access and loading states */
+.navGroup{display:grid;gap:4px}
+.navGroup+.navGroup{margin-top:6px}
+.sidebar .navGroupLabel{padding:16px 17px 6px;font-size:11px;font-weight:700;letter-spacing:.2px}
+.sidebar nav{padding-bottom:16px}
+.roleChip{font-size:11px;font-weight:700;color:#0f6f66;background:var(--aqua);border:1px solid #cdeee6;padding:6px 11px;border-radius:20px;white-space:nowrap}
+.loadingPanel{padding:40px 24px;text-align:center;color:var(--muted);font-size:13px}
+.accessPanel{padding:34px 30px;max-width:640px}
+.accessPanel h2{font-size:19px;margin-bottom:10px}
+.accessPanel p{color:#5c6f7c;font-size:13px;line-height:2;margin-bottom:20px}
+.accessPanel .button{display:inline-block}
+.environmentFlag{font-size:11px;letter-spacing:0}
+.eyebrow{letter-spacing:.4px;font-size:11px}
+.badge{font-weight:700;white-space:nowrap}
+.badge.warn{background:#fff4df;color:#9a6a1f}
+.badge.danger{background:#fff0f0;color:#ac3e43}
+.badge.muted{background:#f0f3f6;color:#5f7582}
+td,th{white-space:normal;min-width:90px}
+td code{white-space:nowrap}
+.srOnly{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+@media(max-width:760px){
+ .navGroup{display:contents}
+ .roleChip{display:none}
+ .accessPanel{padding:24px 18px}
+}
+.publicCard{max-width:640px;margin:6vh auto;padding:32px;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);line-height:2}
+.publicCard h1{font-size:24px;margin:18px 0 8px}.publicCard h2{font-size:18px;margin:22px 0 6px}
+.publicBrand{display:flex;align-items:center;gap:12px}.publicBrand .brandMark{width:40px;height:40px;font-size:22px}
+.publicLead{color:#5c6f7c;font-size:14px}
+.successBox{padding:13px 16px;border:1px solid #bfe5d9;background:#eefaf6;color:#13705f;border-radius:10px;margin:12px 0}
+.checkRow{display:flex;gap:10px;align-items:flex-start;margin:20px 0;font-size:14px}
+.checkRow input{margin-top:8px}
+.buttonRow{display:flex;gap:12px;flex-wrap:wrap}
+.textLink{color:#087e74;text-decoration:underline}
+@media(max-width:760px){.publicCard{margin:0;border-radius:0;border:0;padding:22px 16px}}
+.portal{max-width:960px;margin:0 auto;padding:28px 20px 60px}
+.portalHeader{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px}
+.publicBrand small{display:block;color:var(--muted);font-size:11px}
+.portalName{font-size:24px;margin:8px 0 16px}
+.portalPanel{padding:22px 24px}
+.portalPanel h2{font-size:17px;margin-bottom:8px}.portalPanel h3{font-size:14px;margin:0 0 8px}
+.portalForm{display:grid;gap:14px;max-width:470px;margin:16px 0}
+.portalForm label,.noticeField,.inlineLabel{display:flex;flex-direction:column;gap:8px;font-size:12px;font-weight:700;color:#586b78}
+.inlineLabel{flex-direction:row;align-items:center}
+.portalForm input,.noticeField input,.portal textarea,.uploadRow input{border:1px solid #d9e2e8;border-radius:9px;padding:11px 12px;background:#fff;color:#16364b}
+.noticeField{max-width:320px;margin:12px 0}
+.consentList{display:grid;gap:2px;margin-top:8px}
+.consentRow{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #f0f3f6;font-size:13px}
+.consentRow .button{padding:8px 14px;font-size:12px}
+.portalCaseHead{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.portalBox{border:1px solid #d2e5e0;background:#fbfefd;padding:16px;border-radius:12px;margin:14px 0;display:grid;gap:10px;justify-items:start}
+.uploadRow{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.docList{list-style:none;padding:0;margin:0;display:grid;gap:8px;width:100%}
+.docList li{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px}
+.docList .button{padding:7px 13px;font-size:12px}
+.portalGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:6px;font-size:13px}
+.portal textarea{width:100%}
+.intakePrompt{font-size:17px;line-height:2}
+.chatStream{max-height:390px;overflow-y:auto;background:#f6f9fb;padding:14px;border-radius:10px;margin:10px 0;display:grid;gap:8px}
+.chatBubble{background:#fff;border-radius:12px;padding:10px 14px;max-width:80%;justify-self:start;font-size:13px;line-height:1.9}
+.chatBubble.mine{background:#e8f7f2;justify-self:end}
+.chatBubble small{color:var(--teal);font-size:11px;font-weight:700}
+.portal .messageComposer{padding:0}
+@media(max-width:760px){.portalGrid{grid-template-columns:1fr}.consentRow{grid-template-columns:1fr auto}.consentRow .button{grid-column:1/-1;justify-self:start}.portalPanel{padding:18px 16px}}
+
+/* Consistent controls for pages built with plain elements */
+.content button:not([class]),.portal button:not([class]){border:1px solid #cfe6e1;background:#f2faf8;color:#0b766c;padding:9px 15px;border-radius:9px;font-weight:700;font-size:13px}
+.content button:not([class]):hover{background:#e3f4f0}
+.content button:not([class]):disabled,.portal button:not([class]):disabled{opacity:.55;cursor:not-allowed}
+.content input:not([type=checkbox]):not([type=radio]):not([type=file]),.content select,.content textarea{border:1px solid #d5dfe6;border-radius:9px;padding:10px 12px;background:#fff;color:#16364b;min-height:42px;max-width:100%}
+.content input:focus,.content select:focus,.content textarea:focus{border-color:#139b8c;box-shadow:0 0 0 3px #0d94881b;outline:0}
+.content .panel>label,.content section>label,.content form>label{display:flex;flex-direction:column;gap:7px;font-size:12px;font-weight:700;color:#586b78;margin:8px 0}
+.content .panel h2{font-size:17px}.content .panel h3{font-size:14px}
+.content .panel p{line-height:1.9;font-size:13px}
+.content section.panel[style]{padding:22px 24px}
+.button:disabled{cursor:not-allowed}
+.statusBullet{margin-left:8px}
+.sidebar .navItem{padding:9px 15px;font-size:13px}
+.sidebar nav{max-height:calc(100vh - 210px)}

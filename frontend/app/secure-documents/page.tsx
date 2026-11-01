@@ -2,6 +2,7 @@
 import {useEffect,useState} from 'react';
 import Shell from '@/components/Shell';
 import {API_BASE,getSession,request} from '@/lib/api';
+import {fa,faError} from '@/lib/i18n';
 type CaseRow={id:string;status:string;specialty:string};
 type MedicalDoc={id:string;filename:string;status:string;category:string;created_at:string};
 type Readiness={storage_mode:string;configured:boolean;actual_s3_kms_scanner_verified:boolean;production_ready:boolean};
@@ -35,9 +36,9 @@ export default function Documents(){
    const r=await fetch(API_BASE+'/api/v1/secure-documents/cases/'+encodeURIComponent(caseId),{
     method:'POST',headers:{Authorization:'Bearer '+getSession()},body:fd,cache:'no-store'
    });
-   const data=await r.json();
-   if(!r.ok)throw new Error(String(data.detail||r.status));
-   setMessage('فایل ساختگی با وضعیت '+data.status+' ذخیره شد. این محیط برای اطلاعات واقعی بیماران نیست.');
+   const data=await r.json().catch(()=>({}));
+   if(!r.ok)throw new Error(faError(data.detail,r.status));
+   setMessage('فایل با وضعیت «'+fa(data.status)+'» ذخیره شد. این نسخه برای اطلاعات واقعی بیماران نیست.');
    setFile(null);await refresh();
   }catch(e){setError((e as Error).message)}finally{setBusy(false)}
  }
@@ -47,14 +48,14 @@ export default function Documents(){
    const r=await fetch(API_BASE+'/api/v1/secure-documents/'+encodeURIComponent(d.id),{
     headers:{Authorization:'Bearer '+getSession()},cache:'no-store'
    });
-   if(!r.ok)throw new Error('دسترسی به فایل مجاز نیست ('+r.status+').');
+   if(!r.ok){const body=await r.json().catch(()=>({}));throw new Error(faError(body.detail,r.status));}
    const blob=await r.blob(),url=URL.createObjectURL(blob);
-   const link=document.createElement('a');link.href=url;link.download='synthetic-document';
+   const link=document.createElement('a');link.href=url;link.download=d.filename||'medical-document';
    document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url);
   }catch(e){setError((e as Error).message)}finally{setBusy(false)}
  }
  return <Shell title="مدیریت امن مدارک">
-  <div className="infoBanner">نسخه Alpha برای اطلاعات پزشکی واقعی مجاز نیست. فایل محلی AES-GCM رمزنگاری می‌شود ولی اسکن نمی‌شود؛ S3/KMS/ClamAV و سیاست نگهداری نیازمند تأیید مستقل‌اند.</div>
+  <div className="infoBanner">نسخه نمایشی برای اطلاعات پزشکی واقعی مجاز نیست. فایل‌ها رمزنگاری می‌شوند ولی اسکن بدافزار نمی‌شوند؛ مخزن ابری امن، اسکن فایل و سیاست نگهداری پیش از استفاده واقعی باید تأیید شوند.</div>
   {error&&<p className="errorBox" role="alert">{error}</p>}
   {message&&<p className="infoBanner" role="status">{message}</p>}
   <section className="panel" style={{padding:20}}>
@@ -72,12 +73,12 @@ export default function Documents(){
    </label>}
    <form onSubmit={upload} style={{display:'flex',flexWrap:'wrap',gap:10,margin:'16px 0'}}>
     <input aria-label="فایل آزمایشی" type="file" accept=".pdf,.jpg,.jpeg,.png" required onChange={e=>setFile(e.target.files?.[0]||null)}/>
-    <button className="button" disabled={busy||!file||!caseId||!readiness?.configured}>بارگذاری آزمایشی</button>
+    <button className="button" disabled={busy||!file||!caseId||!readiness?.configured}>بارگذاری امن</button>
    </form>
    <p>فایل‌های قبلی پس از لغو رضایت مسدود می‌شوند و با رضایت جدید خودکار باز نمی‌گردند.</p>
    <div className="tableScroll"><table><thead><tr><th>نام فایل</th><th>وضعیت</th><th>تاریخ</th><th>دسترسی</th></tr></thead>
     <tbody>{documents.length===0?<tr><td colSpan={4}>فایل دارای دسترسی موجود نیست.</td></tr>:documents.map(d=><tr key={d.id}>
-     <td>{d.filename}</td><td>{d.status}</td><td>{new Date(d.created_at).toLocaleString('fa-IR')}</td>
+     <td>{d.filename}</td><td>{fa(d.status)}</td><td>{new Date(d.created_at).toLocaleString('fa-IR')}</td>
      <td><button type="button" disabled={busy} onClick={()=>download(d)}>دریافت امن</button></td>
     </tr>)}</tbody></table></div>
   </section>

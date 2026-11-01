@@ -57,7 +57,7 @@ export default function IntakeConsentActions({patients}:{patients:Row[]}) {
  return <section className="panel" style={{marginTop:18,padding:20}}>
   <div className="panelHeader"><h2>رضایت و دسترسی آزمایشی بیمار</h2></div>
   <p>ابتدا برای بیمار آزمایشی رضایت‌های پذیرش و ارتباطات را در فرم جداگانه ثبت کنید؛ سپس می‌توانید دعوت‌نامه ورود به پرتال بسازید.</p>
-  <div className="infoBanner">فقط داده ساختگی در محیط توسعه. لینک‌ها محرمانه و یک‌بارمصرف‌اند؛ کد شش‌رقمی صرفاً برای تست دستی است و هویت واقعی بیمار را احراز نمی‌کند.</div>
+  <div className="infoBanner">فقط داده ساختگی در نسخه نمایشی. لینک‌ها محرمانه و یک‌بارمصرف‌اند؛ کد شش‌رقمی صرفاً برای تست دستی است و هویت واقعی بیمار را احراز نمی‌کند.</div>
   {error&&<div className="errorBox" role="alert">{error}</div>}
   {notice&&<p className="infoBanner" role="status">{notice}</p>}
   <div className="formGrid" style={{marginTop:12}}>
@@ -71,8 +71,8 @@ export default function IntakeConsentActions({patients}:{patients:Row[]}) {
    <label>نوع رضایت
     <select aria-label="نوع رضایت" value={purpose} disabled={busy}
      onChange={e=>{setPurpose(e.target.value as ConsentPurpose);setConsentLink('');setError('');setNotice('');}}>
-     <option value="intake">پذیرش اولیه (intake)</option>
-     <option value="communication">ارتباطات بیمار (communication)</option>
+     <option value="intake">پذیرش اولیه</option>
+     <option value="communication">ارتباط با بیمار</option>
     </select>
    </label>
    <div className="formActions">
@@ -93,7 +93,7 @@ export default function IntakeConsentActions({patients}:{patients:Row[]}) {
   </div>}
   <section style={{borderTop:'1px solid #cdd7df',marginTop:18,paddingTop:18}}>
    <h3>دعوت‌نامه پرتال بیمار آزمایشی</h3>
-   <p>پس از ثبت هر دو رضایت intake و communication، دعوت‌نامه و کد شش‌رقمی را برای تست محلی صادر کنید.</p>
+   <p>پس از ثبت هر دو رضایت «پذیرش اولیه» و «ارتباط با بیمار»، دعوت‌نامه و کد شش‌رقمی بیمار را صادر کنید.</p>
    <button className="button secondary" type="button" disabled={!currentId||busy} onClick={issuePortal}>
     {busy?'در حال صدور…':'ایجاد دعوت‌نامه پرتال'}
    </button>

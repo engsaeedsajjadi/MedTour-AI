@@ -2,6 +2,7 @@
 import Shell from '@/components/Shell';
 import {request,logout} from '@/lib/api';
 import {useEffect,useState} from 'react';
+import {fa} from '@/lib/i18n';
 type Status={enabled:boolean;enrollment_pending:boolean;method:string;recovery_codes_configured:boolean};
 type Enroll={secret:string;otpauth_uri:string;expires_in:number};
 type Staff={id:string;email:string;role:string;active:boolean;auth_version:number};
@@ -28,7 +29,7 @@ export default function SecurityPage(){
  async function setup(){
   const result=await action<Enroll>('/auth/mfa/enroll');
   if(result){setSecret(result.secret);setUri(result.otpauth_uri);
-   setNotice('کلید فقط همین بار نمایش داده می‌شود؛ آن را در برنامه TOTP وارد کنید. از انتشار یا ارسال آن خودداری کنید.');}
+   setNotice('کلید فقط همین بار نمایش داده می‌شود؛ آن را در برنامه احراز هویت وارد کنید و برای کسی ارسال نکنید.');}
  }
  async function confirm(){
   const result=await action<{enabled:boolean;access_token:string;refresh_token:string}>('/auth/mfa/confirm',{code});
@@ -41,17 +42,17 @@ export default function SecurityPage(){
   if(result){setPwd('');setNewPwd('');await logout();}
  }
  return <Shell title="امنیت هویت و دسترسی">
-  <div className="infoBanner">بخش ۲۷ — TOTP برای حساب کارکنان. این نسخه برای محیط آزمایشی است؛ بدون کلید مستقل رمزگذاری MFA قابل فعال‌سازی نیست و اتصال MFA به Gateway آزمایشی بخش ۲۶ هنوز برای همه مسیرها کامل نشده است.</div>
+  <div className="infoBanner">ورود دومرحله‌ای با کد یک‌بارمصرف زمان‌دار برای حساب کارکنان. در نسخه نمایشی، فعال‌سازی به کلید رمزگذاری مستقل نیاز دارد و هنوز برای همه مسیرهای ورود کامل نشده است.</div>
   {error&&<div className="errorBox" role="alert">{error}</div>}
   {notice&&<div className="infoBanner" role="status">{notice}</div>}
   <section className="panel" style={{padding:20,marginTop:18}}>
    <h2>احراز هویت دومرحله‌ای</h2>
-   <p>وضعیت: <strong>{status?.enabled?'فعال':'غیرفعال'}</strong> · روش: TOTP · کدهای بازیابی: ارائه نشده‌اند</p>
-   {!status?.enabled&&<button className="button" disabled={busy} onClick={()=>void setup()}>ساخت کلید راه‌اندازی TOTP</button>}
+   <p>وضعیت: <strong>{status?.enabled?'فعال':'غیرفعال'}</strong> · روش: کد یک‌بارمصرف زمان‌دار · کدهای بازیابی: ارائه نشده‌اند</p>
+   {!status?.enabled&&<button className="button" disabled={busy} onClick={()=>void setup()}>ساخت کلید راه‌اندازی ورود دومرحله‌ای</button>}
    {secret&&<div style={{marginTop:15}}>
-    <p>کلید محرمانه برای افزودن دستی به اپ Authenticator:</p>
+    <p>کلید محرمانه برای افزودن دستی به برنامه احراز هویت:</p>
     <code dir="ltr" style={{display:'block',overflowWrap:'anywhere'}}>{secret}</code>
-    <p>می‌توانید با برنامه Authenticator، پیوند زیر را نیز باز کنید:</p>
+    <p>می‌توانید با برنامه احراز هویت، پیوند زیر را نیز باز کنید:</p>
     <code dir="ltr" style={{display:'block',overflowWrap:'anywhere'}}>{uri}</code>
     <label>کد شش‌رقمی<input dir="ltr" type="text" inputMode="numeric"
      maxLength={6} pattern="[0-9]{6}" value={code} onChange={e=>setCode(e.target.value)}/></label>
@@ -67,7 +68,7 @@ export default function SecurityPage(){
   {role==='admin'&&<section className="panel" style={{padding:20,marginTop:18}}>
    <h2>مدیریت حساب‌های سازمان</h2>
    <div className="tableScroll"><table><thead><tr><th>حساب</th><th>نقش</th><th>وضعیت</th><th>اقدام</th></tr></thead><tbody>
-    {members.map(m=><tr key={m.id}><td>{m.email}</td><td>{m.role}</td>
+    {members.map(m=><tr key={m.id}><td>{m.email}</td><td>{fa(m.role)}</td>
      <td>{m.active?'فعال':'غیرفعال'}</td>
      <td><button className="button secondary" disabled={busy} onClick={()=>void action(
       '/auth/staff/'+m.id+'/active',{active:!m.active},'PUT')}>{m.active?'غیرفعال‌کردن':'فعال‌کردن'}</button></td></tr>)}

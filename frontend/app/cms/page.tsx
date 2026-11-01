@@ -76,7 +76,7 @@ export default function Cms(){
       </td>)}
      </tr>)}</tbody>
     </table></div>
-    <p>پس از بازبینی مستقل حقوقی و ترجمه، در تنظیمات سازمان کلید <code>public_portal</code> را با ساختار <code>{'{"search_indexing_enabled":true,"legal_content_reviewed":true}'}</code> تنظیم کنید. بدون URL عمومی HTTPS، صفحات همچنان noindex می‌مانند.</p>
+    <p>پس از بازبینی مستقل حقوقی و ترجمه، در تنظیمات سازمان کلید <code>public_portal</code> را با ساختار <code>{'{"search_indexing_enabled":true,"legal_content_reviewed":true}'}</code> تنظیم کنید. بدون نشانی عمومی امن (HTTPS)، صفحات از نمایه موتورهای جست‌وجو خارج می‌مانند.</p>
    </div>}
   </section>
   <section className="panel" style={{padding:20,marginBottom:22}}>
@@ -85,7 +85,7 @@ export default function Cms(){
     <label>شناسه مسیر انگلیسی<input required dir="ltr" pattern="[a-z0-9]+(-[a-z0-9]+)*" value={slug} onChange={e=>setSlug(e.target.value)}/></label>
     <label>زبان<select value={locale} onChange={e=>setLocale(e.target.value)}>{['fa','ar','en','ps','prs'].map(x=><option key={x} value={x}>{localeNames[x]||x}</option>)}</select></label>
     <label>عنوان<input required value={title} maxLength={250} onChange={e=>setTitle(e.target.value)}/></label>
-    <label>متن امن بدون HTML<textarea required rows={6} value={body} onChange={e=>setBody(e.target.value)}/></label>
+    <label>متن ساده (بدون کد HTML)<textarea required rows={6} value={body} onChange={e=>setBody(e.target.value)}/></label>
     <button className="button" disabled={busy}>ذخیره پیش‌نویس</button>
    </form>
   </section>

@@ -3,6 +3,7 @@ import Link from 'next/link';
 import {useEffect,useState} from 'react';
 import Shell from '@/components/Shell';
 import {request} from '@/lib/api';
+import {fa} from '@/lib/i18n';
 
 type Directory={
  physician_id:string;name:string;specialty:string;city:string;
@@ -83,7 +84,7 @@ export default function PhysicianAdministration(){
      </select>
     </label>
     {chosen&&<p>
-     وضعیت فهرست: {chosen.directory_status} · شواهد مجوز: <strong>{chosen.evidence_status}</strong>
+     وضعیت فهرست: {chosen.directory_status} · شواهد مجوز: <strong>{fa(chosen.evidence_status)}</strong>
      {chosen.evidence_expiry?' · تاریخ انقضا: '+new Date(chosen.evidence_expiry).toLocaleDateString('fa-IR'):''}
      {' · '}حساب متصل: {chosen.linked_user_id?.slice(0,12)||'ندارد'}
     </p>}
@@ -92,7 +93,7 @@ export default function PhysicianAdministration(){
    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(300px,1fr))',gap:16,marginTop:16}}>
     <section className="panel" style={{padding:20}}>
      <h2>اتصال حساب پزشک</h2>
-     <p>ابتدا از صفحه کاربران، حسابی با نقش physician بسازید.</p>
+     <p>ابتدا از صفحه کاربران، حسابی با نقش «پزشک» بسازید.</p>
      <label>حساب فعال
       <select value={staffId} onChange={e=>setStaffId(e.target.value)}
        style={{width:'100%',padding:10}}>

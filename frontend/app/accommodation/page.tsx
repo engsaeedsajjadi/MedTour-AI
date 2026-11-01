@@ -2,6 +2,7 @@
 import {useEffect,useState} from 'react';
 import Shell from '@/components/Shell';
 import {request} from '@/lib/api';
+import {fa} from '@/lib/i18n';
 
 type Hotel={id:string;name:string;city:string;status:string};
 type Capacity={id:string;room_type:string;proposed_rooms:number;starts_on:string;ends_on:string;status:string;reference:string};
@@ -83,7 +84,7 @@ export default function Accommodation(){
  }
  return <Shell title="هماهنگی اقامت و هتل">
   <div className="infoBanner">
-   فقط داده ساختگی در محیط توسعه. فهرست هتل‌ها و ظرفیت‌های آن‌ها صرفاً ثبت محلی هستند و با سامانه واقعی هتل همگام‌سازی نمی‌شوند. تخصیص داخلی یا ثبت پاسخ مثبت ارائه‌دهنده، به معنی رزرو تأییدشده نیست. این صفحه برای اطلاعات هویتی، گذرنامه و شرح پزشکی بیمار نیست.
+   فقط داده ساختگی در نسخه نمایشی. فهرست هتل‌ها و ظرفیت‌های آن‌ها صرفاً ثبت محلی هستند و با سامانه واقعی هتل همگام‌سازی نمی‌شوند. تخصیص داخلی یا ثبت پاسخ مثبت ارائه‌دهنده، به معنی رزرو تأییدشده نیست. این صفحه برای اطلاعات هویتی، گذرنامه و شرح پزشکی بیمار نیست.
   </div>
   {error&&<div className="errorBox" role="alert">{error}</div>}
   {notice&&<div className="infoBanner" role="status">{notice}</div>}
@@ -131,7 +132,7 @@ export default function Accommodation(){
     <label>پرونده<select value={caseId} onChange={e=>{
      setCaseId(e.target.value);setHistory({});
      void loadStays(e.target.value).catch(x=>setError((x as Error).message));
-    }}><option value="">انتخاب پرونده</option>{cases.map(c=><option key={c.id} value={c.id}>{c.id.slice(0,8)} · {c.status}</option>)}</select></label>
+    }}><option value="">انتخاب پرونده</option>{cases.map(c=><option key={c.id} value={c.id}>{c.id.slice(0,8)} · {fa(c.status)}</option>)}</select></label>
     <label>تعداد اتاق برای پرونده<input type="number" min={1} max={5} value={rooms} onChange={e=>setRooms(Number(e.target.value))}/></label>
     <label>تعداد مهمان (بدون نام و اطلاعات هویتی)<input type="number" min={1} max={20} value={guests} onChange={e=>setGuests(Number(e.target.value))}/></label>
     <button disabled={busy||!caseId||!propertyId||!start||!end||end<=start}
@@ -144,7 +145,7 @@ export default function Accommodation(){
   <section className="panel" style={{padding:20,marginTop:16}}>
    <h2>۴. مراحل پیگیری داخلی</h2>
    <label>نام مرجع ارائه‌دهنده برای گزارش تماس (حداقل ۶ حرف لاتین)
-    <input maxLength={100} value={supplier} onChange={e=>setSupplier(e.target.value)} placeholder="Synthetic Hotel Desk"/>
+    <input maxLength={100} value={supplier} onChange={e=>setSupplier(e.target.value)} placeholder="میز هتل آزمایشی"/>
    </label>
    {stays.length===0?<p>برای این پرونده درخواستی موجود نیست یا رضایت فعال نیست.</p>:
     stays.map(s=><div key={s.id} style={{borderTop:'1px solid #d4dde7',padding:'14px 0',display:'grid',gap:10}}>
@@ -163,7 +164,7 @@ export default function Accommodation(){
        <button disabled={busy||reference.length<6} onClick={()=>transition(s.id,'cancel')}>لغو درخواست داخلی</button>}
      </div>}
      <button disabled={busy} onClick={()=>void historyFor(s.id)}>نمایش سوابق</button>
-     {history[s.id]?.map((e,i)=><p key={i}>{new Date(e.at).toLocaleString('fa-IR')} · {e.action} · {label(e.previous)} → {label(e.current)} · {e.reference}</p>)}
+     {history[s.id]?.map((e,i)=><p key={i}>{new Date(e.at).toLocaleString('fa-IR')} · {fa(e.action)} · {label(e.previous)} → {label(e.current)} · {e.reference}</p>)}
     </div>)}
   </section>
  </Shell>;

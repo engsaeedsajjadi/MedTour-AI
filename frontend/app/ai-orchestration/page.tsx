@@ -2,6 +2,7 @@
 import {useEffect,useState} from 'react';
 import Shell from '@/components/Shell';
 import {request} from '@/lib/api';
+import {fa} from '@/lib/i18n';
 
 type Agent={agent_key:string;enabled:boolean;provider_mode:string;allowed_workflows:string[];daily_run_limit:number};
 type Run={id:string;workflow:string;status:string;locale:string;display_text:string;mode:string;sent:boolean};
@@ -35,7 +36,7 @@ export default function AiOrchestrationPage(){
    setNotice('عملیات داخلی ثبت شد. هیچ اقدام خارجی اجرا نشده است.');
   }catch(e){setError((e as Error).message);}finally{setBusy(false);}
  }
- return <Shell title="مدیریت عامل‌های AI">
+ return <Shell title="دستیارهای هوشمند">
   <div className="infoBanner">
    محیط آزمایشی مدیریت عامل‌های اداری. استفاده از اطلاعات پزشکی، ارسال خودکار پیام، تصمیم درمانی و اقدام مالی یا رزرو غیرفعال است. خروجی مدل فقط پیش‌نویس نیازمند تأیید انسانی است.
   </div>
@@ -58,10 +59,10 @@ export default function AiOrchestrationPage(){
   <section className="panel" style={{padding:20,marginTop:15}}>
    <h2>اجرای گردش‌کار غیرکلینیکی</h2>
    <label>کار<select value={task||selected?.allowed_workflows[0]||''} onChange={e=>setTask(e.target.value)}>
-    {selected?.allowed_workflows.map(x=><option key={x} value={x}>{x}</option>)}
+    {selected?.allowed_workflows.map(x=><option key={x} value={x}>{fa(x)}</option>)}
    </select></label>
    <label>زبان<select value={locale} onChange={e=>setLocale(e.target.value)}>
-    {['fa','ar','en','ps','prs'].map(x=><option key={x} value={x}>{x}</option>)}
+    {['fa','ar','en','ps','prs'].map(x=><option key={x} value={x}>{fa(x)}</option>)}
    </select></label>
    <button className="button" disabled={busy||!selected?.enabled} onClick={()=>void action('/ai-orchestration/runs',{
     request_key:'DEMO-'+crypto.randomUUID(),agent_key:key,
@@ -71,7 +72,7 @@ export default function AiOrchestrationPage(){
   <section className="panel" style={{padding:20,marginTop:15}}>
    <h2>صف پیش‌نویس‌ها</h2>
    {items.map(x=><article key={x.id} style={{padding:14,borderBottom:'1px solid #d4dfe3'}}>
-    <strong>{x.workflow} · {x.locale} · {x.status}</strong>
+    <strong>{x.workflow} · {x.locale} · {fa(x.status)}</strong>
     <p style={{whiteSpace:'pre-wrap'}}>{x.display_text}</p>
     <p>حالت اجرا: {x.mode} · پیام ارسال‌شده: خیر</p>
     {role==='admin'&&['pending_human_review','blocked_quality_gate'].includes(x.status)&&

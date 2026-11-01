@@ -3,6 +3,7 @@
 import {useEffect,useState} from 'react';
 import Shell from '@/components/Shell';
 import {request,downloadPdf} from '@/lib/api';
+import {fa} from '@/lib/i18n';
 
 type Quote={id:string;case_id:string;currency:string;amount_minor:number;status:string};
 type CaseRow={id:string;status:string};
@@ -93,7 +94,7 @@ export default function Quotations(){
  }
  return <Shell title="پیش‌فاکتورها و نسخه‌های مالی">
   <div className="infoBanner">
-   محیط توسعه، فقط داده ساختگی. قیمت‌ها و نرخ ارز باید از منابع واقعی به‌صورت دستی بررسی و مستند شوند؛ سامانه دریافت نرخ زنده، محاسبه قانونی مالیات، تأیید صورتحساب بیمارستان یا پرداخت واقعی ندارد. نسبت FX بر حسب کوچک‌ترین واحد پول مبدا به مقصد است، نه نرخ هر واحد اصلی.
+   نسخه نمایشی، فقط داده ساختگی. قیمت‌ها و نرخ ارز باید از منابع واقعی به‌صورت دستی بررسی و مستند شوند؛ سامانه دریافت نرخ زنده، محاسبه قانونی مالیات، تأیید صورتحساب بیمارستان یا پرداخت واقعی ندارد. نسبت نرخ ارز بر حسب کوچک‌ترین واحد پول مبدا به مقصد است، نه نرخ هر واحد اصلی.
   </div>
   {error&&<div role="alert" className="errorBox">{error}</div>}
   {notice&&<div role="status" className="infoBanner">{notice}</div>}
@@ -102,16 +103,16 @@ export default function Quotations(){
    <div style={{display:'flex',gap:12,flexWrap:'wrap',alignItems:'end'}}>
     <label>پرونده
      <select value={caseId} onChange={e=>setCaseId(e.target.value)}>
-      {cases.map(x=><option key={x.id} value={x.id}>{x.id.slice(0,8)} · {x.status}</option>)}
+      {cases.map(x=><option key={x.id} value={x.id}>{x.id.slice(0,8)} · {fa(x.status)}</option>)}
      </select>
     </label>
     <label>ارز خروجی
      <select value={currency} onChange={e=>setCurrency(e.target.value)}>
-      {currencies.map(x=><option key={x} value={x}>{x}</option>)}
+      {currencies.map(x=><option key={x} value={x}>{fa(x)}</option>)}
      </select>
     </label>
     <button disabled={busy||!caseId} onClick={()=>void action('/quotes','POST',{
-     case_id:caseId,currency,amount_minor:0,details:'Managed source-bound quote'
+     case_id:caseId,currency,amount_minor:0,details:'پیش‌فاکتور مبتنی بر منابع قیمت مستند'
     })}>ایجاد پیش‌فاکتور بدون مبلغ دستی</button>
    </div>
   </section>
@@ -120,10 +121,11 @@ export default function Quotations(){
    <label>پیش‌فاکتور
     <select value={quoteId} onChange={e=>{setQuoteId(e.target.value);setLines([freshLine()])}}>
      <option value="">انتخاب</option>
-     {quotes.map(x=><option key={x.id} value={x.id}>{x.id.slice(0,8)} · {x.currency} · {x.status}</option>)}
+     {quotes.map(x=><option key={x.id} value={x.id}>{x.id.slice(0,8)} · {x.currency} · {fa(x.status)}</option>)}
     </select>
    </label>
    <p>ارز نهایی: <strong>{quoteCurrency}</strong> · تعداد ردیف‌ها: {lines.length} از ۵۰</p>
+   {selected&&selected.status!=='draft'?<div className="infoBanner" role="status">این پیش‌فاکتور «{fa(selected.status)}» و قفل است؛ ردیف‌ها قابل تغییر نیستند. برای برآورد تازه، پیش‌فاکتور جدیدی بسازید.</div>:<>
    {lines.map((line,i)=>{
     const source=prices.find(p=>p.id===line.price_id);
     const fxOptions=rates.filter(r=>r.source_currency===source?.currency&&r.target_currency===quoteCurrency);
@@ -155,16 +157,17 @@ export default function Quotations(){
     <button type="button" disabled={busy||!quoteId||selected?.status!=='draft'}
      onClick={()=>void createVersion()}>محاسبه و ذخیره نسخه جدید</button>
    </div>
+   </>}
   </section>
   {role==='admin'&&<section className="panel" style={{padding:20,marginTop:16}}>
    <h2>۳. ثبت نرخ ارز مستند به‌دست مدیر</h2>
    <p>مقدار نمونه یا تخمینی ثبت نکنید. نسبت عدد صحیح «جزء پول مبدأ → جزء پول مقصد» همراه مرجع قابل پیگیری و انقضای حداکثر ۳۰ روز است؛ این سیستم صحت مرجع را به‌صورت مستقل اثبات نمی‌کند.</p>
    <form onSubmit={e=>void createRate(e)} style={{display:'grid',gap:9,maxWidth:590}}>
     <label>ارز مبدأ <select value={rateFrom} onChange={e=>setRateFrom(e.target.value)}>
-     {currencies.map(x=><option key={x} value={x}>{x}</option>)}
+     {currencies.map(x=><option key={x} value={x}>{fa(x)}</option>)}
     </select></label>
     <label>ارز مقصد <select value={rateTo} onChange={e=>setRateTo(e.target.value)}>
-     {currencies.map(x=><option key={x} value={x}>{x}</option>)}
+     {currencies.map(x=><option key={x} value={x}>{fa(x)}</option>)}
     </select></label>
     <label>صورت نسبت <input required type="number" min="1" max="1000000000000" step="1" value={num} onChange={e=>setNum(e.target.value)}/></label>
     <label>مخرج نسبت <input required type="number" min="1" max="1000000000000" step="1" value={den} onChange={e=>setDen(e.target.value)}/></label>
@@ -180,7 +183,7 @@ export default function Quotations(){
     onChange={e=>setReference(e.target.value)}/></label>
    {versions.length===0?<p>نسخه‌ای برای این پیش‌فاکتور وجود ندارد.</p>:versions.map(v=>
     <div key={v.id} style={{padding:12,borderBottom:'1px solid #d4dde7'}}>
-     <strong>نسخه {v.version} · {v.status} · {v.total_minor} {v.currency} (جزء ارز)</strong>
+     <strong>نسخه {v.version} · {fa(v.status)} · {v.total_minor} {v.currency} (جزء ارز)</strong>
      {v.lines.map((l,i)=><p key={i}>{i+1}. {l.label}: {l.units} واحد · جمع {l.line_total_minor} {v.currency}
       {l.fx_source_reference?' · FX دستی: '+l.fx_source_reference:''}</p>)}
      {v.status==='draft'&&role==='admin'&&<button disabled={busy||reference.length<6}

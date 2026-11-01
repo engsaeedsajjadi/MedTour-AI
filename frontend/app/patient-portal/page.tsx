@@ -1,6 +1,7 @@
 'use client';
 import {useEffect,useState} from 'react';
 import {API_BASE} from '@/lib/api';
+import {fa,faError,faNetwork,tone} from '@/lib/i18n';
 type Journey={case_id:string,status:string,specialty:string,services:{service:string,status:string}[],confirmed_appointments:{at:string,reference:string}[],approved_quotes:{amount_minor:number,currency:string,id:string}[]};
 type ChatMessage={sender:string,body:string,language:string};
 
@@ -12,6 +13,14 @@ const CHAT_UI:Record<string,{chat:string,placeholder:string,send:string,handoff:
  ps:{chat:'خوندي اداري خبرې',placeholder:'همغږي کوونکي ته پیغام',send:'لېږل',handoff:'ستاسو خبرې انساني همغږي کوونکي ته وسپارل شوې.',intake:'د منلو فورمه',answer:'ځواب ثبت کړئ',notice:'دا خدمت بیړنۍ پاملرنه یا تشخیص نه وړاندې کوي.',language:'د خبرو ژبه'},
  prs:{chat:'گفتگوی مصون هماهنگی',placeholder:'پیام به هماهنگ‌کننده',send:'ارسال',handoff:'گفتگو به هماهنگ‌کننده انسانی راجع شد.',intake:'فورم پذیرش',answer:'ثبت جواب',notice:'این خدمت برای حالت عاجل یا تشخیص طبی نیست.',language:'زبان گفتگو'}
 };
+const SENDER:Record<string,string>={patient:'شما',staff:'هماهنگ‌کننده',coordinator:'هماهنگ‌کننده',assistant:'دستیار',system:'سامانه'};
+
+function readInvite():string{
+ const hash=window.location.hash.slice(1);
+ return hash.startsWith('invite=')?decodeURIComponent(hash.slice(7)):'';
+}
+function money(minor:number,currency:string){const digits=['IRR','JPY','KRW','IQD','AFN'].includes(currency)?0:2;return (minor/10**digits).toLocaleString('fa-IR',{minimumFractionDigits:digits,maximumFractionDigits:digits})+' '+currency;}
+function fmtDate(value:string){const d=new Date(value);return Number.isNaN(d.getTime())?value:d.toLocaleString('fa-IR',{dateStyle:'medium',timeStyle:'short'});}
 
 export default function PatientPortal(){
  const [invite,setInvite]=useState(''),[otp,setOtp]=useState(''),[otpBusy,setOtpBusy]=useState(false);
@@ -22,100 +31,130 @@ export default function PatientPortal(){
  const [documentFile,setDocumentFile]=useState<File|null>(null);
  const [documentStatus,setDocumentStatus]=useState('');
  const [documentsByCase,setDocumentsByCase]=useState<Record<string,Array<{id:string;filename:string;status:string}>>>({});
- const [chatLocale,setChatLocale]=useState('en');
- const copy=CHAT_UI[chatLocale]||CHAT_UI.en;
- const [messages,setMessages]=useState<ChatMessage[]>([]),[input,setInput]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false);
+ const [chatLocale,setChatLocale]=useState('fa');
+ const copy=CHAT_UI[chatLocale]||CHAT_UI.fa;
+ const [messages,setMessages]=useState<ChatMessage[]>([]),[input,setInput]=useState(''),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false);
  useEffect(()=>{
-   const hash=window.location.hash.slice(1);
-   const invitation=hash.startsWith('invite=')?decodeURIComponent(hash.slice(7)):'';
-   // Legacy access tokens are never accepted from the URL; session must come
-   // from a successfully exchanged OTP challenge.
+  // Legacy access tokens are never accepted from the URL; a session only comes from a verified OTP exchange.
+  function takeInvite(){
+   const invitation=readInvite();
    if(invitation){sessionStorage.setItem('medtour_patient_invite',invitation);window.history.replaceState({},'',window.location.pathname);}
    setInvite(invitation||sessionStorage.getItem('medtour_patient_invite')||'');
-   setToken(sessionStorage.getItem('medtour_patient_access')||'');
+  }
+  takeInvite();
+  setToken(sessionStorage.getItem('medtour_patient_access')||'');
+  window.addEventListener('hashchange',takeInvite);
+  return ()=>window.removeEventListener('hashchange',takeInvite);
  },[]);
- async function call<T>(path:string,init:RequestInit={}):Promise<T>{const r=await fetch(`${API_BASE}/api/v1/portal${path}`,{...init,headers:{'Content-Type':'application/json','X-Patient-Access':token,...init.headers},cache:'no-store'});const data=await r.json();if(!r.ok)throw new Error(String(data.detail||'Request failed'));return data as T;}
- useEffect(()=>{if(!token)return;Promise.all([call<{name:string,language:string}>('/me'),call<Journey[]>('/journey'),call<ChatMessage[]>('/chat'),call<{purposes:Record<string,boolean>}>('/consents')]).then(([p,j,m,co])=>{setPatient(p);setChatLocale(CHAT_UI[p.language]?p.language:'en');setJourney(j);setMessages(m);setConsents(co.purposes)}).catch(e=>{setError(e.message);sessionStorage.removeItem('medtour_patient_access');setToken('');setPatient(null);});},[token]);
- async function send(e:React.FormEvent){e.preventDefault();setBusy(true);setError('');try{const result=await call<{warning:string|null,human_handoff:boolean,handoff_notice?:string|null}>('/chat',{method:'POST',body:JSON.stringify({message:input,language:chatLocale})});setMessages(await call<ChatMessage[]>('/chat'));setInput('');if(result.warning)setError(result.warning);else if(result.human_handoff)setError(result.handoff_notice||copy.handoff)}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
+ async function call<T>(path:string,init:RequestInit={}):Promise<T>{
+  let r:Response;
+  try{r=await fetch(`${API_BASE}/api/v1/portal${path}`,{...init,headers:{'Content-Type':'application/json','X-Patient-Access':token,...init.headers},cache:'no-store'});}
+  catch(e){throw new Error(faNetwork(e));}
+  const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(faError(data.detail,r.status));return data as T;
+ }
+ useEffect(()=>{if(!token)return;Promise.all([call<{name:string,language:string}>('/me'),call<Journey[]>('/journey'),call<ChatMessage[]>('/chat'),call<{purposes:Record<string,boolean>}>('/consents')]).then(([p,j,m,co])=>{setPatient(p);setChatLocale(CHAT_UI[p.language]?p.language:'fa');setJourney(j);setMessages(m);setConsents(co.purposes)}).catch(e=>{setError(e.message);sessionStorage.removeItem('medtour_patient_access');setToken('');setPatient(null);});
+ // eslint-disable-next-line react-hooks/exhaustive-deps
+ },[token]);
+ async function send(e:React.FormEvent){e.preventDefault();setBusy(true);setError('');setNotice('');try{const result=await call<{warning:string|null,human_handoff:boolean,handoff_notice?:string|null}>('/chat',{method:'POST',body:JSON.stringify({message:input,language:chatLocale})});setMessages(await call<ChatMessage[]>('/chat'));setInput('');if(result.warning)setNotice(result.warning);else if(result.human_handoff)setNotice(result.handoff_notice||copy.handoff)}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
  async function startIntake(caseId:string){setBusy(true);setError('');try{setIntake(await call<NonNullable<typeof intake>>('/intake/sessions',{method:'POST',body:JSON.stringify({case_id:caseId,language:chatLocale})}));}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
- async function answerIntake(e:React.FormEvent){e.preventDefault();if(!intake)return;setBusy(true);setError('');try{const out=await call<typeof intake&{warning?:string}>(`/intake/sessions/${intake.id}/answer`,{method:'POST',body:JSON.stringify({answer:intakeAnswer})});setIntake(out);setIntakeAnswer('');if(out.warning)setError(out.warning);}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
+ async function answerIntake(e:React.FormEvent){e.preventDefault();if(!intake)return;setBusy(true);setError('');try{const out=await call<typeof intake&{warning?:string}>(`/intake/sessions/${intake.id}/answer`,{method:'POST',body:JSON.stringify({answer:intakeAnswer})});setIntake(out);setIntakeAnswer('');if(out.warning)setNotice(out.warning);}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
  async function loadDocuments(caseId:string){
+  setError('');
   try{
-   const r=await fetch(API_BASE+'/api/v1/secure-documents/portal/cases/'+encodeURIComponent(caseId)+'/list',{
-    headers:{'X-Patient-Access':token},cache:'no-store'
-   });
-   if(!r.ok)throw new Error('Document list unavailable ('+r.status+').');
+   const r=await fetch(API_BASE+'/api/v1/secure-documents/portal/cases/'+encodeURIComponent(caseId)+'/list',{headers:{'X-Patient-Access':token},cache:'no-store'});
+   if(!r.ok){const body=await r.json().catch(()=>({}));throw new Error(faError(body.detail,r.status));}
    const docs=await r.json() as Array<{id:string;filename:string;status:string}>;
    setDocumentsByCase(prev=>({...prev,[caseId]:docs}));
-  }catch(e){setError((e as Error).message)}
+  }catch(e){setError(faNetwork(e))}
  }
  async function downloadDocument(caseId:string,id:string){
   setBusy(true);setError('');
   try{
-   const r=await fetch(API_BASE+'/api/v1/secure-documents/portal/cases/'+encodeURIComponent(caseId)+'/documents/'+encodeURIComponent(id),{
-    headers:{'X-Patient-Access':token},cache:'no-store'
-   });
-   if(!r.ok)throw new Error('File access denied ('+r.status+').');
+   const r=await fetch(API_BASE+'/api/v1/secure-documents/portal/cases/'+encodeURIComponent(caseId)+'/documents/'+encodeURIComponent(id),{headers:{'X-Patient-Access':token},cache:'no-store'});
+   if(!r.ok){const body=await r.json().catch(()=>({}));throw new Error(faError(body.detail,r.status));}
    const obj=URL.createObjectURL(await r.blob());
-   const link=document.createElement('a');link.href=obj;link.download='synthetic-medical-document';
-   document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(obj);
-  }catch(e){setError((e as Error).message)}finally{setBusy(false)}
+   const link=document.createElement('a');link.href=obj;link.download='medical-document';
+   document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(obj),1000);
+  }catch(e){setError(faNetwork(e))}finally{setBusy(false)}
  }
- async function uploadDocument(caseId:string){if(!documentFile)return;setBusy(true);setDocumentStatus('');setError('');try{const body=new FormData();body.append('file',documentFile);const r=await fetch(`${API_BASE}/api/v1/secure-documents/portal/cases/${caseId}`,{method:'POST',headers:{'X-Patient-Access':token},body,cache:'no-store'});const result=await r.json();if(!r.ok)throw new Error(String(result.detail||'Upload unavailable'));setDocumentStatus('Synthetic file stored: '+result.status+'. Real patient documents are not permitted.');setDocumentFile(null);await loadDocuments(caseId);}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
+ async function uploadDocument(caseId:string){if(!documentFile)return;setBusy(true);setDocumentStatus('');setError('');try{const body=new FormData();body.append('file',documentFile);const r=await fetch(`${API_BASE}/api/v1/secure-documents/portal/cases/${caseId}`,{method:'POST',headers:{'X-Patient-Access':token},body,cache:'no-store'});const result=await r.json().catch(()=>({}));if(!r.ok)throw new Error(faError(result.detail,r.status));setDocumentStatus('فایل ثبت شد · وضعیت: '+fa(result.status));setDocumentFile(null);await loadDocuments(caseId);}catch(e){setError(faNetwork(e))}finally{setBusy(false)}}
  async function redeem(e:React.FormEvent){e.preventDefault();setOtpBusy(true);setError('');
   try{
    const response=await fetch(API_BASE+'/api/v1/portal/session/exchange',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({invitation_token:invite,verification_code:otp}),cache:'no-store'});
-   const body=await response.json();if(!response.ok)throw new Error(String(body.detail||'Invalid invitation or code'));
+   const body=await response.json().catch(()=>({}));if(!response.ok)throw new Error(faError(body.detail,response.status));
    sessionStorage.removeItem('medtour_patient_invite');sessionStorage.setItem('medtour_patient_access',body.access_token);
-   setInvite('');setOtp('');setToken(body.access_token);
-  }catch(e){setError((e as Error).message);}finally{setOtpBusy(false);}
+   setInvite('');setOtp('');setNotice('');setToken(body.access_token);
+  }catch(e){setError(faNetwork(e));}finally{setOtpBusy(false);}
  }
  async function changeConsent(purpose:string,accepted:boolean){
+  if(!accepted&&!window.confirm('با لغو این رضایت، نشست شما بسته می‌شود و برای ورود دوباره به دعوت جدید نیاز دارید. ادامه می‌دهید؟'))return;
   setBusy(true);setError('');
   try{
    await call('/consents',{method:'POST',body:JSON.stringify({purpose,accepted,notice_version:consentNotice})});
-   if(!accepted){await logout();setError('رضایت لغو و نشست بسته شد. برای دسترسی دوباره دعوت جدید لازم است.');}
+   if(!accepted){await logout();setNotice('رضایت لغو و نشست بسته شد. برای دسترسی دوباره دعوت جدید لازم است.');}
    else setConsents(x=>({...x,[purpose]:true}));
   }catch(e){setError((e as Error).message);}finally{setBusy(false);}
  }
  async function logout(){
   const t=token;
   sessionStorage.removeItem('medtour_patient_access');sessionStorage.removeItem('medtour_patient_invite');
-  setToken('');setInvite('');setOtp('');setPatient(null);setJourney([]);setMessages([]);setDocumentsByCase({});setConsents({});
+  setToken('');setInvite('');setOtp('');setPatient(null);setJourney([]);setMessages([]);setDocumentsByCase({});setConsents({});setIntake(null);
   if(t)try{await fetch(API_BASE+'/api/v1/portal/session/logout',{method:'POST',headers:{'X-Patient-Access':t},cache:'no-store'});}catch{}
  }
- return <main style={{maxWidth:900,margin:'32px auto',padding:24,fontFamily:'system-ui',color:'#142b3c'}}>
- <header style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12}}><h1>✚ MedTour AI | Patient Portal</h1><button onClick={logout}>Clear access</button></header>
- <p>Secure coordination portal · بوابة المريض · پورتال بیمار</p><p>Information shown here is for administrative coordination; emergency care and clinical decisions require qualified local services.</p>
- {error&&<div role="alert" style={{background:'#ffefdd',padding:16,borderRadius:10}}>{error}</div>}
- {!patient?<section style={{border:'1px solid #cedae0',padding:20,borderRadius:12}}>
- <h2>تأیید دسترسی · Verify access</h2>
- <p>فقط محیط آزمایشی با اطلاعات ساختگی؛ احراز هویت مستقل SMS/Email فعال نیست. لینک دعوت به‌تنهایی مجوز مشاهده پرونده نمی‌دهد.</p>
- <form onSubmit={redeem} style={{display:'grid',gap:12,maxWidth:470}}>
-  <label>لینک دعوت / Invitation token<input required dir="ltr" value={invite} onChange={e=>setInvite(e.target.value)} placeholder="Token supplied privately"/></label>
-  <label>کد شش‌رقمی / Verification code<input required dir="ltr" inputMode="numeric" maxLength={6} pattern="[0-9]{6}" autoComplete="one-time-code" value={otp} onChange={e=>setOtp(e.target.value)}/></label>
-  <button disabled={otpBusy||invite.length<35||otp.length!==6}>{otpBusy?'در حال بررسی…':'ورود با کد یک‌بارمصرف / Verify'}</button>
- </form><p>هر دعوت ۱۰ دقیقه و حداکثر ۵ تلاش اعتبار دارد. کد آزمایشی را تنها از هماهنگ‌کننده دریافت کنید.</p>
- </section>:<><h2 dir="auto">{patient.name}</h2>
- <section style={{border:'1px solid #cedae0',padding:20,margin:'16px 0',borderRadius:12}}>
- <h3>رضایت‌های ثبت‌شده · Consent preferences</h3>
- <p>تمام تغییرات آزمایشی ثبت می‌شوند. لغو هر رضایت باعث بسته‌شدن نشست می‌شود؛ دسترسی واقعی درمانی در این محیط مجاز نیست.</p>
- <label>نسخه اطلاعیه حریم خصوصی<input dir="ltr" required value={consentNotice} onChange={e=>setConsentNotice(e.target.value)} maxLength={40}/></label>
- {Object.entries(consents).map(([purpose,accepted])=><div key={purpose} style={{padding:'8px 0',display:'flex',justifyContent:'space-between',gap:12,alignItems:'center'}}>
- <span>{purpose}: {accepted?'فعال':'غیرفعال'}</span><button disabled={busy||!consentNotice.trim()} onClick={()=>void changeConsent(purpose,!accepted)}>{accepted?'لغو رضایت':'اعطای رضایت'}</button></div>)}
- </section>
- {journey.map(c=><section key={c.case_id} style={{border:'1px solid #cedae0',padding:20,margin:'16px 0',borderRadius:12}}><h3>Medical case · {c.specialty||'Medical service'} — {c.status}</h3>
- <small>Reference: {c.case_id}</small><p><button disabled={busy} onClick={()=>startIntake(c.case_id)}>Start / resume structured intake</button></p><div style={{border:'1px solid #d2e5e0',padding:12,borderRadius:8,margin:'10px 0'}}><h4>Secure medical document upload</h4><p>PDF/JPG/PNG up to 8 MiB; only after your explicit document consent and secure storage setup.</p><input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e=>setDocumentFile(e.target.files?.[0]||null)}/><button disabled={busy||!documentFile} onClick={()=>uploadDocument(c.case_id)}>Upload securely</button>{documentStatus&&<p>{documentStatus}</p>}
- <div style={{marginTop:10}}>
-  <button disabled={busy} type="button" onClick={()=>loadDocuments(c.case_id)}>Show available files</button>
-  {(documentsByCase[c.case_id]||[]).map(d=><p key={d.id}>
-   {d.filename} — {d.status} <button disabled={busy} type="button" onClick={()=>downloadDocument(c.case_id,d.id)}>Download privately</button>
-  </p>)}
- </div></div><h4>Travel and care coordination</h4>{c.services.length===0?<p>No active services.</p>:c.services.map((s,i)=><p key={i}>{s.service} — {s.status}</p>)}
- <h4>Confirmed appointments</h4>{c.confirmed_appointments.map((a,i)=><p key={i}>{a.at} — {a.reference}</p>)}
- <h4>Approved estimates</h4>{c.approved_quotes.map(q=><p key={q.id}>{q.amount_minor} minor units / {q.currency}</p>)}</section>)}
- {intake&&<section style={{border:'2px solid #168f83',padding:20,margin:'16px 0',borderRadius:12}}><h3>{copy.intake} · {intake.status}</h3><small>Step {intake.stage+1} / 5</small>{intake.next_prompt?<form onSubmit={answerIntake}><p dir="auto" style={{fontSize:18}}>{intake.next_prompt}</p><textarea dir="auto" required maxLength={3000} value={intakeAnswer} onChange={e=>setIntakeAnswer(e.target.value)} style={{width:'100%'}}/><p><button disabled={busy}>{copy.answer}</button></p></form>:<p>Submitted for qualified human review. Do not use this service in an emergency.</p>}</section>}
- <section style={{border:'1px solid #cedae0',padding:20,borderRadius:12}}><h3>{copy.chat}</h3><label>{copy.language} <select aria-label={copy.language} value={chatLocale} onChange={e=>setChatLocale(e.target.value)}>{Object.keys(LANGUAGE_LABELS).map(code=><option key={code} value={code}>{LANGUAGE_LABELS[code]}</option>)}</select></label><p>{copy.notice}</p><div style={{maxHeight:390,overflowY:'auto',background:'#f6f9fb',padding:16,borderRadius:8}}>{messages.map((m,i)=><div key={i} style={{padding:10,margin:'8px 0',background:'#fff',borderRadius:8}}><small>{m.sender}</small><div dir="auto">{m.body}</div></div>)}</div><form onSubmit={send} style={{display:'flex',gap:8,marginTop:10}}><input dir={chatLocale==='en'?'ltr':'rtl'} lang={chatLocale} required maxLength={4000} style={{flex:1,padding:12}} value={input} onChange={e=>setInput(e.target.value)} placeholder={copy.placeholder}/><button disabled={busy} style={{padding:12}}>{busy?'…':copy.send}</button></form></section>
- </>}
+ return <main className="portal">
+  <header className="portalHeader">
+   <div className="publicBrand"><span className="brandMark" aria-hidden="true">✚</span><div><strong>MedTour AI</strong><small>پرتال امن بیمار</small></div></div>
+   {patient&&<button className="logout" onClick={logout}>خروج از پرتال</button>}
+  </header>
+  <div className="infoBanner">اطلاعات این پرتال برای هماهنگی اداری است. در شرایط اورژانسی و برای تصمیم‌های درمانی با مراکز درمانی مجاز محل خود تماس بگیرید.</div>
+  {error&&<div role="alert" className="errorBox">{error}</div>}
+  {notice&&<div role="status" className="successBox">{notice}</div>}
+  {!patient?<section className="panel portalPanel">
+   <h2>ورود به پرتال</h2>
+   <p className="subtle">لینک دعوت و کد شش‌رقمی را از هماهنگ‌کننده دریافت می‌کنید. لینک دعوت به‌تنهایی اجازه مشاهده پرونده نمی‌دهد.</p>
+   <form onSubmit={redeem} className="portalForm">
+    <label>کد دعوت<input required dir="ltr" value={invite} onChange={e=>setInvite(e.target.value)} placeholder="از لینک دعوت به‌صورت خودکار پر می‌شود"/></label>
+    <label>کد شش‌رقمی<input required dir="ltr" inputMode="numeric" maxLength={6} pattern="[0-9]{6}" autoComplete="one-time-code" value={otp} onChange={e=>setOtp(e.target.value)}/></label>
+    <button className="button" disabled={otpBusy||invite.length<35||otp.length!==6}>{otpBusy?'در حال بررسی…':'ورود با کد یک‌بارمصرف'}</button>
+   </form>
+   <p className="subtle">هر دعوت ۱۰ دقیقه و حداکثر ۵ تلاش اعتبار دارد.</p>
+  </section>:<>
+   <h1 className="portalName" dir="auto">{patient.name}</h1>
+   <section className="panel portalPanel">
+    <h2>رضایت‌های من</h2>
+    <p className="subtle">هر تغییر ثبت می‌شود. لغو هر رضایت، نشست فعلی را می‌بندد.</p>
+    <label className="noticeField">نسخه اطلاعیه حریم خصوصی<input dir="ltr" required value={consentNotice} onChange={e=>setConsentNotice(e.target.value)} maxLength={40}/></label>
+    <div className="consentList">{Object.entries(consents).map(([purpose,accepted])=><div key={purpose} className="consentRow">
+     <span>{fa(purpose)}</span>
+     <span className={'badge '+(accepted?'':'muted')}>{accepted?'فعال':'غیرفعال'}</span>
+     <button className={accepted?'button secondary':'button'} disabled={busy||!consentNotice.trim()} onClick={()=>void changeConsent(purpose,!accepted)}>{accepted?'لغو رضایت':'اعطای رضایت'}</button>
+    </div>)}</div>
+   </section>
+   {journey.map(c=><section key={c.case_id} className="panel portalPanel">
+    <div className="portalCaseHead"><h2>پرونده {fa(c.specialty)||'درمانی'}</h2><span className={'badge '+tone(c.status)}>{fa(c.status)}</span></div>
+    <p className="subtle">شماره پیگیری: <code>{c.case_id.slice(0,8)}</code></p>
+    <p><button className="button secondary" disabled={busy} onClick={()=>startIntake(c.case_id)}>شروع یا ادامه فرم پذیرش</button></p>
+    <div className="portalBox">
+     <h3>بارگذاری امن مدارک پزشکی</h3>
+     <p className="subtle">PDF، JPG یا PNG تا ۸ مگابایت؛ فقط پس از رضایت «مدارک پزشکی».</p>
+     <div className="uploadRow"><input type="file" aria-label="انتخاب فایل مدرک" accept=".pdf,.jpg,.jpeg,.png" onChange={e=>setDocumentFile(e.target.files?.[0]||null)}/><button className="button" disabled={busy||!documentFile} onClick={()=>uploadDocument(c.case_id)}>بارگذاری امن</button></div>
+     {documentStatus&&<p role="status">{documentStatus}</p>}
+     <button className="button secondary" disabled={busy} type="button" onClick={()=>loadDocuments(c.case_id)}>نمایش مدارک من</button>
+     {documentsByCase[c.case_id]&&(documentsByCase[c.case_id].length===0?<p className="subtle">مدرکی در دسترس نیست.</p>:<ul className="docList">{documentsByCase[c.case_id].map(d=><li key={d.id}>
+      <span dir="auto">{d.filename}</span><span className={'badge '+tone(d.status)}>{fa(d.status)}</span><button className="button secondary" disabled={busy} type="button" onClick={()=>downloadDocument(c.case_id,d.id)}>دریافت</button>
+     </li>)}</ul>)}
+    </div>
+    <div className="portalGrid">
+     <div><h3>خدمات سفر و درمان</h3>{c.services.length===0?<p className="subtle">خدمت فعالی ثبت نشده است.</p>:c.services.map((s,i)=><p key={i}>{fa(s.service)} — <span className={'badge '+tone(s.status)}>{fa(s.status)}</span></p>)}</div>
+     <div><h3>نوبت‌های تأییدشده</h3>{c.confirmed_appointments.length===0?<p className="subtle">نوبت تأییدشده‌ای ندارید.</p>:c.confirmed_appointments.map((a,i)=><p key={i}>{fmtDate(a.at)}</p>)}</div>
+     <div><h3>برآورد هزینه تأییدشده</h3>{c.approved_quotes.length===0?<p className="subtle">برآورد تأییدشده‌ای ثبت نشده است.</p>:c.approved_quotes.map(q=><p key={q.id}>{money(q.amount_minor,q.currency)}</p>)}</div>
+    </div>
+   </section>)}
+   {intake&&<section className="panel portalPanel portalIntake"><h2>{copy.intake} · {fa(intake.status)}</h2><p className="subtle">مرحله {(intake.stage+1).toLocaleString('fa-IR')} از ۵</p>{intake.next_prompt?<form onSubmit={answerIntake}><p dir="auto" className="intakePrompt">{intake.next_prompt}</p><textarea dir="auto" required maxLength={3000} value={intakeAnswer} onChange={e=>setIntakeAnswer(e.target.value)} aria-label="پاسخ شما"/><p><button className="button" disabled={busy}>{copy.answer}</button></p></form>:<p>پاسخ‌های شما برای بررسی کارشناس ثبت شد. در شرایط اورژانسی از این سامانه استفاده نکنید.</p>}</section>}
+   <section className="panel portalPanel"><div className="portalCaseHead"><h2>{copy.chat}</h2><label className="inlineLabel">{copy.language} <select value={chatLocale} onChange={e=>setChatLocale(e.target.value)}>{Object.keys(LANGUAGE_LABELS).map(code=><option key={code} value={code}>{LANGUAGE_LABELS[code]}</option>)}</select></label></div><p className="subtle">{copy.notice}</p>
+    <div className="chatStream">{messages.length===0?<p className="subtle">هنوز پیامی ارسال نشده است.</p>:messages.map((m,i)=><div key={i} className={m.sender==='patient'?'chatBubble mine':'chatBubble'}><small>{SENDER[m.sender]||fa(m.sender)}</small><div dir="auto">{m.body}</div></div>)}</div>
+    <form onSubmit={send} className="messageComposer"><input dir={chatLocale==='en'?'ltr':'rtl'} lang={chatLocale} required maxLength={4000} value={input} onChange={e=>setInput(e.target.value)} placeholder={copy.placeholder} aria-label={copy.placeholder}/><button className="button" disabled={busy}>{busy?'…':copy.send}</button></form>
+   </section>
+  </>}
  </main>;
 }
