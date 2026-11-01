@@ -25,8 +25,9 @@ EMAIL = re.compile(r"^[^@\s]{1,64}@[^@\s]{1,190}\.[A-Za-z]{2,}$")
 
 
 def validate_password(password: str) -> None:
-    if len(password) < 14:
-        raise ValueError("Password must contain at least 14 characters")
+    # Same minimum as every other staff password in the application.
+    if len(password) < 16:
+        raise ValueError("Password must contain at least 16 characters")
     classes = sum(bool(re.search(p, password)) for p in (r"[a-z]", r"[A-Z]", r"[0-9]", r"[^A-Za-z0-9]"))
     if classes < 3:
         raise ValueError("Password needs at least three of: lower case, upper case, digits, symbols")

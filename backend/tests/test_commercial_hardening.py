@@ -391,3 +391,11 @@ def test_scanner_outage_is_not_logged_as_malware(monkeypatch):
     with pytest.raises(HTTPException):
         document_storage.scan_or_reject(DB(), "t", "u", "c", b"x", "application/pdf")
     assert DB.rows == []
+
+
+def test_provisioned_admin_password_matches_staff_minimum():
+    import pytest
+    from app.provision_tenant import validate_password
+    with pytest.raises(ValueError):
+        validate_password("Short-Pass-2026")  # 15 characters
+    validate_password("Strong-Password-2026")

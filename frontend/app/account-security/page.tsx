@@ -42,7 +42,7 @@ export default function SecurityPage(){
   if(result){setPwd('');setNewPwd('');await logout();}
  }
  return <Shell title="امنیت هویت و دسترسی">
-  <div className="infoBanner">ورود دومرحله‌ای با کد یک‌بارمصرف زمان‌دار برای حساب کارکنان. در نسخه نمایشی، فعال‌سازی به کلید رمزگذاری مستقل نیاز دارد و هنوز برای همه مسیرهای ورود کامل نشده است.</div>
+  <div className="infoBanner">ورود دومرحله‌ای با کد یک‌بارمصرف زمان‌دار (Google Authenticator، Microsoft Authenticator یا مشابه). برای مدیران و اپراتورها اجباری است و تا فعال نشود، دسترسی به بخش‌های دیگر پنل بسته می‌ماند.</div>
   {error&&<div className="errorBox" role="alert">{error}</div>}
   {notice&&<div className="infoBanner" role="status">{notice}</div>}
   <section className="panel" style={{padding:20,marginTop:18}}>
