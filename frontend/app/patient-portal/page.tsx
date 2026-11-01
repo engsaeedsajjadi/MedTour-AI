@@ -7,6 +7,7 @@ type Travel={visa:{status:string,visa_type:string,decision:string|null,intended_
  accommodation:{hotel:string,city:string,check_in:string,check_out:string,room_type:string,guests:number,status:string,confirmed:boolean}[],
  transfers:{kind:string,starts_at:string,ends_at:string,from:string,to:string,passengers:number,status:string,confirmed:boolean}[],
  readiness:{ready_to_travel:boolean,pending:string[],departure_at:string|null}};
+type Org={display_name:string,contact_email:string,contact_phone:string,website:string,privacy_notice_url:string,patient_support_hours:string};
 type ChatMessage={sender:string,body:string,language:string};
 
 const LANGUAGE_LABELS:Record<string,string>={fa:'فارسی',ar:'العربية',en:'English',ps:'پښتو',prs:'دری'};
@@ -46,6 +47,7 @@ function fmtDate(value:string){const d=new Date(value);return Number.isNaN(d.get
 
 export default function PatientPortal(){
  const [invite,setInvite]=useState(''),[otp,setOtp]=useState(''),[otpBusy,setOtpBusy]=useState(false);
+ const [org,setOrg]=useState<Org|null>(null);
  const [consents,setConsents]=useState<Record<string,boolean>>({}),[consentNotice,setConsentNotice]=useState('v21-synthetic');
  const [token,setToken]=useState(''),[patient,setPatient]=useState<{name:string,language:string}|null>(null),[journey,setJourney]=useState<Journey[]>([]);
  const [intake,setIntake]=useState<{id:string;case_id:string;status:string;next_prompt:string|null;language:string;stage:number}|null>(null);
@@ -74,7 +76,7 @@ export default function PatientPortal(){
   catch(e){throw new Error(faNetwork(e));}
   const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(faError(data.detail,r.status));return data as T;
  }
- useEffect(()=>{if(!token)return;Promise.all([call<{name:string,language:string}>('/me'),call<Journey[]>('/journey'),call<ChatMessage[]>('/chat'),call<{purposes:Record<string,boolean>}>('/consents')]).then(([p,j,m,co])=>{setPatient(p);setChatLocale(CHAT_UI[p.language]?p.language:'fa');setJourney(j);setMessages(m);setConsents(co.purposes)}).catch(e=>{setError(e.message);sessionStorage.removeItem('medtour_patient_access');setToken('');setPatient(null);});
+ useEffect(()=>{if(!token)return;Promise.all([call<{name:string,language:string}>('/me'),call<Journey[]>('/journey'),call<ChatMessage[]>('/chat'),call<{purposes:Record<string,boolean>}>('/consents')]).then(([p,j,m,co])=>{setPatient(p);setChatLocale(CHAT_UI[p.language]?p.language:'fa');setJourney(j);setMessages(m);setConsents(co.purposes);call<Org>('/organization').then(setOrg).catch(()=>{})}).catch(e=>{setError(e.message);sessionStorage.removeItem('medtour_patient_access');setToken('');setPatient(null);});
  // eslint-disable-next-line react-hooks/exhaustive-deps
  },[token]);
  async function send(e:React.FormEvent){e.preventDefault();setBusy(true);setError('');setNotice('');try{const result=await call<{warning:string|null,human_handoff:boolean,handoff_notice?:string|null}>('/chat',{method:'POST',body:JSON.stringify({message:input,language:chatLocale})});setMessages(await call<ChatMessage[]>('/chat'));setInput('');if(result.warning)setNotice(result.warning);else if(result.human_handoff)setNotice(result.handoff_notice||copy.handoff)}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
@@ -120,12 +122,12 @@ export default function PatientPortal(){
  async function logout(){
   const t=token;
   sessionStorage.removeItem('medtour_patient_access');sessionStorage.removeItem('medtour_patient_invite');
-  setToken('');setInvite('');setOtp('');setPatient(null);setJourney([]);setMessages([]);setDocumentsByCase({});setConsents({});setIntake(null);
+  setToken('');setInvite('');setOtp('');setPatient(null);setOrg(null);setJourney([]);setMessages([]);setDocumentsByCase({});setConsents({});setIntake(null);
   if(t)try{await fetch(API_BASE+'/api/v1/portal/session/logout',{method:'POST',headers:{'X-Patient-Access':t},cache:'no-store'});}catch{}
  }
  return <main className="portal">
   <header className="portalHeader">
-   <div className="publicBrand"><span className="brandMark" aria-hidden="true">✚</span><div><strong>MedTour AI</strong><small>پرتال امن بیمار</small></div></div>
+   <div className="publicBrand"><span className="brandMark" aria-hidden="true">✚</span><div><strong dir="auto">{org?.display_name||'MedTour AI'}</strong><small>پرتال امن بیمار</small></div></div>
    {patient&&<button className="logout" onClick={logout}>خروج از پرتال</button>}
   </header>
   <div className="infoBanner">اطلاعات این پرتال برای هماهنگی اداری است. در شرایط اورژانسی و برای تصمیم‌های درمانی با مراکز درمانی مجاز محل خود تماس بگیرید.</div>
@@ -142,6 +144,13 @@ export default function PatientPortal(){
    <p className="subtle">هر دعوت ۱۰ دقیقه و حداکثر ۵ تلاش اعتبار دارد.</p>
   </section>:<>
    <h1 className="portalName" dir="auto">{patient.name}</h1>
+   {org&&(org.contact_email||org.contact_phone||org.privacy_notice_url)&&<section className="panel portalPanel portalContact">
+    <h2>تماس با {org.display_name}</h2>
+    {org.contact_phone&&<p>تلفن: <a dir="ltr" href={'tel:'+org.contact_phone.replace(/[^0-9+]/g,'')}>{org.contact_phone}</a></p>}
+    {org.contact_email&&<p>ایمیل: <a dir="ltr" href={'mailto:'+org.contact_email}>{org.contact_email}</a></p>}
+    {org.patient_support_hours&&<p className="subtle">ساعات پاسخ‌گویی: {org.patient_support_hours}</p>}
+    {org.privacy_notice_url&&<p><a href={org.privacy_notice_url} target="_blank" rel="noopener noreferrer">اطلاعیه حریم خصوصی</a></p>}
+   </section>}
    <section className="panel portalPanel">
     <h2>رضایت‌های من</h2>
     <p className="subtle">هر تغییر ثبت می‌شود. لغو هر رضایت، نشست فعلی را می‌بندد.</p>

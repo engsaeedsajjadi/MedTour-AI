@@ -225,6 +225,9 @@ def patients(limit:int=Query(50,ge=1,le=200),db:Session=Depends(get_db),user:Use
 @app.post('/api/v1/patients',status_code=201)
 def create_patient(body:PatientIn,db:Session=Depends(get_db),user:User=Depends(MODERATOR)):
     if body.language not in LANGUAGES:raise HTTPException(422,'Unsupported language')
+    from .account_settings import enabled_languages
+    if body.language not in enabled_languages(db,user.tenant_id):
+        raise HTTPException(422,'Language is not enabled for this organization')
     import re
     supplied=body.model_dump()
     cleaned=body.contact.strip()
@@ -511,6 +514,9 @@ app.include_router(document_storage_router)
 
 from .session_api import router as session_router
 app.include_router(session_router)
+
+from .account_settings import router as account_settings_router
+app.include_router(account_settings_router)
 
 from .communications import router as communications_router
 app.include_router(communications_router)

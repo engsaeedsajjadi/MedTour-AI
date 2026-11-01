@@ -1,4 +1,5 @@
 'use client';
+import {cachedOrganization} from '@/lib/preferences';
 
 import {useEffect,useState} from 'react';
 import Shell from '@/components/Shell';
@@ -24,6 +25,7 @@ export default function Quotations(){
  const [quoteId,setQuoteId]=useState('');
  const [caseId,setCaseId]=useState('');
  const [currency,setCurrency]=useState('USD');
+ useEffect(()=>{const c=cachedOrganization()?.default_currency;if(c)setCurrency(c);},[]);
  const [lines,setLines]=useState<QuoteLine[]>([freshLine()]);
  const [versions,setVersions]=useState<Version[]>([]);
  const [role,setRole]=useState('');

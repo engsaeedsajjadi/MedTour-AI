@@ -252,12 +252,15 @@ export function tone(value:unknown):string{
 const CODE_KEYS=new Set(['status','role','license_status','credential_status','entry_type','service_type','language','purpose','kind','action','evidence_status','legacy_directory_status','category','specialty','service_code']);
 const DATE_KEYS=/(_at|_until|^date|_date)$/;
 
+/** Time zone chosen on the settings page (falls back to the browser's). */
+function userTimezone():string|undefined{if(typeof window==='undefined')return undefined;try{const z=sessionStorage.getItem('medtour_tz')||undefined;if(z)new Intl.DateTimeFormat('en',{timeZone:z});return z;}catch{return undefined;}}
+
 /** Formats one table cell for display: codes in Persian, dates in the Persian calendar, booleans as بله/خیر. */
 export function cell(key:string,value:unknown):string{
  if(value===null||value===undefined||value==='')return '—';
  if(typeof value==='boolean')return fa(value);
  if(CODE_KEYS.has(key))return fa(value);
- if(DATE_KEYS.test(key)&&typeof value==='string'){const d=new Date(value);if(!Number.isNaN(d.getTime()))return d.toLocaleString('fa-IR',{dateStyle:'medium',timeStyle:'short'});}
+ if(DATE_KEYS.test(key)&&typeof value==='string'){const d=new Date(value);if(!Number.isNaN(d.getTime()))return d.toLocaleString('fa-IR',{dateStyle:'medium',timeStyle:'short',timeZone:userTimezone()});}
  if(/amount|total|units|count/.test(key)&&typeof value==='number')return value.toLocaleString('fa-IR');
  return String(value);
 }

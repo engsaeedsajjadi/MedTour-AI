@@ -108,3 +108,12 @@ td code{white-space:nowrap}
 .pendingBanner{background:#fff8ea;border:1px solid #f4dfb0;color:#7a5a17}
 .readyBanner h3,.pendingBanner h3{margin:0 0 6px;font-size:17px}
 .pendingBanner ul{margin:4px 0 0;padding-inline-start:20px}
+.settingsRows{padding:6px 23px 18px;display:grid;gap:4px}
+.settingsRows p{margin:8px 0;font-size:13px}
+.settingsNote{padding:12px 23px}
+.settingsFieldset{display:contents;border:0;margin:0;padding:0}
+.settingsWide{grid-column:1/-1;display:flex;flex-direction:column;gap:8px}
+.fieldLabel{color:#586b78;font-size:12px;font-weight:700}
+.checkRow{display:flex;flex-wrap:wrap;gap:10px}
+.checkItem{flex-direction:row!important;align-items:center;gap:7px!important;border:1px solid #d9e2e8;border-radius:9px;padding:9px 13px;font-weight:600!important}
+.portalContact a{color:#087e74;font-weight:700}
