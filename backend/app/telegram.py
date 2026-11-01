@@ -107,11 +107,11 @@ def _language(message: dict) -> str:
 
 
 _HELP = {
-    "fa": "دستورات: /start شروع، /language انتخاب زبان، /privacy حریم خصوصی، /services خدمات، /process مراحل، /emergency اورژانس، /operator ارتباط با اپراتور، /stop توقف راهنمایی.",
-    "ar": "الأوامر: /start بداية، /language اللغة، /privacy الخصوصية، /services الخدمات، /process الخطوات، /emergency الطوارئ، /operator التواصل مع الموظف، /stop إيقاف الإرشادات.",
-    "en": "Commands: /start welcome, /language language choices, /privacy privacy, /services services, /process steps, /emergency emergency, /operator human support, /stop stop guidance.",
-    "ps": "لارښوونې: /start پیل، /language ژبه، /privacy محرمیت، /services خدمتونه، /process ګامونه، /emergency بیړنۍ مرستې، /operator کارکوونکی، /stop پای.",
-    "prs": "دستورها: /start آغاز، /language انتخاب زبان، /privacy حریم خصوصی، /services خدمات، /process مراحل، /emergency عاجل، /operator کارمند، /stop پایان.",
+    "fa": "از دکمه‌های پایین صفحه استفاده کنید. دستورات: /start شروع، /language انتخاب زبان، /privacy حریم خصوصی، /services خدمات، /process مراحل، /emergency اورژانس، /operator ارتباط با اپراتور، /stop توقف راهنمایی.",
+    "ar": "استخدم الأزرار أسفل الشاشة. الأوامر: /start بداية، /language اللغة، /privacy الخصوصية، /services الخدمات، /process الخطوات، /emergency الطوارئ، /operator التواصل مع الموظف، /stop إيقاف الإرشادات.",
+    "en": "Use the buttons below. Commands: /start welcome, /language language choices, /privacy privacy, /services services, /process steps, /emergency emergency, /operator human support, /stop stop guidance.",
+    "ps": "لاندې تڼۍ وکاروئ. لارښوونې: /start پیل، /language ژبه، /privacy محرمیت، /services خدمتونه، /process ګامونه، /emergency بیړنۍ مرستې، /operator کارکوونکی، /stop پای.",
+    "prs": "از دکمه‌های پایین صفحه استفاده کنید. دستورها: /start آغاز، /language انتخاب زبان، /privacy حریم خصوصی، /services خدمات، /process مراحل، /emergency عاجل، /operator کارمند، /stop پایان.",
 }
 
 _OPERATOR = {
@@ -166,6 +166,94 @@ _INFORMATION = {
 }
 
 
+# Persistent buttons so patients never have to type commands. Each label maps to exactly one
+# fixed command; any other text is treated as free text and only receives the generic notice.
+_MENU = {
+    "fa": [[("🩺 خدمات", "/services"), ("🧭 مراحل کار", "/process")],
+           [("🔒 حریم خصوصی", "/privacy"), ("👤 تماس با اپراتور", "/operator")],
+           [("🚨 اورژانس", "/emergency"), ("🌐 تغییر زبان", "/language")],
+           [("❓ راهنما", "/help"), ("⏹ پایان", "/stop")]],
+    "ar": [[("🩺 الخدمات", "/services"), ("🧭 الخطوات", "/process")],
+           [("🔒 الخصوصية", "/privacy"), ("👤 التواصل مع الموظف", "/operator")],
+           [("🚨 الطوارئ", "/emergency"), ("🌐 اللغة", "/language")],
+           [("❓ المساعدة", "/help"), ("⏹ إيقاف", "/stop")]],
+    "en": [[("🩺 Services", "/services"), ("🧭 How it works", "/process")],
+           [("🔒 Privacy", "/privacy"), ("👤 Contact operator", "/operator")],
+           [("🚨 Emergency", "/emergency"), ("🌐 Language", "/language")],
+           [("❓ Help", "/help"), ("⏹ Stop", "/stop")]],
+    "ps": [[("🩺 خدمتونه", "/services"), ("🧭 ګامونه", "/process")],
+           [("🔒 محرمیت", "/privacy"), ("👤 کارکوونکی", "/operator")],
+           [("🚨 بیړنۍ مرسته", "/emergency"), ("🌐 ژبه", "/language")],
+           [("❓ لارښود", "/help"), ("⏹ پای", "/stop")]],
+    "prs": [[("🩺 خدمات", "/services"), ("🧭 مراحل", "/process")],
+            [("🔒 حریم خصوصی", "/privacy"), ("👤 تماس با کارمند", "/operator")],
+            [("🚨 عاجل", "/emergency"), ("🌐 زبان", "/language")],
+            [("❓ رهنمایی", "/help"), ("⏹ پایان", "/stop")]],
+}
+_LANGUAGE_MENU = [[("فارسی", "/language fa"), ("دری", "/language prs")],
+                  [("العربية", "/language ar"), ("پښتو", "/language ps")],
+                  [("English", "/language en")]]
+_PLACEHOLDER = {
+    "fa": "یکی از گزینه‌ها را انتخاب کنید",
+    "ar": "اختر أحد الخيارات",
+    "en": "Choose an option",
+    "ps": "یو انتخاب وټاکئ",
+    "prs": "یکی از گزینه‌ها را انتخاب کنید",
+}
+
+
+def _button_key(text: str) -> str:
+    return " ".join(text.replace("\ufe0f", "").split())
+
+
+_BUTTON_COMMANDS = {
+    _button_key(label): command
+    for rows in [*_MENU.values(), _LANGUAGE_MENU] for row in rows for label, command in row
+}
+
+
+def _command_text(raw: object) -> object:
+    """Translate a tapped keyboard label into its fixed command; leave anything else as is."""
+    if isinstance(raw, str) and len(raw) <= 64:
+        return _BUTTON_COMMANDS.get(_button_key(raw), raw)
+    return raw
+
+
+def _keyboard(rows: list, language: str) -> dict:
+    return {
+        "keyboard": [[{"text": label} for label, _ in row] for row in rows],
+        "resize_keyboard": True,
+        "is_persistent": True,
+        "input_field_placeholder": _PLACEHOLDER[language],
+    }
+
+
+def _reply_markup(update: dict, operator_contact_url: str | None = None) -> dict:
+    """Keyboard sent with a reply. Derived only from the fixed command, never from free text."""
+    message = update.get("message") if isinstance(update, dict) else None
+    if not isinstance(message, dict):
+        return {"remove_keyboard": True}
+    language = _language(message)
+    text = _command_text(message.get("text"))
+    words = text.split(maxsplit=1) if isinstance(text, str) and text.startswith("/") else []
+    command = words[0].split("@", 1)[0].lower() if words else ""
+    if command in ("/start", "/language", "/lang") and len(words) > 1:
+        candidate = words[1].strip().lower()
+        if candidate in _LANGS:
+            language = candidate
+        else:
+            return _keyboard(_LANGUAGE_MENU, language)
+    if command in ("/language", "/lang") and len(words) == 1:
+        return _keyboard(_LANGUAGE_MENU, language)
+    if command == "/stop":
+        return {"remove_keyboard": True}
+    if command == "/operator" and operator_contact_url:
+        label = {"fa": "تماس با اپراتور", "ar": "التواصل مع الموظف", "en": "Contact operator",
+                 "ps": "کارکوونکی", "prs": "تماس با کارمند"}[language]
+        return {"inline_keyboard": [[{"text": "👤 " + label, "url": operator_contact_url}]]}
+    return _keyboard(_MENU[language], language)
+
+
 def _safe_reply(update: dict, operator_contact_url: str | None = None) -> tuple[int, str] | None:
     """Read command metadata only; never extract, record or echo patient content."""
     message = update.get("message")
@@ -181,7 +269,7 @@ def _safe_reply(update: dict, operator_contact_url: str | None = None) -> tuple[
         or sender["id"] != chat_id or sender.get("is_bot") is True):
         return None
     language = _language(message)
-    user_text = message.get("text")
+    user_text = _command_text(message.get("text"))
     if not isinstance(user_text, str) or not user_text.startswith("/") or len(user_text) > 128:
         return chat_id, _NOTICE[language]
     words = user_text.split(maxsplit=1)
@@ -243,13 +331,16 @@ async def _finish(redis_url: str, key: str, owner: str, *, sent: bool) -> None:
         await client.aclose()
 
 
-async def _send_message(token: str, chat_id: int, reply: str, privacy_url: str) -> None:
+async def _send_message(token: str, chat_id: int, reply: str, privacy_url: str,
+                        reply_markup: dict | None = None) -> None:
     payload = {
         "chat_id": chat_id,
         "text": reply + ("\n\nPrivacy notice: " + privacy_url if privacy_url else ""),
         "disable_web_page_preview": True,
         "protect_content": True,
     }
+    if reply_markup is not None:
+        payload["reply_markup"] = reply_markup
     # No untrusted destination. Token is operator-provisioned. Never log URLs.
     async with httpx.AsyncClient(timeout=httpx.Timeout(connect=18.0, read=20.0, write=12.0, pool=8.0), follow_redirects=False) as client:
         response = await client.post(
@@ -302,7 +393,8 @@ async def telegram_webhook(request: Request):
     if not reserved:
         return {"ok": True, "duplicate": True}
     try:
-        await _send_message(config.token, reply[0], reply[1], config.privacy_url)
+        await _send_message(config.token, reply[0], reply[1], config.privacy_url,
+                            reply_markup=_reply_markup(update, config.operator_contact_url))
     except (httpx.HTTPError, ValueError):
         try:
             await _finish(config.redis_url, key, owner, sent=False)

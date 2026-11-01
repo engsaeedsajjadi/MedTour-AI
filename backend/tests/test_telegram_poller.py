@@ -90,7 +90,7 @@ def _update(update_id: int, chat_id: int, text: str, lang: str = "fa"):
 def test_unauthorized_chat_never_replied_to(monkeypatch):
     _env(monkeypatch)
     cfg = telegram_poller.config_from_env()
-    async def reject(*args):
+    async def reject(*args, **_kw):
         raise AssertionError("Unauthorized chat must not cause outbound delivery")
     monkeypatch.setattr(telegram, "_send_message", reject)
     http = FakeHTTP([_update(101, 999, "/start fa")])
@@ -109,7 +109,7 @@ def test_authorized_chat_generates_safe_reply_and_ack(monkeypatch):
         return True
     async def finish(*args, **kwargs):
         assert kwargs["sent"] is True
-    async def send(token, chat, text, privacy):
+    async def send(token, chat, text, privacy, **_kw):
         deliveries.append((chat, text, privacy))
     monkeypatch.setattr(telegram, "_claim", claim)
     monkeypatch.setattr(telegram, "_finish", finish)
@@ -132,7 +132,7 @@ def test_failed_send_is_not_acknowledged(monkeypatch):
         return True
     async def finish(*args, **kwargs):
         released.append(kwargs["sent"])
-    async def send(*args):
+    async def send(*args, **_kw):
         raise httpx.ConnectError("synthetic", request=httpx.Request("POST", "https://api.telegram.org"))
     monkeypatch.setattr(telegram, "_claim", claim)
     monkeypatch.setattr(telegram, "_finish", finish)
@@ -167,7 +167,7 @@ def test_selected_persian_survives_followup_with_english_telegram_ui(monkeypatch
         return True
     async def finish(*args, **kwargs):
         assert kwargs["sent"] is True
-    async def send(token, chat, text, privacy):
+    async def send(token, chat, text, privacy, **_kw):
         deliveries.append(text)
     monkeypatch.setattr(telegram, "_claim", claim)
     monkeypatch.setattr(telegram, "_finish", finish)
@@ -193,7 +193,7 @@ def test_farsi_greeting_when_telegram_ui_is_english(monkeypatch):
         return True
     async def finish(*args, **kwargs):
         assert kwargs["sent"] is True
-    async def send(token, chat, text, privacy):
+    async def send(token, chat, text, privacy, **_kw):
         delivered.append(text)
     monkeypatch.setattr(telegram, "_claim", claim)
     monkeypatch.setattr(telegram, "_finish", finish)
@@ -214,7 +214,7 @@ def test_explicit_language_switch_and_unauthorized_chat_isolation(monkeypatch):
         return True
     async def finish(*args, **kwargs):
         assert kwargs["sent"] is True
-    async def send(token, chat, text, privacy):
+    async def send(token, chat, text, privacy, **_kw):
         delivered.append(text)
     monkeypatch.setattr(telegram, "_claim", claim)
     monkeypatch.setattr(telegram, "_finish", finish)
@@ -243,7 +243,7 @@ def test_invalid_language_command_does_not_replace_preference(monkeypatch):
         return True
     async def finish(*args, **kwargs):
         pass
-    async def send(token, chat, text, privacy):
+    async def send(token, chat, text, privacy, **_kw):
         delivered.append(text)
     monkeypatch.setattr(telegram, "_claim", claim)
     monkeypatch.setattr(telegram, "_finish", finish)
@@ -362,3 +362,23 @@ def test_local_poller_exits_on_invalid_bot_credentials(monkeypatch, capsys):
     output = capsys.readouterr().out
     assert "FAIL: telegram_authorization_failed; polling stopped" in output
     assert "123456789:" not in output
+
+
+def test_poller_sends_keyboard_in_selected_language(monkeypatch):
+    _env(monkeypatch)
+    cfg = telegram_poller.config_from_env()
+    markups = []
+    async def claim(*args):
+        return True
+    async def finish(*args, **kwargs):
+        pass
+    async def send(token, chat, text, privacy, **kw):
+        markups.append(kw.get("reply_markup"))
+    monkeypatch.setattr(telegram, "_claim", claim)
+    monkeypatch.setattr(telegram, "_finish", finish)
+    monkeypatch.setattr(telegram, "_send_message", send)
+    http = FakeHTTP([_update(20, 12345, "English"), _update(21, 12345, "🩺 Services")])
+    redis = FakeRedis()
+    asyncio.run(telegram_poller.poll_batch(http, redis, cfg, 0))
+    labels = [[b["text"] for row in m["keyboard"] for b in row] for m in markups]
+    assert all("🩺 Services" in l for l in labels)

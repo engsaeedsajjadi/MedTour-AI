@@ -35,7 +35,7 @@ def setup(monkeypatch):
         if owned.get(key) == owner and not sent:
             del owned[key]
 
-    async def send(_token, chat_id, reply, privacy_url):
+    async def send(_token, chat_id, reply, privacy_url, **_kw):
         out.append((chat_id, reply, privacy_url))
 
     monkeypatch.setattr(telegram, '_claim', claim)
@@ -142,7 +142,7 @@ def test_sender_missing_or_callback_ignored(setup):
 
 def test_upstream_failure_releases_reservation_and_returns_retryable_error(setup, monkeypatch):
     client, owned, out = setup
-    async def reject(*args):
+    async def reject(*args, **_kw):
         raise httpx.ReadTimeout('synthetic')
     monkeypatch.setattr(telegram,'_send_message',reject)
     resp = post(client, update())
@@ -269,3 +269,61 @@ def test_media_is_not_processed_or_accepted_as_medical_input(setup):
     assert len(out) == 1
     assert 'synthetic-sensitive-id' not in out[-1][1]
     assert 'Do not send' in out[-1][1]
+
+
+def _labels(markup):
+    return [button['text'] for row in markup['keyboard'] for button in row]
+
+
+@pytest.mark.parametrize('language', ['fa', 'ar', 'en', 'ps', 'prs'])
+def test_every_menu_button_maps_to_a_fixed_command_reply(language):
+    markup = telegram._reply_markup(update(text='/start ' + language))
+    assert markup['is_persistent'] is True and markup['resize_keyboard'] is True
+    labels = _labels(markup)
+    assert len(labels) == 8
+    for label in labels:
+        reply = telegram._safe_reply(update(text=label, lang=language))
+        assert reply is not None and reply[0] == 1234
+        assert label not in reply[1]
+
+
+def test_button_tap_gives_same_reply_as_typed_command():
+    assert telegram._safe_reply(update(text='🩺 خدمات', lang='fa')) == telegram._safe_reply(update(text='/services', lang='fa'))
+    assert telegram._safe_reply(update(text='🚨 Emergency', lang='en')) == telegram._safe_reply(update(text='/emergency', lang='en'))
+
+
+def test_language_button_opens_language_keyboard_and_switches_language():
+    markup = telegram._reply_markup(update(text='🌐 تغییر زبان', lang='fa'))
+    assert 'English' in _labels(markup) and 'العربية' in _labels(markup)
+    reply = telegram._safe_reply(update(text='English', lang='fa'))
+    assert 'medical records' in reply[1]
+    assert '🩺 Services' in _labels(telegram._reply_markup(update(text='English', lang='fa')))
+
+
+def test_stop_removes_keyboard_and_operator_uses_public_url_button():
+    assert telegram._reply_markup(update(text='⏹ پایان', lang='fa')) == {'remove_keyboard': True}
+    markup = telegram._reply_markup(update(text='/operator', lang='en'), 'https://example.org/contact')
+    assert markup['inline_keyboard'][0][0]['url'] == 'https://example.org/contact'
+
+
+def test_free_text_resembling_a_button_is_not_a_command():
+    sensitive = '🩺 خدمات - my diagnosis is synthetic-TEST-123'
+    reply = telegram._safe_reply(update(text=sensitive, lang='fa'))
+    assert sensitive not in reply[1] and 'پاسپورت' in reply[1]
+    assert '🩺 خدمات' in _labels(telegram._reply_markup(update(text=sensitive, lang='fa')))
+
+
+def test_send_message_includes_keyboard_only_when_given(monkeypatch):
+    received = []
+    class MockClient:
+        def __init__(self, **kwargs): pass
+        async def __aenter__(self): return self
+        async def __aexit__(self, *args): pass
+        async def post(self, url, json):
+            received.append(json)
+            return httpx.Response(200, json={'ok': True}, request=httpx.Request('POST', url))
+    monkeypatch.setattr(telegram.httpx, 'AsyncClient', MockClient)
+    import asyncio
+    markup = telegram._reply_markup(update(text='/start fa'))
+    asyncio.run(telegram._send_message(TOKEN, 42, 'generic', '', reply_markup=markup))
+    assert received[0]['reply_markup'] == markup

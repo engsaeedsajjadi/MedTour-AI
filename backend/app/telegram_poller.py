@@ -120,7 +120,7 @@ def _requested_locale(update: dict) -> str | None:
     message = update.get("message")
     if not isinstance(message, dict):
         return None
-    raw = message.get("text")
+    raw = telegram._command_text(message.get("text"))
     if not isinstance(raw, str) or len(raw) > 128:
         return None
     parts = raw.split(maxsplit=1)
@@ -220,7 +220,8 @@ async def poll_batch(client: httpx.AsyncClient, redis: Redis, cfg: PollingConfig
                         await telegram._finish(cfg.redis_url, key, owner, sent=False)
                         raise
                 try:
-                    await telegram._send_message(cfg.token, cfg.chat_id, safe[1], cfg.privacy_url)
+                    await telegram._send_message(cfg.token, cfg.chat_id, safe[1], cfg.privacy_url,
+                                                 reply_markup=telegram._reply_markup(localized))
                 except (httpx.HTTPError, ValueError):
                     await telegram._finish(cfg.redis_url, key, owner, sent=False)
                     raise
