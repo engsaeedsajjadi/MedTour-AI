@@ -16,6 +16,7 @@ from .enterprise_models import PortalAccess,PortalLoginChallenge
 from .security import roles,secret
 from .safety_rules import active_consent,revoke_patient_access,CONSENT_PURPOSES
 from .patient_portal import portal_session
+from .tenant_context import bind_tenant,system_scope
 
 router=APIRouter(prefix="/api/v1/portal",tags=["patient portal identity"])
 LIFETIME_MINUTES=10
@@ -23,8 +24,13 @@ SESSION_MINUTES=30
 MAX_ATTEMPTS=5
 MAX_INVITES_PER_HOUR=8
 
+def development()->bool:
+    return os.getenv("APP_ENV","development").lower() in ("development","test")
+
 def dev_only():
-    if os.getenv("APP_ENV","development").lower() not in ("development","test"):
+    """Portal sign-in needs a real delivery channel outside development."""
+    from .otp_delivery import configured
+    if not development() and not configured():
         raise HTTPException(503,"Independent patient identity and approved OTP delivery not configured")
 
 def hashed(raw):
@@ -74,6 +80,18 @@ def invite(patient_id:str,db:Session=Depends(get_db),user:User=Depends(roles("ad
     db.add(Audit(tenant_id=user.tenant_id,user_id=user.id,
         event="portal_invitation_issued_dev_only",entity_type="PortalLoginChallenge",
         entity_id=challenge.id))
+    from . import otp_delivery
+    if otp_delivery.configured():
+        # The patient receives link and code on their own contact; staff never see the code.
+        portal=os.getenv("PUBLIC_PORTAL_URL","http://localhost:3000/patient-portal").rstrip("/")
+        channel=otp_delivery.deliver(patient.contact,"MedTour — کد ورود به پرتال",
+            "برای ورود به پرتال امن بیمار این لینک را باز کنید:\n"+portal+"#invite="+invitation+
+            "\n\nکد شش‌رقمی شما: "+code+"\nاین کد ۱۰ دقیقه اعتبار دارد. آن را به هیچ‌کس، حتی کارکنان، ندهید.")
+        db.add(Audit(tenant_id=user.tenant_id,user_id=user.id,event="portal_invitation_delivered",
+            entity_type="PortalLoginChallenge",entity_id=challenge.id,detail="channel="+channel))
+        db.commit()
+        return {"delivered":True,"channel":channel,"masked_contact":otp_delivery.mask(patient.contact),
+            "expires_in_seconds":600,"access_enabled":False,"otp_delivery":channel}
     db.commit()
     return {"token":invitation,"demo_verification_code":code,"expires_in_seconds":600,
         "access_enabled":False,"independent_identity_verified":False,
@@ -89,6 +107,12 @@ class VerifyIn(BaseModel):
 def exchange(body:VerifyIn,db:Session=Depends(get_db)):
     dev_only()
     now=datetime.now(timezone.utc)
+    with system_scope(db):
+        owner=db.scalar(select(PortalLoginChallenge.tenant_id).where(
+            PortalLoginChallenge.invitation_hash==hashed(body.invitation_token)))
+    if not owner:
+        raise HTTPException(401,"Invalid or used invitation")
+    bind_tenant(db,owner)
     candidate=db.scalar(select(PortalLoginChallenge).where(
         PortalLoginChallenge.invitation_hash==hashed(body.invitation_token)))
     if not candidate:
@@ -109,6 +133,8 @@ def exchange(body:VerifyIn,db:Session=Depends(get_db)):
     if not good:
         c.attempts+=1
         if c.attempts>=MAX_ATTEMPTS:c.consumed_at=now
+        db.add(Audit(tenant_id=c.tenant_id,user_id="anonymous",event="patient_portal_login_failed",
+            entity_type="PortalLoginChallenge",entity_id=c.id,detail=f"attempt={c.attempts}"))
         db.commit()
         raise HTTPException(401,"Invalid verification code")
     if not active_consent(db,c.tenant_id,c.patient_id,"intake") or not active_consent(

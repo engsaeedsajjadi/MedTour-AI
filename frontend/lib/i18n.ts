@@ -28,7 +28,7 @@ const STATUS:Record<string,string>={
  // evidence and documents
  unverified:'تأییدنشده',verified:'تأییدشده دستی',locally_attested:'گواهی محلی',locally_recorded:'ثبت محلی',
  locally_reviewed:'بازبینی محلی',access_revoked:'دسترسی لغوشده',encrypted_dev_unscanned:'رمزنگاری‌شده — اسکن‌نشده',
- scanned_private_s3:'اسکن‌شده — مخزن خصوصی',local_encrypted_unscanned_test:'مخزن محلی رمزنگاری‌شده (آزمایشی)',
+ scanned_private_s3:'اسکن‌شده — مخزن خصوصی',erased:'حذف رمزنگاری‌شده',local_encrypted_unscanned_test:'مخزن محلی رمزنگاری‌شده (آزمایشی)',
  // finance
  payment_received:'دریافت وجه',refund_issued:'بازپرداخت',service_expense:'هزینه خدمت',agency_fee:'کارمزد نمایندگی',
  // roles
@@ -172,6 +172,15 @@ const MESSAGES:Record<string,string>={
  'Bad status':'وضعیت معتبر نیست.',
  'Invalid appointment state':'وضعیت نوبت اجازه این تغییر را نمی‌دهد.',
  'Required stack dependency unavailable':'یکی از سرویس‌های پشتیبان در دسترس نیست.',
+ 'Two-factor authentication required':'برای ادامه، ورود دومرحله‌ای حساب خود را فعال و تأیید کنید.',
+ 'Proposed availability is no longer active':'ظرفیت پزشک برای این نوبت لغو شده است؛ نوبت قابل تأیید نیست.',
+ 'Document is under legal hold':'این سند در توقیف قانونی است و قابل حذف نیست.',
+ 'Document is not due for erasure: revoke access or wait for the retention period':'این سند هنوز قابل حذف نیست؛ ابتدا دسترسی لغو شود یا دوره نگهداری به پایان برسد.',
+ 'Document already erased':'این سند قبلاً حذف رمزنگاری‌شده است.',
+ 'Approved OTP delivery provider is not configured':'سرویس ارسال کد یک‌بارمصرف پیکربندی نشده است.',
+ 'Patient contact is not a valid address for the configured delivery channel':'اطلاعات تماس بیمار برای ارسال کد معتبر نیست؛ ایمیل یا شماره موبایل را اصلاح کنید.',
+ 'One-time code delivery failed; try again later':'ارسال کد ناموفق بود؛ کمی بعد دوباره تلاش کنید.',
+ 'Independent patient identity and approved OTP delivery not configured':'ارسال امن کد ورود بیمار پیکربندی نشده است.',
 };
 
 const KEYWORDS:[RegExp,string][]=[
@@ -179,6 +188,7 @@ const KEYWORDS:[RegExp,string][]=[
  [/consent/i,'رضایت فعال بیمار برای این عملیات لازم است.'],
  [/expired/i,'اعتبار این مورد تمام شده است.'],
  [/not (approved|configured)|disabled|unavailable|provider/i,'این قابلیت در محیط فعلی فعال نیست.'],
+ [/active appointment/i,'این ظرفیت نوبت فعال دارد؛ ابتدا نوبت‌ها را لغو کنید.'],
  [/overlap|conflict/i,'این درخواست با مورد دیگری تداخل دارد.'],
  [/required/i,'اطلاعات لازم کامل نیست.'],
  [/invalid|unsupported|unknown|must/i,'اطلاعات وارد‌شده معتبر نیست.'],

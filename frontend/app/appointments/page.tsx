@@ -54,8 +54,8 @@ export default function Appointments(){
    <label>مرجع اداری بازبینی <input minLength={6} maxLength={100} value={ref} onChange={e=>setRef(e.target.value)}/></label>
    {rows.map(x=><div key={x.id} style={{padding:12,borderBottom:'1px solid #ddd'}}>
     <p>پزشک {x.physician_id.slice(0,8)} · {new Date(x.starts_at).toLocaleString('fa-IR')} — {new Date(x.ends_at).toLocaleString('fa-IR')} · {fa(x.status)}</p>
-    {role==='admin'&&x.status==='requested'&&<div style={{display:'flex',gap:8}}>
-     <button disabled={busy||ref.length<6} onClick={()=>void act('/appointment-calendar/requests/'+x.id+'/review',{action:'internally_confirmed',reference:ref})}>تأیید داخلی</button>
+    {role==='admin'&&(x.status==='requested'||x.status==='internally_confirmed')&&<div style={{display:'flex',gap:8}}>
+     {x.status==='requested'&&<button disabled={busy||ref.length<6} onClick={()=>void act('/appointment-calendar/requests/'+x.id+'/review',{action:'internally_confirmed',reference:ref})}>تأیید داخلی</button>}
      <button disabled={busy||ref.length<6} onClick={()=>void act('/appointment-calendar/requests/'+x.id+'/review',{action:'cancelled',reference:ref})}>لغو</button>
     </div>}
     <small>وضعیت رزرو خارجی: تأیید نشده</small>

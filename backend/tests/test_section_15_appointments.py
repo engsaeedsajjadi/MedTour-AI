@@ -39,10 +39,14 @@ def test_conflict_idempotency_and_manual_confirmation(seeded):
     approved=client.post(review,headers=admin,json={"action":"internally_confirmed","reference":"INTERNAL-REVIEW-15"})
     assert approved.status_code==200,approved.text
     assert approved.json()["external_booking_confirmed"] is False
-    assert client.post(review,headers=admin,json={"action":"cancelled","reference":"SECOND-REVIEW-15"}).status_code==409
+    # Re-confirming is refused; a confirmed internal allocation can be cancelled exactly once.
+    assert client.post(review,headers=admin,json={"action":"internally_confirmed","reference":"SECOND-REVIEW-15"}).status_code==409
     assert client.patch("/api/v1/appointments/"+first.json()["id"]+"/status",headers=admin,
         json={"status":"confirmed","reference":"LEGACY-BYPASS-15"}).status_code==409
     with Session() as db:assert db.query(AppointmentSlot).count()==1
+    cancelled=client.post(review,headers=admin,json={"action":"cancelled","reference":"CANCEL-CONFIRMED-15"})
+    assert cancelled.status_code==200 and cancelled.json()["status"]=="cancelled",cancelled.text
+    assert client.post(review,headers=admin,json={"action":"cancelled","reference":"CANCEL-AGAIN-15"}).status_code==409
 
 def test_cancel_releases_slot_and_tenant_isolation(seeded):
     (client,auth,tids,Session),admin,p,c=seeded

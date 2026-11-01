@@ -27,9 +27,35 @@ def validate_file(raw: bytes) -> tuple[str,str]:
     raise HTTPException(415, 'Only PDF, JPEG and PNG contents are accepted')
 
 
+def client_encryption() -> bool:
+    """Self-hosted S3 (e.g. MinIO) without KMS: encrypt in the API with per-document data keys."""
+    return os.getenv('MEDICAL_S3_ENCRYPTION', 'kms').lower() == 'client'
+
+
+def master_key() -> bytes:
+    import base64
+    raw = os.getenv('MEDICAL_MASTER_KEY', '')
+    try:
+        key = base64.urlsafe_b64decode(raw)
+    except Exception:
+        key = b''
+    if len(key) != 32:
+        raise HTTPException(503, 'A 32-byte MEDICAL_MASTER_KEY is required for client-side encryption')
+    return key
+
+
+def _master_key_valid() -> bool:
+    try:
+        master_key()
+        return True
+    except HTTPException:
+        return False
+
+
 def s3_ready() -> bool:
-    return all([os.getenv('APP_ENV') == 'production', os.getenv('MEDICAL_S3_BUCKET'),
-        os.getenv('MEDICAL_S3_KMS_KEY_ID'), os.getenv('CLAMAV_HOST'),
+    deployment = os.getenv('APP_ENV') == 'production' or os.getenv('MEDICAL_STORAGE_SELF_HOSTED', '').lower() == 'true'
+    encryption = _master_key_valid() if client_encryption() else bool(os.getenv('MEDICAL_S3_KMS_KEY_ID'))
+    return all([deployment, os.getenv('MEDICAL_S3_BUCKET'), encryption, os.getenv('CLAMAV_HOST'),
         os.getenv('DOCUMENT_PROCESSING_APPROVED', '').lower() == 'true'])
 
 
@@ -92,3 +118,65 @@ def s3_load(key:str,tenant_id:str,document_id:str,expected_hash:str)->bytes:
     if len(raw)>MAX_BYTES or hashlib.sha256(raw).hexdigest()!=expected_hash:
         raise HTTPException(500,'Document integrity verification failed')
     return raw
+
+
+# --- Client-side envelope encryption (self-hosted S3 such as MinIO) -------------------------
+# Each document gets a random 256-bit data key. Only the data key wrapped by MEDICAL_MASTER_KEY
+# is stored, in the database row. Deleting that wrapped key is a cryptographic erasure: the
+# object (and any storage backup of it) can no longer be decrypted.
+
+def _aad(tenant_id: str, document_id: str) -> bytes:
+    return object_key(tenant_id, document_id).encode()
+
+
+def s3_store_encrypted(tenant_id: str, document_id: str, raw: bytes, mime: str) -> tuple[str, str]:
+    import base64
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    if not s3_ready() or not client_encryption():
+        raise HTTPException(503, 'Approved self-hosted medical storage unavailable')
+    key = object_key(tenant_id, document_id)
+    data_key = AESGCM.generate_key(bit_length=256)
+    nonce = os.urandom(12)
+    body = nonce + AESGCM(data_key).encrypt(nonce, raw, _aad(tenant_id, document_id))
+    wrap_nonce = os.urandom(12)
+    wrapped = base64.urlsafe_b64encode(wrap_nonce + AESGCM(master_key()).encrypt(
+        wrap_nonce, data_key, _aad(tenant_id, document_id))).decode()
+    try:
+        s3_client().put_object(Bucket=os.environ['MEDICAL_S3_BUCKET'], Key=key, Body=body,
+            ContentType='application/octet-stream',
+            Metadata={'integrity-sha256': hashlib.sha256(raw).hexdigest(), 'encryption': 'client-aes256gcm'})
+    except Exception as exc:
+        raise HTTPException(503, 'Private object storage failed') from exc
+    return key, wrapped
+
+
+def s3_load_encrypted(key: str, tenant_id: str, document_id: str, expected_hash: str, wrapped: str | None) -> bytes:
+    import base64
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    from cryptography.exceptions import InvalidTag
+    if not wrapped:
+        raise HTTPException(404, 'Document unavailable')
+    if not s3_ready() or key != object_key(tenant_id, document_id):
+        raise HTTPException(503, 'Approved self-hosted medical storage unavailable')
+    try:
+        body = s3_client().get_object(Bucket=os.environ['MEDICAL_S3_BUCKET'], Key=key)['Body'].read(MAX_BYTES + 64)
+    except Exception as exc:
+        raise HTTPException(503, 'Private document read failed') from exc
+    try:
+        blob = base64.urlsafe_b64decode(wrapped)
+        data_key = AESGCM(master_key()).decrypt(blob[:12], blob[12:], _aad(tenant_id, document_id))
+        raw = AESGCM(data_key).decrypt(body[:12], body[12:], _aad(tenant_id, document_id))
+    except (InvalidTag, ValueError) as exc:
+        raise HTTPException(500, 'Document integrity verification failed') from exc
+    if len(raw) > MAX_BYTES or hashlib.sha256(raw).hexdigest() != expected_hash:
+        raise HTTPException(500, 'Document integrity verification failed')
+    return raw
+
+
+def s3_delete(key: str, tenant_id: str, document_id: str) -> None:
+    if key != object_key(tenant_id, document_id):
+        raise HTTPException(500, 'Invalid private storage reference')
+    try:
+        s3_client().delete_object(Bucket=os.environ['MEDICAL_S3_BUCKET'], Key=key)
+    except Exception as exc:
+        raise HTTPException(503, 'Private object storage delete failed') from exc

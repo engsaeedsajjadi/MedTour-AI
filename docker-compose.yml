@@ -27,16 +27,22 @@ services:
   migrate:
     build: ./backend
     env_file: .env
+    environment:
+      # Migrations run as the database owner; the API never does.
+      DATABASE_URL: ${MIGRATION_DATABASE_URL:-postgresql+psycopg://medtour:${POSTGRES_PASSWORD}@db:5432/medtour}
     depends_on:
       db:
         condition: service_healthy
-    command: ["python", "-m", "alembic", "upgrade", "head"]
+    command: ["sh", "-c", "python -m alembic upgrade head && python -m app.provision_db"]
     restart: "no"
   api:
     build: ./backend
     env_file: .env
     environment:
       PRIVATE_DOCUMENT_DIR: /home/appuser/.medtour_documents
+      # Non-privileged role: no superuser, no BYPASSRLS. Row-level security isolates tenants.
+      DATABASE_URL: postgresql+psycopg://medtour_app:${APP_DB_PASSWORD:?Set APP_DB_PASSWORD in .env (16+ letters and digits)}@db:5432/medtour
+      RLS_ENFORCEMENT: ${RLS_ENFORCEMENT:-required}
     volumes:
       - medtour_secure_dev:/home/appuser/.medtour_documents
     ports:
@@ -58,6 +64,10 @@ services:
     profiles: ["messaging"]
     build: ./backend
     env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://medtour_app:${APP_DB_PASSWORD:?Set APP_DB_PASSWORD in .env}@db:5432/medtour
+      # The delivery worker processes the outbox of every tenant.
+      MEDTOUR_WORKER_SCOPE: system
     command: ["python", "-m", "app.outbound_worker"]
     depends_on:
       db:
@@ -128,7 +138,63 @@ services:
     depends_on:
       api:
         condition: service_healthy
+  # --- Secure medical document storage (docker compose --profile secure-storage up -d) ---
+  minio:
+    profiles: ["secure-storage"]
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER in .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD in .env}
+    volumes:
+      - medtour_minio:/data
+    ports:
+      - "127.0.0.1:9001:9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+  minio-init:
+    profiles: ["secure-storage"]
+    image: minio/mc:RELEASE.2025-04-16T18-13-26Z
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        set -e
+        mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"
+        mc mb --ignore-existing local/"$$MEDICAL_S3_BUCKET"
+        mc anonymous set none local/"$$MEDICAL_S3_BUCKET"
+        mc version enable local/"$$MEDICAL_S3_BUCKET"
+        # The API user may only read, write and delete objects in the medical bucket.
+        printf '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:GetObject","s3:PutObject","s3:DeleteObject","s3:GetObjectVersion","s3:DeleteObjectVersion"],"Resource":["arn:aws:s3:::%s/*"]},{"Effect":"Allow","Action":["s3:ListBucket","s3:GetBucketLocation","s3:ListBucketVersions"],"Resource":["arn:aws:s3:::%s"]}]}' "$$MEDICAL_S3_BUCKET" "$$MEDICAL_S3_BUCKET" > /tmp/medtour-medical-rw.json
+        mc admin policy create local medtour-medical-rw /tmp/medtour-medical-rw.json
+        mc admin user add local "$$AWS_ACCESS_KEY_ID" "$$AWS_SECRET_ACCESS_KEY"
+        mc admin policy attach local medtour-medical-rw --user "$$AWS_ACCESS_KEY_ID" || echo "policy already attached"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MEDICAL_S3_BUCKET: ${MEDICAL_S3_BUCKET:-medtour-medical}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:?Set AWS_ACCESS_KEY_ID for the API storage user}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:?Set AWS_SECRET_ACCESS_KEY for the API storage user}
+    restart: "no"
+  clamav:
+    profiles: ["secure-storage"]
+    image: clamav/clamav:1.4
+    volumes:
+      - medtour_clamav:/var/lib/clamav
+    healthcheck:
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      start_period: 300s
+      retries: 10
 volumes:
+  medtour_minio:
+  medtour_clamav:
   medtour_secure_dev:
   medtour_redis:
   medtour_pg:

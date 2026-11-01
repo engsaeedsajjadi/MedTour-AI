@@ -10,6 +10,7 @@ from .database import get_db
 from .models import Patient,Case,Appointment,Quote,TravelRequest,Consent,User,Audit
 from .enterprise_models import PortalAccess,Operation
 from .security import roles
+from .tenant_context import bind_tenant,system_scope
 from .safety_rules import active_consent
 
 router=APIRouter(prefix='/api/v1/portal',tags=['patient portal'])
@@ -17,6 +18,11 @@ router=APIRouter(prefix='/api/v1/portal',tags=['patient portal'])
 def portal_session(token:str|None,db:Session):
     if not token or len(token)<35:raise HTTPException(401,'Patient access required')
     hashval=hashlib.sha256(token.encode()).hexdigest()
+    # The secret token identifies the tenant; resolve it, then restrict the request to that tenant.
+    with system_scope(db):
+        owner=db.scalar(select(PortalAccess.tenant_id).where(PortalAccess.token_hash==hashval,PortalAccess.revoked==False))
+    if not owner:raise HTTPException(401,'Invalid patient access')
+    bind_tenant(db,owner)
     grant=db.scalar(select(PortalAccess).where(PortalAccess.token_hash==hashval,PortalAccess.revoked==False))
     if not grant:raise HTTPException(401,'Invalid patient access')
     expires=grant.expires_at

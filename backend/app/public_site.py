@@ -85,6 +85,9 @@ def tenant_by_slug(db:Session,slug:str):
         return SimpleNamespace(id=db.info["verified_tenant_id"],slug=slug)
     tenant=db.scalar(select(Tenant).where(Tenant.slug==slug))
     if not tenant:raise HTTPException(404,"Public site not found")
+    # Anonymous visitors only ever see the one tenant named in the URL (row-level security).
+    from .tenant_context import bind_tenant
+    bind_tenant(db,tenant.id)
     return tenant
 
 def public_rows(db:Session,tenant_id:str):

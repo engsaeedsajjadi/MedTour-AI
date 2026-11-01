@@ -4,7 +4,7 @@ import {request,Row} from '@/lib/api';
 
 type ConsentPurpose='intake'|'communication';
 type IssuedConsent={token:string;purpose:string;expires_in_seconds:number};
-type PortalInvitation={token:string;demo_verification_code:string;expires_in_seconds:number};
+type PortalInvitation={token?:string;demo_verification_code?:string;expires_in_seconds:number;delivered?:boolean;channel?:string;masked_contact?:string};
 
 export default function IntakeConsentActions({patients}:{patients:Row[]}) {
  const [selectedId,setSelectedId]=useState('');
@@ -37,7 +37,12 @@ export default function IntakeConsentActions({patients}:{patients:Row[]}) {
   setBusy(true);setError('');setNotice('');setPortalLink('');setDemoCode('');
   try {
    const data=await request<PortalInvitation>('/portal/invites/'+encodeURIComponent(currentId),{method:'POST'});
-   if(!data.token||!/^[0-9]{6}$/.test(data.demo_verification_code))throw new Error('پاسخ دعوت آزمایشی نامعتبر است.');
+   if(data.delivered){
+    // Production path: link and code went straight to the patient; staff never see the code.
+    setNotice('لینک ورود و کد یک‌بارمصرف از طریق '+(data.channel==='sms'?'پیامک':'ایمیل')+' به '+(data.masked_contact||'بیمار')+' ارسال شد. اعتبار: ۱۰ دقیقه.');
+    return;
+   }
+   if(!data.token||!data.demo_verification_code||!/^[0-9]{6}$/.test(data.demo_verification_code))throw new Error('پاسخ دعوت آزمایشی نامعتبر است.');
    // This development-only manual OTP is not an independent identity factor.
    // Retain both challenge values in component memory, not logs, URLs (OTP), or storage.
    setPortalLink(window.location.origin+'/patient-portal#invite='+encodeURIComponent(data.token));

@@ -15,6 +15,7 @@ from .database import get_db
 from .models import Tenant,Patient,Consent,Conversation,Message
 from .enterprise_models import OutboundMessage
 from .enterprise_models import MessageEvent
+from .tenant_context import bind_tenant
 
 router=APIRouter(prefix='/api/v1/webhooks/whatsapp',tags=['Official WhatsApp'])
 
@@ -88,6 +89,7 @@ async def receive(request:Request,db:Session=Depends(get_db)):
     else:
         tenant=db.scalar(select(Tenant).where(Tenant.slug==os.environ['WHATSAPP_TENANT_SLUG']))
     if not tenant:raise HTTPException(503,'Configured tenant not provisioned')
+    bind_tenant(db,tenant.id)
     accepted=duplicates=quarantined=receipts=0
     seen=set()
     try:

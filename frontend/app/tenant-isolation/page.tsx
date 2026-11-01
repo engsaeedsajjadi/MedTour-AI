@@ -9,13 +9,16 @@ type Status={
  runtime_role_nonprivileged:boolean;authenticated_tenant_role:boolean;
  verified_end_to_end_routing:boolean;production_ready:boolean;reason:string;
 };
+type Check={key:string;label:string;passed:boolean;kind:string};
+type Readiness={real_patient_data_mode:boolean;ready_for_real_patients:boolean;checks:Check[]};
 export default function TenantIsolation(){
  const [state,setState]=useState<Status|null>(null);
+ const [ready,setReady]=useState<Readiness|null>(null);
  const [error,setError]=useState('');
  const [loading,setLoading]=useState(true);
  async function refresh(){
   setLoading(true);setError('');
-  try{const s=await request<Status>('/admin/tenant-isolation/status');setState(s);}
+  try{const [s,r]=await Promise.all([request<Status>('/admin/tenant-isolation/status'),request<Readiness>('/compliance/readiness')]);setState(s);setReady(r);}
   catch(e){setError((e as Error).message);}finally{setLoading(false);}
  }
  useEffect(()=>{void refresh();},[]);
@@ -26,7 +29,7 @@ export default function TenantIsolation(){
   ['جدول‌های دارای اجبار امنیت سطری در پایگاه داده',state?.rls_force_tables??'-']
  ];
  return <Shell title="ممیزی جداسازی سازمان‌ها">
-  <div className="infoBanner">ساختار کلیدهای مرکب و سیاست‌های امنیت سطری آماده شده‌اند، اما این صفحه مجوز استفاده از اطلاعات پزشکی واقعی یا استقرار تجاری نیست. فعال‌سازی امنیت سطری باید پس از انتقال کامل ورود، پرتال، وب‌هوک و پردازشگرهای پس‌زمینه به نقش‌های مستقل سازمان انجام شود.</div>
+  <div className="infoBanner">این صفحه وضعیت واقعی جداسازی داده سازمان‌ها در پایگاه داده و چک‌لیست آمادگی برای کار با بیمار واقعی را نشان می‌دهد. موارد حقوقی فقط با ثبت شماره مرجع تصمیم‌های رسمی تکمیل می‌شوند.</div>
   {error&&<div className="errorBox" role="alert">{error}</div>}
   <section className="panel" style={{padding:20,marginTop:18}}>
    <h2>وضعیت دیتابیس فعلی</h2>
@@ -48,5 +51,11 @@ export default function TenantIsolation(){
    </>}
    <button className="button" style={{marginTop:14}} disabled={loading} onClick={()=>void refresh()}>بررسی مجدد</button>
   </section>
+  {ready&&<section className="panel" style={{padding:20}}>
+   <div className="portalCaseHead"><h2>آمادگی برای بیمار واقعی</h2><span className={'badge '+(ready.ready_for_real_patients?'':'danger')}>{ready.ready_for_real_patients?'آماده':'آماده نیست'}</span></div>
+   <p>حالت داده واقعی: <strong>{ready.real_patient_data_mode?'فعال':'غیرفعال'}</strong> · سامانه تا تکمیل همه موارد زیر اجازه فعال شدن این حالت را نمی‌دهد.</p>
+   {(['technical','legal'] as const).map(kind=><div key={kind}><h3>{kind==='technical'?'کنترل‌های فنی':'الزامات حقوقی و مجوزها'}</h3>
+    <ul className="docList">{ready.checks.filter(c=>c.kind===kind).map(c=><li key={c.key}><span className={'badge '+(c.passed?'':'warn')}>{c.passed?'تکمیل':'ناقص'}</span><span>{c.label}</span></li>)}</ul></div>)}
+  </section>}
  </Shell>;
 }

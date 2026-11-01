@@ -11,6 +11,14 @@ from .security import roles
 from .models import Patient,Consent,Audit,User
 from .enterprise_models import PatientConsentChallenge,PortalAccess,OutboundMessage
 from .safety_rules import revoke_patient_access
+from .tenant_context import bind_tenant,system_scope
+
+def _bind_link_owner(db:Session,digest:str)->None:
+    """Resolve which tenant issued this link (cross-tenant read limited to the hash), then confine the request to it."""
+    with system_scope(db):
+        owner=db.scalar(select(PatientConsentChallenge.tenant_id).where(PatientConsentChallenge.token_hash==digest))
+    if not owner:raise HTTPException(401,'Invalid or consumed link')
+    bind_tenant(db,owner)
 
 router=APIRouter(prefix='/api/v1/consent-links',tags=['patient attested consent'])
 PURPOSES={'intake','medical_documents','communication','ai_processing','visa_coordination','accommodation_coordination','transport_coordination','interpreter_coordination','agent_referral'}
@@ -34,8 +42,9 @@ def issue(patient_id:str,purpose:str,db:Session=Depends(get_db),user:User=Depend
 
 @router.get('/preview')
 def preview(token:str=Query(min_length=35,max_length=200),db:Session=Depends(get_db)):
-    challenge=db.scalar(select(PatientConsentChallenge).where(
-        PatientConsentChallenge.token_hash==hashlib.sha256(token.encode()).hexdigest()))
+    digest=hashlib.sha256(token.encode()).hexdigest()
+    _bind_link_owner(db,digest)
+    challenge=db.scalar(select(PatientConsentChallenge).where(PatientConsentChallenge.token_hash==digest))
     if not challenge or challenge.used_at is not None:
         raise HTTPException(401,'Invalid or consumed link')
     expiry=challenge.expires_at if challenge.expires_at.tzinfo else challenge.expires_at.replace(tzinfo=timezone.utc)
@@ -57,6 +66,7 @@ def respond(body:Response,db:Session=Depends(get_db)):
     if os.getenv('APP_ENV')=='production' and body.notice_version!=os.getenv('PRIVACY_NOTICE_VERSION'):
         raise HTTPException(409,'Current privacy notice must be acknowledged')
     digest=hashlib.sha256(body.token.encode()).hexdigest()
+    _bind_link_owner(db,digest)
     # Reject replay using a conditional update in the same transaction.
     c=db.scalar(select(PatientConsentChallenge).where(PatientConsentChallenge.token_hash==digest).with_for_update())
     if not c or c.used_at is not None:raise HTTPException(401,'Invalid or consumed link')

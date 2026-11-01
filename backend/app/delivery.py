@@ -114,7 +114,7 @@ def send_one(outbound_id: str, *, tenant_session_factory=None,
             raise ValueError('Invalid provider response')
     except Exception:
         # A timeout may mean the provider DID send. Never retry automatically.
-        with SessionLocal() as db:
+        with make_session() as db:
             db.execute(update(OutboundMessage).where(
                 OutboundMessage.id == outbound_id,
                 OutboundMessage.tenant_id == expected_tenant_id if expected_tenant_id is not None else OutboundMessage.tenant_id == OutboundMessage.tenant_id,
@@ -123,7 +123,7 @@ def send_one(outbound_id: str, *, tenant_session_factory=None,
             db.commit()
         return {'status':'needs_reconciliation'}
 
-    with SessionLocal() as db:
+    with make_session() as db:
         row = db.scalar(select(OutboundMessage).where(
             OutboundMessage.id == outbound_id,
             OutboundMessage.tenant_id == expected_tenant_id if expected_tenant_id is not None else OutboundMessage.tenant_id == OutboundMessage.tenant_id

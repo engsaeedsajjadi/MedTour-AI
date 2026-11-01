@@ -10,6 +10,7 @@ from .database import get_db
 from .security import current_user,token_for,secret
 from .models import User,Audit
 from .enterprise_models import RefreshSession,RevokedAccess,StaffTotp,StaffMFA
+from .tenant_context import bind_tenant,system_scope
 
 router=APIRouter(prefix='/api/v1/auth',tags=['staff sessions'])
 
@@ -28,6 +29,11 @@ class RefreshIn(BaseModel):
 
 @router.post('/refresh')
 def refresh(body:RefreshIn,db:Session=Depends(get_db)):
+    # The refresh secret identifies the tenant; resolve it, then drop to that tenant only.
+    with system_scope(db):
+        owner=db.scalar(select(RefreshSession.tenant_id).where(RefreshSession.refresh_hash==hash_token(body.refresh_token)))
+    if not owner:raise HTTPException(401,'Invalid refresh credential')
+    bind_tenant(db,owner)
     previous=db.scalar(select(RefreshSession).where(RefreshSession.refresh_hash==hash_token(body.refresh_token)).with_for_update())
     if not previous:raise HTTPException(401,'Invalid refresh credential')
     # A reused refresh token invalidates the entire family; never reactivate a session.

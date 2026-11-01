@@ -19,6 +19,7 @@ from .models import User,Audit
 from .enterprise_models import StaffTotp,StaffMfaChallenge,RefreshSession
 from .security import current_user,roles,token_for,password_verify
 from .session_api import issue_refresh,hash_token
+from .tenant_context import bind_tenant,system_scope
 
 router=APIRouter(prefix="/api/v1/auth",tags=["staff MFA"])
 admin=roles("admin")
@@ -77,7 +78,8 @@ def invalidate_sessions(db:Session,user:User):
         StaffMfaChallenge.used_at.is_(None)).values(used_at=now()))
 
 def tokens(db,user):
-    access=token_for(user)
+    # Only called after a successful second factor: the access token records that assurance.
+    access=token_for(user,mfa_verified=True)
     signer=db.info.get("tenant_route_keyring")
     if signer:
         # In strict tenant-role mode the refresh token MUST carry an
@@ -176,6 +178,11 @@ class VerifyIn(BaseModel):
 @router.post("/mfa/verify")
 def verify(body:VerifyIn,response:Response,db:Session=Depends(get_db)):
     response.headers["Cache-Control"]="no-store, private"
+    with system_scope(db):
+        owner=db.scalar(select(StaffMfaChallenge.tenant_id).where(
+            StaffMfaChallenge.challenge_hash==hash_token(body.challenge_token)))
+    if owner is None:raise HTTPException(401,"Invalid MFA challenge")
+    bind_tenant(db,owner)
     challenge=db.scalar(select(StaffMfaChallenge).where(
         StaffMfaChallenge.challenge_hash==hash_token(body.challenge_token)).with_for_update())
     if challenge is None:raise HTTPException(401,"Invalid MFA challenge")
