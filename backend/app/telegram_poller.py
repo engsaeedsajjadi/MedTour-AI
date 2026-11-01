@@ -11,6 +11,7 @@ import hashlib
 import hmac
 import os
 import secrets
+import time
 from dataclasses import dataclass
 
 import httpx
@@ -92,8 +93,11 @@ def _fatal_telegram_error(error: Exception) -> bool:
 
 
 def _backoff_seconds(failures: int, *, jitter: float = 0.0) -> float:
-    """Bounded exponential delay; no busy-looping during Telegram outages."""
-    return min(20.0, float(2 ** min(max(failures, 1), 5)) + min(max(jitter, 0.0), 1.0))
+    """Bounded exponential delay (1, 2, 4, 8 s, capped at 10 s); no busy-looping during outages.
+
+    Kept short so a brief network drop (e.g. a VPN reconnect) does not delay replies for long.
+    """
+    return min(10.0, float(2 ** (min(max(failures, 1), 5) - 1)) + min(max(jitter, 0.0), 1.0))
 
 
 def _endpoint(token: str, method: str) -> str:
@@ -107,6 +111,7 @@ def _redacted_key(token: str, kind: str) -> str:
 
 
 _LOCALE_TTL_SECONDS = 30 * 24 * 60 * 60
+_LONG_POLL_SECONDS = 10
 
 
 def _locale_key(cfg: PollingConfig) -> str:
@@ -178,8 +183,10 @@ async def poll_batch(client: httpx.AsyncClient, redis: Redis, cfg: PollingConfig
     """
     data = await _telegram_call(client, cfg, "getUpdates", {
         "offset": offset,
-        "limit": 2,
-        "timeout": 20,
+        "limit": 10,
+        # Short long-poll: a connection silently dropped by an unstable network or VPN is
+        # detected within seconds instead of stalling until a long read timeout.
+        "timeout": _LONG_POLL_SECONDS,
         "allowed_updates": ["message"],
     })
     updates = data.get("result")
@@ -208,7 +215,7 @@ async def poll_batch(client: httpx.AsyncClient, redis: Redis, cfg: PollingConfig
             safe = telegram._safe_reply(localized)
             key = telegram._dedup_key(update_id, cfg.secret)
             owner = secrets.token_urlsafe(24)
-            claimed = await telegram._claim(cfg.redis_url, key, owner)
+            claimed = await telegram._claim(cfg.redis_url, key, owner, client=redis)
             if claimed:
                 # Store just a small locale code, not message text or patient data.
                 # Write before delivery so a Redis failure cannot cause a sent
@@ -217,15 +224,19 @@ async def poll_batch(client: httpx.AsyncClient, redis: Redis, cfg: PollingConfig
                     try:
                         await redis.set(locale_key, explicit or greeting, ex=_LOCALE_TTL_SECONDS)
                     except Exception:
-                        await telegram._finish(cfg.redis_url, key, owner, sent=False)
+                        await telegram._finish(cfg.redis_url, key, owner, sent=False, client=redis)
                         raise
+                started = time.monotonic()
                 try:
                     await telegram._send_message(cfg.token, cfg.chat_id, safe[1], cfg.privacy_url,
-                                                 reply_markup=telegram._reply_markup(localized))
+                                                 reply_markup=telegram._reply_markup(localized),
+                                                 client=client)
                 except (httpx.HTTPError, ValueError):
-                    await telegram._finish(cfg.redis_url, key, owner, sent=False)
+                    await telegram._finish(cfg.redis_url, key, owner, sent=False, client=redis)
                     raise
-                await telegram._finish(cfg.redis_url, key, owner, sent=True)
+                await telegram._finish(cfg.redis_url, key, owner, sent=True, client=redis)
+                # Timing only; no message content or identifiers.
+                print("INFO: reply delivered in %d ms" % ((time.monotonic() - started) * 1000), flush=True)
 
         # No content or user identifiers are stored or logged, only offset.
         offset = update_id + 1
@@ -266,8 +277,10 @@ async def run() -> int:
             return 2
         # getUpdates uses a 20s long poll; a read timeout must be longer.
         # Longer connect budget tolerates the intermittent Docker->Telegram timeouts.
-        timeout = httpx.Timeout(connect=18.0, read=35.0, write=12.0, pool=8.0)
-        async with httpx.AsyncClient(timeout=timeout, follow_redirects=False) as client:
+        # Read timeout just above the long-poll window; keep-alive connection reused for replies.
+        timeout = httpx.Timeout(connect=10.0, read=_LONG_POLL_SECONDS + 8.0, write=10.0, pool=5.0)
+        limits = httpx.Limits(max_keepalive_connections=4, keepalive_expiry=60.0)
+        async with httpx.AsyncClient(timeout=timeout, limits=limits, follow_redirects=False) as client:
             stored = await redis.get(_redacted_key(cfg.token, "offset"))
             offset = int(stored) if stored is not None else 0
             verified_webhook = False

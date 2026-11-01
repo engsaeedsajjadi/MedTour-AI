@@ -105,7 +105,7 @@ def test_authorized_chat_generates_safe_reply_and_ack(monkeypatch):
     _env(monkeypatch)
     cfg = telegram_poller.config_from_env()
     deliveries = []
-    async def claim(*args):
+    async def claim(*args, **_kw):
         return True
     async def finish(*args, **kwargs):
         assert kwargs["sent"] is True
@@ -128,7 +128,7 @@ def test_failed_send_is_not_acknowledged(monkeypatch):
     _env(monkeypatch)
     cfg = telegram_poller.config_from_env()
     released = []
-    async def claim(*args):
+    async def claim(*args, **_kw):
         return True
     async def finish(*args, **kwargs):
         released.append(kwargs["sent"])
@@ -163,7 +163,7 @@ def test_selected_persian_survives_followup_with_english_telegram_ui(monkeypatch
     _env(monkeypatch)
     cfg = telegram_poller.config_from_env()
     deliveries = []
-    async def claim(*args):
+    async def claim(*args, **_kw):
         return True
     async def finish(*args, **kwargs):
         assert kwargs["sent"] is True
@@ -189,7 +189,7 @@ def test_farsi_greeting_when_telegram_ui_is_english(monkeypatch):
     _env(monkeypatch)
     cfg = telegram_poller.config_from_env()
     delivered = []
-    async def claim(*args):
+    async def claim(*args, **_kw):
         return True
     async def finish(*args, **kwargs):
         assert kwargs["sent"] is True
@@ -210,7 +210,7 @@ def test_explicit_language_switch_and_unauthorized_chat_isolation(monkeypatch):
     _env(monkeypatch)
     cfg = telegram_poller.config_from_env()
     delivered = []
-    async def claim(*args):
+    async def claim(*args, **_kw):
         return True
     async def finish(*args, **kwargs):
         assert kwargs["sent"] is True
@@ -239,7 +239,7 @@ def test_invalid_language_command_does_not_replace_preference(monkeypatch):
     _env(monkeypatch)
     cfg = telegram_poller.config_from_env()
     delivered = []
-    async def claim(*args):
+    async def claim(*args, **_kw):
         return True
     async def finish(*args, **kwargs):
         pass
@@ -288,10 +288,10 @@ def test_safe_error_codes_never_expose_telegram_token():
 
 
 def test_bounded_exponential_backoff():
-    assert telegram_poller._backoff_seconds(1, jitter=0) == 2.0
-    assert telegram_poller._backoff_seconds(2, jitter=0) == 4.0
-    assert telegram_poller._backoff_seconds(3, jitter=0.5) == 8.5
-    assert telegram_poller._backoff_seconds(100, jitter=1) == 20.0
+    assert telegram_poller._backoff_seconds(1, jitter=0) == 1.0
+    assert telegram_poller._backoff_seconds(2, jitter=0) == 2.0
+    assert telegram_poller._backoff_seconds(3, jitter=0.5) == 4.5
+    assert telegram_poller._backoff_seconds(100, jitter=1) == 10.0
 
 
 def test_local_poller_recovers_after_connect_timeout(monkeypatch, capsys):
@@ -368,7 +368,7 @@ def test_poller_sends_keyboard_in_selected_language(monkeypatch):
     _env(monkeypatch)
     cfg = telegram_poller.config_from_env()
     markups = []
-    async def claim(*args):
+    async def claim(*args, **_kw):
         return True
     async def finish(*args, **kwargs):
         pass
@@ -382,3 +382,38 @@ def test_poller_sends_keyboard_in_selected_language(monkeypatch):
     asyncio.run(telegram_poller.poll_batch(http, redis, cfg, 0))
     labels = [[b["text"] for row in m["keyboard"] for b in row] for m in markups]
     assert all("🩺 Services" in l for l in labels)
+
+
+def test_poller_reuses_its_connections_for_replies(monkeypatch, capsys):
+    _env(monkeypatch)
+    cfg = telegram_poller.config_from_env()
+    seen = {}
+    async def claim(*args, **kw):
+        seen["claim"] = kw.get("client")
+        return True
+    async def finish(*args, **kw):
+        seen["finish"] = kw.get("client")
+    async def send(*args, **kw):
+        seen["send"] = kw.get("client")
+    monkeypatch.setattr(telegram, "_claim", claim)
+    monkeypatch.setattr(telegram, "_finish", finish)
+    monkeypatch.setattr(telegram, "_send_message", send)
+    http = FakeHTTP([_update(30, 12345, "/start fa")])
+    redis = FakeRedis()
+    asyncio.run(telegram_poller.poll_batch(http, redis, cfg, 0))
+    assert seen == {"claim": redis, "finish": redis, "send": http}
+    assert http.queries[0]["timeout"] <= 10
+    log = capsys.readouterr().out
+    assert "INFO: reply delivered in" in log and "12345" not in log
+
+
+def test_shared_redis_client_is_not_closed_by_claim_or_finish():
+    class R:
+        closed = False
+        async def set(self, *a, **k): return True
+        async def eval(self, *a): return 1
+        async def aclose(self): R.closed = True
+    r = R()
+    assert asyncio.run(telegram._claim("redis://unused", "k", "o", client=r)) is True
+    asyncio.run(telegram._finish("redis://unused", "k", "o", sent=True, client=r))
+    assert R.closed is False

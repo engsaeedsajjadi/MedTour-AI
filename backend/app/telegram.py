@@ -306,7 +306,10 @@ def _dedup_key(update_id: int, key: str) -> str:
     return "medtour:telegram:update:" + digest
 
 
-async def _claim(redis_url: str, key: str, owner: str) -> bool:
+async def _claim(redis_url: str, key: str, owner: str, *, client=None) -> bool:
+    """Reserve an update for delivery. A long-lived caller may pass its own Redis client."""
+    if client is not None:
+        return bool(await client.set(key, owner, ex=120, nx=True))
     from redis.asyncio import Redis
     client = Redis.from_url(redis_url, socket_connect_timeout=2, socket_timeout=2)
     try:
@@ -315,9 +318,11 @@ async def _claim(redis_url: str, key: str, owner: str) -> bool:
         await client.aclose()
 
 
-async def _finish(redis_url: str, key: str, owner: str, *, sent: bool) -> None:
+async def _finish(redis_url: str, key: str, owner: str, *, sent: bool, client=None) -> None:
     from redis.asyncio import Redis
-    client = Redis.from_url(redis_url, socket_connect_timeout=2, socket_timeout=2)
+    shared = client is not None
+    if not shared:
+        client = Redis.from_url(redis_url, socket_connect_timeout=2, socket_timeout=2)
     script = """
         if redis.call('GET',KEYS[1]) == ARGV[1] then
             if ARGV[2] == '1' then return redis.call('EXPIRE',KEYS[1],86400)
@@ -328,11 +333,12 @@ async def _finish(redis_url: str, key: str, owner: str, *, sent: bool) -> None:
     try:
         await client.eval(script, 1, key, owner, "1" if sent else "0")
     finally:
-        await client.aclose()
+        if not shared:
+            await client.aclose()
 
 
 async def _send_message(token: str, chat_id: int, reply: str, privacy_url: str,
-                        reply_markup: dict | None = None) -> None:
+                        reply_markup: dict | None = None, client: httpx.AsyncClient | None = None) -> None:
     payload = {
         "chat_id": chat_id,
         "text": reply + ("\n\nPrivacy notice: " + privacy_url if privacy_url else ""),
@@ -342,14 +348,22 @@ async def _send_message(token: str, chat_id: int, reply: str, privacy_url: str,
     if reply_markup is not None:
         payload["reply_markup"] = reply_markup
     # No untrusted destination. Token is operator-provisioned. Never log URLs.
-    async with httpx.AsyncClient(timeout=httpx.Timeout(connect=18.0, read=20.0, write=12.0, pool=8.0), follow_redirects=False) as client:
-        response = await client.post(
-            "https://api.telegram.org/bot" + token + "/sendMessage", json=payload
-        )
-        response.raise_for_status()
-        data = response.json()
-        if not isinstance(data, dict) or data.get("ok") is not True:
-            raise ValueError("Telegram did not accept the generic response")
+    # A long-lived caller (the poller) passes its own client so the TLS connection is reused.
+    if client is not None:
+        await _post_message(client, token, payload)
+        return
+    async with httpx.AsyncClient(timeout=httpx.Timeout(connect=18.0, read=20.0, write=12.0, pool=8.0), follow_redirects=False) as own:
+        await _post_message(own, token, payload)
+
+
+async def _post_message(client: httpx.AsyncClient, token: str, payload: dict) -> None:
+    response = await client.post(
+        "https://api.telegram.org/bot" + token + "/sendMessage", json=payload
+    )
+    response.raise_for_status()
+    data = response.json()
+    if not isinstance(data, dict) or data.get("ok") is not True:
+        raise ValueError("Telegram did not accept the generic response")
 
 
 @router.post("")
