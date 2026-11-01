@@ -64,7 +64,7 @@ export default function VisaCoordination(){
  }
  return <Shell title="هماهنگی ویزای درمانی">
   <div className="infoBanner">
-   فقط داده ساختگی در نسخه نمایشی. هیچ درخواست ویزا به مرجع دولتی ارسال نمی‌شود؛ نتیجه‌های ثبت‌شده، گزارش انسانی و غیرقابل اتکا به‌عنوان تأیید رسمی هستند. شماره گذرنامه، تصویر مدرک، تاریخ تولد و شرح پزشکی را در فیلدهای مرجع وارد نکنید. چک‌لیست نمونه است و الزامات رسمی کشورها نیست.
+   این صفحه مراحل پرونده ویزای درمانی را پیگیری می‌کند. درخواست ویزا را تیم شما به سفارت یا سامانه رسمی ارائه می‌دهد و نتیجه را اینجا ثبت می‌کند. شماره گذرنامه، تصویر مدرک، تاریخ تولد و شرح پزشکی را در فیلدهای مرجع وارد نکنید. الزامات هر کشور را از مرجع رسمی آن بررسی کنید.
   </div>
   {error&&<div className="errorBox" role="alert">{error}</div>}
   {notice&&<div className="infoBanner" role="status">{notice}</div>}
@@ -93,7 +93,7 @@ export default function VisaCoordination(){
     <label>مرجع اداری غیرحساس (لاتین، حداقل ۶ نویسه)<input value={reference} minLength={6} maxLength={100}
      pattern="[A-Za-z0-9][A-Za-z0-9._:/-]{5,99}" onChange={e=>setReference(e.target.value)}/></label>
     <label>عنوان مرجع دریافت‌کننده (فقط برای گزارش دستی)<input value={authority} maxLength={100}
-     placeholder="میز ویزای آزمایشی" onChange={e=>setAuthority(e.target.value)}/></label>
+     placeholder="مثلاً: بخش کنسولی سفارت" onChange={e=>setAuthority(e.target.value)}/></label>
     <label>نتیجه اعلام‌شده (تأیید مستقل نشده)<select value={outcome} onChange={e=>setOutcome(e.target.value)}>
      {['issued_reported','refused_reported','additional_information_reported'].map(x=><option key={x} value={x}>{title(x)}</option>)}
     </select></label>

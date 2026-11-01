@@ -49,7 +49,7 @@ export default function HospitalManagement(){
  }
  const chosen=items.find(x=>x.hospital_id===hospital);
  return <Shell title="مدیریت سازمانی بیمارستان‌ها">
-  <div className="infoBanner">فقط داده ساختگی. ثبت مدرک، خدمات و ظرفیت پیشنهادی اثبات مجوز بیمارستان، ظرفیت واقعی یا پذیرش پزشکی نیست. درخواست داخلی به‌معنی ارسال پیام به بیمارستان یا رزرو تخت نیست.</div>
+  <div className="infoBanner">مدارک مجوز، خدمات و ظرفیت هر بیمارستان را پس از بررسی اسناد آن ثبت کنید. ثبت درخواست در این صفحه به معنی ارسال پیام به بیمارستان یا رزرو تخت نیست؛ تأیید پذیرش را از بیمارستان دریافت و ثبت کنید.</div>
   {loading&&<p>در حال بررسی نقش و بیمارستان‌ها...</p>}
   {error&&<p className="errorBox" role="alert">{error}</p>}
   {notice&&<p className="infoBanner" role="status">{notice}</p>}
@@ -57,7 +57,7 @@ export default function HospitalManagement(){
   {role==='admin'&&<>
    <section className="panel" style={{padding:20}}>
     <h2>فهرست مراکز و وضعیت مدارک</h2>
-    <Link href="/hospitals">افزودن بیمارستان آزمایشی</Link>
+    <Link href="/hospitals">افزودن بیمارستان</Link>
     <label>مرکز
      <select value={hospital} onChange={e=>setHospital(e.target.value)} style={{display:'block',padding:10,width:'100%'}}>
       <option value="">انتخاب مرکز</option>

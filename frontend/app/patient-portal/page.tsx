@@ -48,7 +48,7 @@ function fmtDate(value:string){const d=new Date(value);return Number.isNaN(d.get
 export default function PatientPortal(){
  const [invite,setInvite]=useState(''),[otp,setOtp]=useState(''),[otpBusy,setOtpBusy]=useState(false);
  const [org,setOrg]=useState<Org|null>(null);
- const [consents,setConsents]=useState<Record<string,boolean>>({}),[consentNotice,setConsentNotice]=useState('v21-synthetic');
+ const [consents,setConsents]=useState<Record<string,boolean>>({}),[consentNotice,setConsentNotice]=useState('v1');
  const [token,setToken]=useState(''),[patient,setPatient]=useState<{name:string,language:string}|null>(null),[journey,setJourney]=useState<Journey[]>([]);
  const [intake,setIntake]=useState<{id:string;case_id:string;status:string;next_prompt:string|null;language:string;stage:number}|null>(null);
  const [intakeAnswer,setIntakeAnswer]=useState('');

@@ -23,7 +23,7 @@ export default function IdentitySettings(){
   }catch(e){setError((e as Error).message);}finally{setBusy(false);}
  }
  return <Shell title="امنیت ورود و تأیید دومرحله‌ای">
-  <div className="infoBanner">احراز هویت دومرحله‌ای با کد یک‌بارمصرف برای کارکنان. این نسخه نمایشی هنوز جایگزین کلید امنیتی سخت‌افزاری یا مدیریت حساب سازمانی نیست. کلید محرمانه را در پیام‌رسان یا اسناد عمومی کپی نکنید.</div>
+  <div className="infoBanner">احراز هویت دومرحله‌ای با کد یک‌بارمصرف برای کارکنان. کلید راه‌اندازی را در پیام‌رسان یا اسناد عمومی کپی نکنید.</div>
   {error&&<div className="errorBox" role="alert">{error}</div>}
   {notice&&<div className="infoBanner" role="status">{notice}</div>}
   <section className="panel" style={{padding:22,marginTop:16}}>

@@ -64,7 +64,7 @@ export default function IntakeCoordination(){
  }
  return <Shell title="پذیرش اولیه پزشکی">
   <div className="infoBanner">
-   این پنل صرفاً هماهنگی اداری پذیرش را مدیریت می‌کند و نباید برای تریاژ یا تشخیص استفاده شود. اطلاعات واقعی بیمار و متن بالینی را در فیلد مرجع وارد نکنید.
+   این پنل هماهنگی اداری پذیرش را مدیریت می‌کند و جایگزین تریاژ یا تشخیص نیست. اطلاعات هویتی بیمار و متن بالینی را در فیلد مرجع وارد نکنید.
   </div>
   {error&&<p className="errorBox" role="alert">{error}</p>}
   {notice&&<p className="infoBanner" role="status">{notice}</p>}
@@ -83,7 +83,7 @@ export default function IntakeCoordination(){
      <p>وضعیت: <strong>{statusLabels[active.status]||active.status}</strong></p>
      <p>اعتبارسنجی بالینی: <strong>انجام نشده</strong></p>
      {active.urgency_keyword_alert?<div>
-      <div className="errorBox" role="alert">هشدار احتمالی اورژانس: ارجاع به خدمات اورژانس محلی و تیم واجد صلاحیت خارج از این نسخه آزمایشی الزامی است. ثبت تماس، به معنی موفق بودن تماس یا رفع هشدار نیست.</div>
+      <div className="errorBox" role="alert">هشدار احتمالی اورژانس: بیمار را فوراً به خدمات اورژانس محلی و تیم پزشکی واجد صلاحیت ارجاع دهید. ثبت تماس به معنی موفق بودن تماس یا رفع هشدار نیست.</div>
       <form onSubmit={escalate} style={{maxWidth:580,display:'grid',gap:12,marginTop:14}}>
        <label>ثبت پیگیری انسانی هشدار
         <select value={escalationAction} onChange={e=>setEscalationAction(e.target.value as typeof escalationAction)} style={{width:'100%',padding:10}}>

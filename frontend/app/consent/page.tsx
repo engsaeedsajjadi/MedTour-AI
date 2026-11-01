@@ -40,7 +40,7 @@ export default function Consent(){
    <p className="subtle">نسخه اطلاعیه: <span dir="ltr">{data.privacy_notice_version}</span></p>
    {data.privacy_notice_url
     ?<p><a className="textLink" href={data.privacy_notice_url} target="_blank" rel="noopener noreferrer">پیش از تصمیم، اطلاعیه حریم خصوصی را بخوانید</a></p>
-    :<div className="infoBanner">نسخه نمایشی: متن نهایی و حقوقی اطلاعیه حریم خصوصی هنوز تنظیم نشده است. با اطلاعات واقعی بیمار استفاده نکنید.</div>}
+    :<div className="infoBanner">متن اطلاعیه حریم خصوصی این سازمان هنوز منتشر نشده است. پیش از موافقت، درباره نحوه استفاده از اطلاعات خود از هماهنگ‌کننده بپرسید.</div>}
    <label className="checkRow"><input type="checkbox" checked={choice} onChange={e=>setChoice(e.target.checked)}/> اطلاعیه را خوانده‌ام و با همین هدف مشخص موافقم.</label>
    <div className="buttonRow"><button className="button" disabled={!choice||busy} onClick={()=>respond(true)}>موافقم</button><button className="button secondary" disabled={busy} onClick={()=>respond(false)}>موافق نیستم</button></div>
   </>}

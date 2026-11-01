@@ -49,10 +49,13 @@ def preview(token:str=Query(min_length=35,max_length=200),db:Session=Depends(get
         raise HTTPException(401,'Invalid or consumed link')
     expiry=challenge.expires_at if challenge.expires_at.tzinfo else challenge.expires_at.replace(tzinfo=timezone.utc)
     if expiry<=datetime.now(timezone.utc):raise HTTPException(401,'Expired consent link')
+    # The organization's own published notice (Settings) is used when the server sets none.
+    from .account_settings import organization_profile
+    notice=os.getenv('PUBLIC_PRIVACY_NOTICE_URL') or organization_profile(db,challenge.tenant_id)['privacy_notice_url'] or None
     return {'purpose':challenge.purpose,
-            'privacy_notice_url':os.getenv('PUBLIC_PRIVACY_NOTICE_URL') or None,
+            'privacy_notice_url':notice,
             'privacy_notice_version':os.getenv('PRIVACY_NOTICE_VERSION','v0-development'),
-            'production_notice_configured':bool(os.getenv('PUBLIC_PRIVACY_NOTICE_URL'))}
+            'production_notice_configured':bool(notice)}
 
 class Response(BaseModel):
     token:str=Field(min_length=35,max_length=200)

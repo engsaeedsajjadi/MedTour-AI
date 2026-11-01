@@ -1,6 +1,7 @@
 'use client';
 import {useEffect,useState} from 'react';
 import Shell from '@/components/Shell';
+import ReadinessNotice from '@/components/ReadinessNotice';
 import {API_BASE,getSession,request} from '@/lib/api';
 import {fa,faError} from '@/lib/i18n';
 type CaseRow={id:string;status:string;specialty:string};
@@ -53,7 +54,7 @@ export default function Documents(){
    });
    const data=await r.json().catch(()=>({}));
    if(!r.ok)throw new Error(faError(data.detail,r.status));
-   setMessage('فایل با وضعیت «'+fa(data.status)+'» ذخیره شد. این نسخه برای اطلاعات واقعی بیماران نیست.');
+   setMessage('فایل با وضعیت «'+fa(data.status)+'» ذخیره شد.');
    setFile(null);await refresh();
   }catch(e){setError((e as Error).message)}finally{setBusy(false)}
  }
@@ -70,24 +71,26 @@ export default function Documents(){
   }catch(e){setError((e as Error).message)}finally{setBusy(false)}
  }
  return <Shell title="مدیریت امن مدارک">
-  <div className="infoBanner">نسخه نمایشی برای اطلاعات پزشکی واقعی مجاز نیست. فایل‌ها رمزنگاری می‌شوند ولی اسکن بدافزار نمی‌شوند؛ مخزن ابری امن، اسکن فایل و سیاست نگهداری پیش از استفاده واقعی باید تأیید شوند.</div>
+  {readiness&&(readiness.storage_mode==='s3_kms_configured_unverified'
+   ?<div className="infoBanner">هر فایل پیش از ذخیره با آنتی‌ویروس بررسی و رمزنگاری می‌شود و فقط کارکنان مجاز همین سازمان با رضایت بیمار به آن دسترسی دارند.</div>
+   :<div className="errorBox">مخزن امن مدارک با اسکن آنتی‌ویروس روی سرور فعال نیست. تا فعال شدن آن، مدارک بیماران را بارگذاری نکنید.</div>)}
+  <ReadinessNotice/>
   {error&&<p className="errorBox" role="alert">{error}</p>}
   {message&&<p className="infoBanner" role="status">{message}</p>}
   <section className="panel" style={{padding:20}}>
    <h2>وضعیت مخزن امن</h2>
    <p>حالت: <strong>{readiness?fa(readiness.storage_mode):'در حال بررسی...'}</strong></p>
    <p>مخزن ابری امن و اسکن بدافزار: {readiness?.storage_mode==='s3_kms_configured_unverified'?'پیکربندی‌شده':'پیکربندی نشده'}</p>
-   <p>مجاز برای اطلاعات بیمار واقعی: <strong>خیر</strong></p>
   </section>
   <section className="panel" style={{padding:20,marginTop:18}}>
-   <h2>پرونده آزمایشی و فایل‌های مجاز</h2>
+   <h2>پرونده و فایل‌های مجاز</h2>
    {loading?<p>در حال دریافت...</p>:<label>پرونده
     <select aria-label="انتخاب پرونده" value={caseId} onChange={e=>{setError('');setCaseId(e.target.value)}} style={{display:'block',width:'100%',padding:10}}>
      {cases.map(c=><option key={c.id} value={c.id}>{c.id.slice(0,8)} — {c.specialty||c.status}</option>)}
     </select>
    </label>}
    <form onSubmit={upload} style={{display:'flex',flexWrap:'wrap',gap:10,margin:'16px 0'}}>
-    <input aria-label="فایل آزمایشی" type="file" accept=".pdf,.jpg,.jpeg,.png" required onChange={e=>setFile(e.target.files?.[0]||null)}/>
+    <input aria-label="فایل مدرک" type="file" accept=".pdf,.jpg,.jpeg,.png" required onChange={e=>setFile(e.target.files?.[0]||null)}/>
     <button className="button" disabled={busy||!file||!caseId||!readiness?.configured}>بارگذاری امن</button>
    </form>
    <p>فایل‌های قبلی پس از لغو رضایت مسدود می‌شوند و با رضایت جدید خودکار باز نمی‌گردند.</p>

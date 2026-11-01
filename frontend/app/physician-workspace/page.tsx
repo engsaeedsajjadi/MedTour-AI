@@ -32,7 +32,7 @@ export default function PhysicianWorkspace(){
   })().catch(e=>setError((e as Error).message)).finally(()=>setLoading(false));
  },[]);
  return <Shell title="پرتال اختصاصی پزشک">
-  <div className="infoBanner">صرفاً محیط آزمایشی؛ حساب پزشک فقط اطلاعات اداری ارجاع‌ها و درخواست‌های نوبت مربوط به خودش را می‌بیند، نه مدارک، شکایت پزشکی یا اطلاعات تماس بیماران. مدرک ثبت‌شده محلی به معنی تأیید مستقل نظام پزشکی نیست. هیچ تشخیص، درمان یا نوبت خارجی در این پرتال تأیید نمی‌شود.</div>
+  <div className="infoBanner">در این پرتال ارجاع‌ها و درخواست‌های نوبت مربوط به شما نمایش داده می‌شود. مدارک و اطلاعات تماس بیماران از مسیر جداگانه و با رضایت بیمار در اختیار شما قرار می‌گیرد.</div>
   {loading&&<p>در حال بررسی ارتباط حساب و اعتبار شواهد...</p>}
   {error&&<p className="errorBox" role="alert">{error}</p>}
   {me&&<>
@@ -65,7 +65,7 @@ export default function PhysicianWorkspace(){
      {slots.length===0?<p>بازه‌ای ثبت نشده است.</p>:slots.map(x=><p key={x.id}>
       {new Date(x.starts_at).toLocaleString('fa-IR')} تا {new Date(x.ends_at).toLocaleString('fa-IR')} · پیشنهادی
      </p>)}
-     <p>تقویم واقعی یا ظرفیت نوبت‌دهی به این صفحه متصل نیست.</p>
+     <p>این فهرست به‌صورت خودکار با تقویم مطب شما همگام نمی‌شود.</p>
     </section>
    </div>
   </>}

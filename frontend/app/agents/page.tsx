@@ -48,13 +48,13 @@ export default function Agents(){
   }catch(e){setError((e as Error).message);}finally{setBusy(false);}
  }
  return <Shell title="مدیریت نمایندگان بین‌المللی">
-  <div className="infoBanner">نسخه نمایشی با داده‌های ساختگی. قراردادها صرفاً بررسی اداری می‌شوند و اعتبار قانونی ندارند. کارمزد مرتبط با بیمار یا پرداخت واقعی مجاز نیست. نمایندگان هیچ اطلاعات هویتی یا پزشکی بیمار را دریافت نمی‌کنند.</div>
+  <div className="infoBanner">قرارداد هر نماینده پیش از فعال‌سازی توسط مدیر بررسی می‌شود؛ ثبت آن در این صفحه جایگزین قرارداد حقوقی امضاشده نیست. نمایندگان هیچ اطلاعات هویتی یا پزشکی بیمار دریافت نمی‌کنند.</div>
   {error&&<div className="errorBox" role="alert">{error}</div>}
   {notice&&<div className="infoBanner" role="status">{notice}</div>}
   <section className="panel" style={{padding:20,marginTop:16}}>
    <h2>۱. تعریف نماینده</h2>
    <div style={{display:'grid',gap:10,maxWidth:630}}>
-    <label>نام غیرحساس آزمایشی<input value={name} onChange={e=>setName(e.target.value)}/></label>
+    <label>نام نماینده یا شرکت<input value={name} onChange={e=>setName(e.target.value)}/></label>
     <label>کشور<input value={country} onChange={e=>setCountry(e.target.value)}/></label>
     <button disabled={busy||name.length<2||country.length<2} onClick={()=>void send('/agents',{name,country})}>ثبت نماینده</button>
     <label>نماینده انتخاب‌شده<select value={selected} onChange={e=>{setSelected(e.target.value);void reloadSelected(e.target.value).catch(x=>setError((x as Error).message));}}>
@@ -90,10 +90,10 @@ export default function Agents(){
   </section>}
   {selectedAgent&&<section className="panel" style={{padding:20,marginTop:16}}>
    <h2>۳. حساب مستقل نماینده</h2>
-   <p>فقط بعد از بررسی اداری قرارداد؛ رمز اولیه را از یک مسیر امن و جداگانه به نماینده تحویل دهید. ورود دومرحله‌ای هنوز آماده نیست و استفاده واقعی مجاز نیست.</p>
+   <p>فقط بعد از بررسی قرارداد؛ رمز اولیه را از مسیری امن و جداگانه به نماینده تحویل دهید و از او بخواهید پس از اولین ورود آن را تغییر دهد.</p>
    <div style={{display:'grid',gap:10,maxWidth:620}}>
     <label>ایمیل<input type="email" value={email} onChange={e=>setEmail(e.target.value)}/></label>
-    <label>رمز آزمایشی (حداقل ۱۶ نویسه)<input type="password" value={password} onChange={e=>setPassword(e.target.value)}/></label>
+    <label>رمز اولیه (حداقل ۱۶ نویسه)<input type="password" value={password} onChange={e=>setPassword(e.target.value)}/></label>
     <button disabled={busy||!latestContract||password.length<16} onClick={()=>void send(root+'/agents/'+selected+'/account',{email,password})}>ساخت حساب نماینده</button>
     <button disabled={busy||!selectedAgent.active} onClick={()=>void send(root+'/agents/'+selected+'/disable',{})}>غیرفعال‌سازی کامل نماینده و نشست‌ها</button>
    </div>
@@ -101,7 +101,7 @@ export default function Agents(){
   {selectedAgent&&<section className="panel" style={{padding:20,marginTop:16}}>
    <h2>۴. انتساب ارجاع با رضایت اختصاصی بیمار</h2>
    <p>نماینده فقط کد پیگیری غیرحساس ارسال می‌کند. مدیر فقط پس از ثبت رضایت «پذیرش اولیه» و «ارجاع نماینده» می‌تواند ارجاع را به بیمار موجود متصل کند.</p>
-   <label>شناسه بیمار آزمایشی<input value={patientId} onChange={e=>setPatientId(e.target.value)}/></label>
+   <label>شناسه بیمار<input value={patientId} onChange={e=>setPatientId(e.target.value)}/></label>
    {refs.map(r=><div key={r.id} style={{padding:'12px 0',borderTop:'1px solid #d4dde7'}}>
     <strong>{r.request_key} · {status(r.status)}</strong>
     <p>کانال: {r.channel} · کمپین: {r.campaign_code}</p>

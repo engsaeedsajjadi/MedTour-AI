@@ -65,7 +65,7 @@ export default function Quotations(){
   setBusy(true);setNotice('');setError('');
   try{
    const result=await request<{id?:string}>(path,{method,body:JSON.stringify(body)});
-   setNotice('ثبت در سیستم داخلی انجام شد؛ این نتیجه تأیید مالی یا رزرو واقعی ارائه‌دهنده نیست.');
+   setNotice('در سامانه ثبت شد. تأیید نهایی مالی و رزرو با ارائه‌دهنده جداگانه انجام می‌شود.');
    await refresh();
    if(result.id&&path==='/quotes'){
     setQuoteId(result.id);await readVersions(result.id);
@@ -96,7 +96,7 @@ export default function Quotations(){
  }
  return <Shell title="پیش‌فاکتورها و نسخه‌های مالی">
   <div className="infoBanner">
-   نسخه نمایشی، فقط داده ساختگی. قیمت‌ها و نرخ ارز باید از منابع واقعی به‌صورت دستی بررسی و مستند شوند؛ سامانه دریافت نرخ زنده، محاسبه قانونی مالیات، تأیید صورتحساب بیمارستان یا پرداخت واقعی ندارد. نسبت نرخ ارز بر حسب کوچک‌ترین واحد پول مبدا به مقصد است، نه نرخ هر واحد اصلی.
+   قیمت‌ها و نرخ ارز را از منابع معتبر (تعرفه بیمارستان و نرخ رسمی ارز) وارد و مستند کنید؛ نرخ ارز به‌صورت خودکار دریافت نمی‌شود و پرداخت از این صفحه انجام نمی‌شود. نسبت نرخ ارز بر حسب کوچک‌ترین واحد پول مبدأ به مقصد است، نه نرخ هر واحد اصلی.
   </div>
   {error&&<div role="alert" className="errorBox">{error}</div>}
   {notice&&<div role="status" className="infoBanner">{notice}</div>}

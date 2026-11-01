@@ -98,7 +98,7 @@ export default function VoiceMedia(){
  }
  return <Shell title="پیام صوتی چندزبانه">
   <div className="infoBanner">
-   <strong>فقط محیط آزمایش با فایل ساختگی.</strong> ارسال فایل پزشکی یا صدای واقعی بیمار مجاز نیست. این صفحه به واتساپ یا تلگرام متصل نیست؛ دریافت خودکار فایل صوتی و ارسال خودکار پاسخ غیرفعال‌اند. صوت خام و متن بازشناسی‌شده در پایگاه‌داده ذخیره نمی‌شوند. پشتو و دری بدون ارزیابی مستقل کیفیت گفتار قابل عرضه تجاری نیستند.
+   <strong>پیش از استفاده بخوانید:</strong> این ابزار برای تبدیل پیام صوتی به متن و بازبینی آن است. صوت خام و متن بازشناسی‌شده در پایگاه داده ذخیره نمی‌شوند. کیفیت بازشناسی پشتو و دری را پیش از اتکا به آن، کارشناس بومی‌زبان بررسی کند.
   </div>
   {error&&<div className="errorBox" role="alert">{error}</div>}
   {notice&&<div className="infoBanner" role="status">{notice}</div>}
@@ -109,12 +109,12 @@ export default function VoiceMedia(){
    <p>فرمت ورودی: فایل WAV تک‌کاناله یا OGG · حداکثر ۱ مگابایت · حداکثر ۳۰ ثانیه</p>
   </section>
   <section className="panel" style={{padding:20,marginTop:18}}>
-   <h2>۲. تبدیل صدای آزمایشی به متن</h2>
+   <h2>۲. تبدیل صدا به متن</h2>
    <form onSubmit={transcribe} className="formGrid">
     <label>زبان نمونه<select value={locale} onChange={e=>setLocale(e.target.value)}>
      {langs.map(([value,label])=><option value={value} key={value}>{label}</option>)}
     </select></label>
-    <label>فایل ساختگی محلی<input required type="file" accept=".wav,.ogg,audio/wav,audio/ogg"
+    <label>فایل صوتی<input required type="file" accept=".wav,.ogg,audio/wav,audio/ogg"
      onChange={e=>setFile(e.target.files?.[0]||null)}/></label>
     <div className="formActions">
      <button className="button" disabled={busy||!file||!ready?.stt_enabled_locales.includes(locale)}>
@@ -136,10 +136,10 @@ export default function VoiceMedia(){
    </select></label>
    <button className="button secondary" disabled={busy||!ready?.tts_enabled_locales.includes(locale)}
     onClick={()=>void generate()}>تولید و شنیدن نمونه صوت</button>
-   {playing&&<audio controls src={playing} aria-label="نمونه صوت آزمایشی" style={{display:'block',marginTop:15,maxWidth:'100%'}}/>}
+   {playing&&<audio controls src={playing} aria-label="پخش فایل صوتی" style={{display:'block',marginTop:15,maxWidth:'100%'}}/>}
   </section>
   <section className="panel" style={{padding:20,marginTop:18}}>
-   <h2>۴. بازبینی مستقل متن آزمایشی</h2>
+   <h2>۴. بازبینی مستقل متن</h2>
    <p>بازبین مدیر باید متن دقیق را که از مسیر امن و موقت دریافت کرده وارد کند. هش با پیش‌نویس تطبیق داده می‌شود؛ نویسنده نمی‌تواند متن خودش را تأیید کند.</p>
    <div className="formGrid">
     <label>شناسه پیش‌نویس<select value={reviewId} onChange={e=>setReviewId(e.target.value)}>

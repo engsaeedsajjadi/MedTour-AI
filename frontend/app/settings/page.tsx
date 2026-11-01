@@ -7,7 +7,7 @@ import {cell} from '@/lib/i18n';
 import {CURRENCIES,LANGUAGE_NAMES,TIMEZONES,loadOrganization,loadProfile,rememberOrganization,rememberTimezone,
  type Integrations,type Organization,type Profile} from '@/lib/preferences';
 
-const TELEGRAM:Record<string,string>={off:'خاموش',polling_test:'فعال (حالت آزمایشی محلی)',webhook:'فعال (webhook روی سرور)'};
+const TELEGRAM:Record<string,string>={off:'خاموش',polling_test:'فعال (حالت محلی polling)',webhook:'فعال (webhook روی سرور)'};
 const CODE:Record<string,string>={email:'ایمیل',sms_webhook:'پیامک',not_configured:'تنظیم نشده'};
 const STORAGE:Record<string,string>={object_storage_scanned:'فعال، با اسکن ویروس و رمزنگاری',not_configured:'تنظیم نشده'};
 

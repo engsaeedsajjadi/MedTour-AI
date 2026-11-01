@@ -29,7 +29,7 @@ export default function Appointments(){
   }catch(e){setError((e as Error).message)}finally{setBusy(false)}
  }
  return <Shell title="تقویم و مدیریت نوبت‌های اداری">
-  <div className="infoBanner">نسخه نمایشی با داده ساختگی. پیش‌نیاز: ظرفیت پیشنهادی در مدیریت پزشکان ثبت شده باشد. زمان‌ها بر اساس منطقه زمانی مرورگر وارد و به زمان جهانی تبدیل می‌شوند. تأیید داخلی به معنی تأیید نوبت از پزشک یا بیمارستان نیست.</div>
+  <div className="infoBanner">پیش‌نیاز: ظرفیت نوبت‌دهی پزشک در «مدیریت پزشکان» ثبت شده باشد. زمان‌ها با منطقه زمانی تنظیم‌شده در «تنظیمات» نمایش داده می‌شوند. نوبت فقط پس از دریافت تأیید پزشک یا بیمارستان و ثبت شماره آن قطعی است.</div>
   {error&&<div className="errorBox" role="alert">{error}</div>}
   {notice&&<div className="infoBanner" role="status">{notice}</div>}
   <section className="panel" style={{padding:20}}>

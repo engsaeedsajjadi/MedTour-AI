@@ -48,7 +48,7 @@ export default function Receptionist(){
      {catalog.supported_languages.map(lang=><span className="badge" key={lang.code}>{lang.name} ({lang.code}) · {lang.direction.toUpperCase()}</span>)}
     </div>
     <p>نسخه عملیاتی: {catalog.production_ready?'آماده':'غیرفعال'} | صوت: {catalog.speech_enabled?'فعال':'تحویل‌نشده'} | تأیید ترجمه پزشکی: {catalog.clinical_translation_validated?'ثبت‌شده':'ثبت‌نشده'}</p>
-    <p>پیش از استفاده واقعی، تمام متن‌های هر پنج زبان باید توسط بازبین بومی‌زبان و مسئول ایمنی پزشکی بررسی شوند.</p>
+    <p>متن‌های هر پنج زبان را پیش از انتشار، بازبین بومی‌زبان و مسئول ایمنی پزشکی بررسی کنند.</p>
     <form onSubmit={show} className="formGrid">
      <label>زبان متن
       <select value={locale} onChange={e=>{setLocale(e.target.value);setPreview(null);}}>

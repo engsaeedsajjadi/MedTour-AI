@@ -91,12 +91,12 @@ export default function PatientCRM(){
  }
  const visibleCases=cases.filter(c=>c.patient_id===patientId);
  return <Shell title="مدیریت ارتباط با بیمار">
-  <div className="infoBanner">این بخش فقط برای هماهنگی اداری و اطلاعات ساختگی است؛ تشخیص هویت، ادغام پرونده، ارسال پیام و تصمیم درمانی خودکار انجام نمی‌شود. تاریخ و ساعت پیگیری با منطقه زمانی دستگاه شما ثبت می‌شود.</div>
+  <div className="infoBanner">این بخش برای پیگیری اداری بیماران است. ادغام پرونده، ارسال پیام و تصمیم درمانی به‌صورت خودکار انجام نمی‌شود و نیاز به تأیید کارشناس دارد. تاریخ و ساعت پیگیری با منطقه زمانی دستگاه شما ثبت می‌شود.</div>
   {error&&<div role="alert" className="errorBox">{error}</div>}
   {notice&&<div role="status" className="infoBanner">{notice}</div>}
   <section className="panel" style={{padding:20}}>
    <h2>پرونده‌ها، مسئول هماهنگی و منبع جذب</h2>
-   <label>بیمار آزمایشی
+   <label>بیمار
     <select value={patientId} onChange={e=>{setPatientId(e.target.value);setCandidates([])}} style={{display:'block',width:'100%',padding:10}}>
      <option value="">انتخاب بیمار</option>
      {patients.map(p=><option key={p.id} value={p.id}>{p.full_name} · {p.language}</option>)}

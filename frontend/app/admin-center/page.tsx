@@ -111,7 +111,7 @@ export default function AdminCenter(){
   }catch(e){setError((e as Error).message)}finally{setBusy(false)}
  }
  return <Shell title="مرکز کنترل مدیریتی">
-  <div className="infoBanner">این پنل فقط برای مدیر سازمان و داده‌های آزمایشی است. آمار مستقیماً از دیتابیس همان سازمان خوانده می‌شود؛ وضعیت اتصال و تأیید خارجی خدمات از آن استنباط نمی‌شود. متن پزشکی و فایل بیمار در جستجو یا صف نمایش داده نمی‌شوند.</div>
+  <div className="infoBanner">این پنل مخصوص مدیر سازمان است و آمار را مستقیماً از اطلاعات همین سازمان می‌خواند. متن پزشکی و فایل بیماران در جستجو و صف‌ها نمایش داده نمی‌شوند.</div>
   {error&&<div role="alert" className="errorBox">{error}</div>}
   {notice&&<div role="status" className="infoBanner">{notice}</div>}
   {loading&&<p>در حال بررسی دسترسی...</p>}
@@ -142,7 +142,7 @@ export default function AdminCenter(){
     <form onSubmit={search} className="formGrid">
      <label>عبارت حداقل سه کاراکتر
       <input value={term} onChange={e=>setTerm(e.target.value)} maxLength={80}
-       minLength={3} required placeholder="شناسه، نام بیمار آزمایشی یا وضعیت پرونده"/>
+       minLength={3} required placeholder="شناسه، نام بیمار یا وضعیت پرونده"/>
      </label>
      <label>دامنه
       <select value={domain} onChange={e=>setDomain(e.target.value)}>

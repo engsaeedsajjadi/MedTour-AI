@@ -20,7 +20,8 @@ const groups:{label:string;links:[string,string][]}[]=[
  {label:'حساب من',links:[['settings','تنظیمات'],['account-security','امنیت حساب']]},
 ];
 
-const ENV_LABEL=process.env.NEXT_PUBLIC_ENV_LABEL||'نسخه نمایشی · فقط داده ساختگی';
+// Optional environment badge (e.g. «محیط آزمایش» on a staging server); hidden when not set.
+const ENV_LABEL=process.env.NEXT_PUBLIC_ENV_LABEL||'';
 
 export default function Shell({title,children}:{title:string,children:React.ReactNode}){
  const path=usePathname();
@@ -48,7 +49,7 @@ export default function Shell({title,children}:{title:string,children:React.Reac
     {g.links.map(([href,text])=>{const active=path==='/'+href||path.startsWith('/'+href+'/');
      return <Link aria-current={active?'page':undefined} className={active?'navItem selected':'navItem'} key={href} href={'/'+href}><span className="navDot" aria-hidden="true"/>{text}</Link>;})}
    </div>)}</nav>
-   <div className="sidebarBottom"><span className="statusBullet" aria-hidden="true"/>{ENV_LABEL}</div>
+   {ENV_LABEL&&<div className="sidebarBottom"><span className="statusBullet" aria-hidden="true"/>{ENV_LABEL}</div>}
   </aside>
   <main className="main" id="main-content" tabIndex={-1}>
    <header className="topbar">
@@ -56,7 +57,7 @@ export default function Shell({title,children}:{title:string,children:React.Reac
     <div className="topActions">{role&&<span className="roleChip">{fa(role)}</span>}{displayName?<span className="loggedIn" title={email}>{displayName}</span>:<span className="loggedIn" dir="ltr">{email}</span>}<button type="button" className="logout" onClick={logout}>خروج</button></div>
    </header>
    <div className="content">
-    <div className="pageHeader"><div><div className="eyebrow">عملیات گردشگری سلامت</div><h1>{title}</h1></div><div className="environmentFlag">● {ENV_LABEL}</div></div>
+    <div className="pageHeader"><div><div className="eyebrow">عملیات گردشگری سلامت</div><h1>{title}</h1></div>{ENV_LABEL&&<div className="environmentFlag">● {ENV_LABEL}</div>}</div>
     {failed?<div role="alert" className="errorBox">اطلاعات حساب دریافت نشد؛ صفحه را دوباره بارگذاری کنید.</div>
      :!role?<div className="panel loadingPanel" aria-busy="true">در حال بارگذاری…</div>
      :permitted?children

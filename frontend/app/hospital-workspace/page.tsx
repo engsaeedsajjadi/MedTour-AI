@@ -34,7 +34,7 @@ export default function HospitalWorkspace(){
   }catch(e){setError((e as Error).message)}finally{setBusy(false)}
  }
  return <Shell title="پرتال محدود بیمارستان">
-  <div className="infoBanner">فقط محیط آزمایشی با اطلاعات ساختگی. این صفحه صرفاً شناسه‌های اداری درخواست‌های متعلق به همین بیمارستان را نمایش می‌دهد و مجوز دسترسی به مدارک پزشکی، تماس بیمار، پذیرش واقعی یا تأیید رزرو ندارد.</div>
+  <div className="infoBanner">این صفحه درخواست‌های هماهنگی مربوط به بیمارستان شما را نمایش می‌دهد. مدارک پزشکی و اطلاعات تماس بیماران در این پرتال نمایش داده نمی‌شوند.</div>
   {loading&&<p>در حال اعتبارسنجی ارتباط حساب و مدرک محلی...</p>}
   {error&&<p className="errorBox" role="alert">{error}</p>}
   {notice&&<p className="infoBanner" role="status">{notice}</p>}
@@ -49,7 +49,7 @@ export default function HospitalWorkspace(){
      <h2>بازه‌های ظرفیت پیشنهادی</h2>
      {slots.length===0?<p>ظرفیت پیشنهادی فعالی وجود ندارد.</p>:slots.map(x=>
       <p key={x.id}>{fa(x.service_code)} · {x.proposed_units} واحد · از {new Date(x.starts_at).toLocaleString('fa-IR')} تا {new Date(x.ends_at).toLocaleString('fa-IR')}</p>)}
-     <p>اطلاعات این فهرست به تقویم و ظرفیت واقعی بیمارستان متصل نیست.</p>
+     <p>این فهرست به‌صورت خودکار با تقویم و ظرفیت داخلی بیمارستان همگام نمی‌شود.</p>
     </section>
     <section className="panel" style={{padding:20}}>
      <h2>درخواست‌های هماهنگی داخلی</h2>

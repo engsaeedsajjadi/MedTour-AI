@@ -38,7 +38,7 @@ export default function AiOrchestrationPage(){
  }
  return <Shell title="دستیارهای هوشمند">
   <div className="infoBanner">
-   محیط آزمایشی مدیریت عامل‌های اداری. استفاده از اطلاعات پزشکی، ارسال خودکار پیام، تصمیم درمانی و اقدام مالی یا رزرو غیرفعال است. خروجی مدل فقط پیش‌نویس نیازمند تأیید انسانی است.
+   مدیریت دستیارهای هوشمند اداری. دستیارها پیام خودکار نمی‌فرستند و تصمیم درمانی، مالی یا رزرو نمی‌گیرند؛ هر خروجی پیش‌نویسی است که باید کارشناس تأیید کند.
   </div>
   {error&&<div className="errorBox">{error}</div>}
   {notice&&<div className="infoBanner">{notice}</div>}
@@ -52,7 +52,7 @@ export default function AiOrchestrationPage(){
     <option value="approved_provider">مدل با ارائه‌دهنده تأییدشده</option>
    </select></label>
    {role==='admin'&&<div style={{display:'flex',gap:12}}>
-    <button className="button" disabled={busy} onClick={()=>void action('/ai-orchestration/agents/'+key,{enabled:true,provider_mode:mode,daily_run_limit:20},'PUT')}>فعال‌سازی آزمایشی</button>
+    <button className="button" disabled={busy} onClick={()=>void action('/ai-orchestration/agents/'+key,{enabled:true,provider_mode:mode,daily_run_limit:20},'PUT')}>فعال‌سازی</button>
     <button className="button secondary" disabled={busy} onClick={()=>void action('/ai-orchestration/agents/'+key,{enabled:false,provider_mode:mode,daily_run_limit:20},'PUT')}>غیرفعال‌سازی</button>
    </div>}
   </section>

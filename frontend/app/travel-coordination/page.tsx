@@ -61,7 +61,7 @@ export default function TravelCoordination(){
   setBusy(true);setError('');setNotice('');
   try{
    await request(path,{method:'POST',body:JSON.stringify(body)});
-   setNotice('ثبت داخلی موفق بود؛ تأیید یا اعزام واقعی ارائه‌دهنده دریافت نشده است.');
+   setNotice('در سامانه ثبت شد. تأیید اعزام را از ارائه‌دهنده دریافت و ثبت کنید.');
    await Promise.all([loadResources(),loadCase(caseId),loadWindows(resourceId)]);
   }catch(e){setError((e as Error).message);}finally{setBusy(false);}
  }
@@ -91,7 +91,7 @@ export default function TravelCoordination(){
   catch(e){setError((e as Error).message);}
  }
  return <Shell title="ترانسفر، حمل‌ونقل و مترجم">
-  <div className="infoBanner">فقط داده ساختگی. منابع و ظرفیت‌ها پیشنهاد داخلی هستند؛ مجوز راننده/مترجم، اعزام، رزرو و حضور واقعی مستقلاً تأیید نشده‌اند. هیچ شماره پرواز، نام همراه، آدرس، گذرنامه یا اطلاعات درمانی در این صفحه وارد نکنید. رضایت جداگانه «هماهنگی ترانسفر» یا «هماهنگی مترجم» و پذیرش اولیه باید فعال باشد.</div>
+  <div className="infoBanner">خودروها، مترجمان و زمان‌های در دسترس آن‌ها را ثبت کنید. مجوز راننده یا مترجم را پیش از ثبت بررسی کنید. شماره پرواز، نام همراه، آدرس، گذرنامه یا اطلاعات درمانی را در این صفحه وارد نکنید. رضایت «هماهنگی ترانسفر» یا «هماهنگی مترجم» بیمار باید فعال باشد.</div>
   {error&&<div className="errorBox" role="alert">{error}</div>}
   {notice&&<div className="infoBanner" role="status">{notice}</div>}
   {role==='admin'&&<section className="panel" style={{padding:20,marginTop:16}}>
@@ -100,7 +100,7 @@ export default function TravelCoordination(){
     <label>نوع<select value={type} onChange={e=>setKind(e.target.value==='interpreter'?'interpreter_session':'airport_pickup')}>
      <option value="vehicle">خودرو</option><option value="interpreter">مترجم</option>
     </select></label>
-    <label>نام نمایشی غیرحساس منبع<input value={labelResource} onChange={e=>setLabelResource(e.target.value)}/></label>
+    <label>نام خودرو یا مترجم (بدون اطلاعات شخصی)<input value={labelResource} onChange={e=>setLabelResource(e.target.value)}/></label>
     <label>شهر<input value={city} onChange={e=>setCity(e.target.value)}/></label>
     {type==='vehicle'?<label>ظرفیت صندلی پیشنهادی<input type="number" min={1} max={8} value={seats} onChange={e=>setSeats(Number(e.target.value))}/></label>:
      <label>زبان مترجم<select value={language} onChange={e=>setLanguage(e.target.value)}>
@@ -155,7 +155,7 @@ export default function TravelCoordination(){
   </section>
   <section className="panel" style={{padding:20,marginTop:16}}>
    <h2>۴. تخصیص و پیگیری انسانی</h2>
-   <label>عنوان میز ارائه‌دهنده (فقط برای گزارش تماس)<input value={supplier} onChange={e=>setSupplier(e.target.value)} placeholder="میز تأمین‌کننده آزمایشی"/></label>
+   <label>عنوان میز ارائه‌دهنده (فقط برای گزارش تماس)<input value={supplier} onChange={e=>setSupplier(e.target.value)} placeholder="مثلاً: واحد اعزام شرکت ترانسفر"/></label>
    {rows.map(x=><div key={x.id} style={{padding:'14px 0',borderTop:'1px solid #d4dde7'}}>
     <strong>{label(x.kind)} · {label(x.status)} · {new Date(x.starts_at).toLocaleString('fa-IR')}</strong>
     <p>منبع: {resources.find(r=>r.id===x.resource_id)?.label||x.resource_id.slice(0,8)} · اعزام خارجی تأییدشده: خیر</p>

@@ -15,7 +15,7 @@ export default function ResourcePage({title,path,fields,columns,note,intro,appro
  await request(path,{method:'POST',body:JSON.stringify(body)});setValues({});setShowForm(false);load();}catch(e){setError((e as Error).message);}finally{setSaving(false);}}
  async function approveDraftQuote(id:string){
   if(!approveDraftQuotes||path!=='/quotes'||!id)return;
-  if(!window.confirm('آیا پیش‌فاکتور آزمایشی را تأیید می‌کنید؟ برای موارد واقعی بررسی و تأیید قیمت توسط مسئول مجاز ضروری است.'))return;
+  if(!window.confirm('آیا این پیش‌فاکتور را تأیید می‌کنید؟ پس از تأیید، مبلغ برای بیمار نمایش داده می‌شود و قابل ویرایش نیست.'))return;
   setApprovingId(id);setError('');
   try{await request('/quotes/'+encodeURIComponent(id)+'/approve',{method:'PATCH'});load();}
   catch(e){setError((e as Error).message)}

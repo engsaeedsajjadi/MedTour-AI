@@ -50,7 +50,7 @@ export default function ProviderMatching(){
   }catch(e){setError((e as Error).message)}finally{setBusy(false)}
  }
  return <Shell title="تطبیق اداری بیمار با ارائه‌دهندگان خدمات">
-  <div className="infoBanner">این ابزار صرفاً گزینه‌های اداری را بر اساس متن تخصص و شواهد محلی بررسی‌نشده توسط مرجع مستقل معرفی می‌کند. تطبیق پزشکی، تشخیص، رتبه‌بندی بالینی، معرفی قطعی پزشک و رزرو خودکار انجام نمی‌شود. فقط داده ساختگی.</div>
+  <div className="infoBanner">این ابزار پزشکان و بیمارستان‌های تأییدشده را بر اساس تخصص پیشنهاد می‌دهد. انتخاب نهایی پزشک با بررسی کارشناس انجام می‌شود و رزرو خودکار صورت نمی‌گیرد.</div>
   {loading&&<p>در حال بارگذاری...</p>}
   {error&&<div role="alert" className="errorBox">{error}</div>}
   {notice&&<div role="status" className="infoBanner">{notice}</div>}

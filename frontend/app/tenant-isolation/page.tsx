@@ -29,7 +29,7 @@ export default function TenantIsolation(){
   ['جدول‌های دارای اجبار امنیت سطری در پایگاه داده',state?.rls_force_tables??'-']
  ];
  return <Shell title="ممیزی جداسازی سازمان‌ها">
-  <div className="infoBanner">این صفحه وضعیت واقعی جداسازی داده سازمان‌ها در پایگاه داده و چک‌لیست آمادگی برای کار با بیمار واقعی را نشان می‌دهد. موارد حقوقی فقط با ثبت شماره مرجع تصمیم‌های رسمی تکمیل می‌شوند.</div>
+  <div className="infoBanner">این صفحه وضعیت جداسازی داده سازمان‌ها در پایگاه داده و چک‌لیست آمادگی عملیاتی را نشان می‌دهد. موارد حقوقی فقط با ثبت شماره مرجع تصمیم‌های رسمی تکمیل می‌شوند.</div>
   {error&&<div className="errorBox" role="alert">{error}</div>}
   <section className="panel" style={{padding:20,marginTop:18}}>
    <h2>وضعیت دیتابیس فعلی</h2>
@@ -52,8 +52,8 @@ export default function TenantIsolation(){
    <button className="button" style={{marginTop:14}} disabled={loading} onClick={()=>void refresh()}>بررسی مجدد</button>
   </section>
   {ready&&<section className="panel" style={{padding:20}}>
-   <div className="portalCaseHead"><h2>آمادگی برای بیمار واقعی</h2><span className={'badge '+(ready.ready_for_real_patients?'':'danger')}>{ready.ready_for_real_patients?'آماده':'آماده نیست'}</span></div>
-   <p>حالت داده واقعی: <strong>{ready.real_patient_data_mode?'فعال':'غیرفعال'}</strong> · سامانه تا تکمیل همه موارد زیر اجازه فعال شدن این حالت را نمی‌دهد.</p>
+   <div className="portalCaseHead"><h2>آمادگی عملیاتی برای پذیرش بیمار</h2><span className={'badge '+(ready.ready_for_real_patients?'':'danger')}>{ready.ready_for_real_patients?'آماده':'آماده نیست'}</span></div>
+   <p>حالت عملیاتی بیمار: <strong>{ready.real_patient_data_mode?'فعال':'غیرفعال'}</strong> · سامانه تا تکمیل همه موارد زیر اجازه فعال شدن این حالت را نمی‌دهد.</p>
    {(['technical','legal','review'] as const).map(kind=><div key={kind}><h3>{kind==='technical'?'کنترل‌های فنی':kind==='legal'?'الزامات حقوقی و مجوزها':'بازبینی مستقل پیش از انتشار'}</h3>
     <ul className="docList">{ready.checks.filter(c=>c.kind===kind).map(c=><li key={c.key}><span className={'badge '+(c.passed?'':'warn')}>{c.passed?'تکمیل':'ناقص'}</span><span>{c.label}</span></li>)}</ul></div>)}
   </section>}

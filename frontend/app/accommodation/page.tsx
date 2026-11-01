@@ -84,14 +84,14 @@ export default function Accommodation(){
  }
  return <Shell title="هماهنگی اقامت و هتل">
   <div className="infoBanner">
-   فقط داده ساختگی در نسخه نمایشی. فهرست هتل‌ها و ظرفیت‌های آن‌ها صرفاً ثبت محلی هستند و با سامانه واقعی هتل همگام‌سازی نمی‌شوند. تخصیص داخلی یا ثبت پاسخ مثبت ارائه‌دهنده، به معنی رزرو تأییدشده نیست. این صفحه برای اطلاعات هویتی، گذرنامه و شرح پزشکی بیمار نیست.
+   هتل‌ها و ظرفیت‌ها توسط تیم شما ثبت می‌شوند و به سامانه رزرو هتل متصل نیستند. رزرو فقط زمانی قطعی است که تأییدیه کتبی هتل دریافت و شماره آن در «ثبت تأیید هتل» وارد شود. اطلاعات هویتی، گذرنامه یا شرح پزشکی بیمار را اینجا وارد نکنید.
   </div>
   {error&&<div className="errorBox" role="alert">{error}</div>}
   {notice&&<div className="infoBanner" role="status">{notice}</div>}
   {role==='admin'&&<section className="panel" style={{padding:20,marginTop:16}}>
    <h2>۱. معرفی محل اقامت (ثبت داخلی)</h2>
    <div style={{display:'grid',gap:10,maxWidth:540}}>
-    <label>نام هتل آزمایشی<input value={hotelName} onChange={e=>setHotelName(e.target.value)}/></label>
+    <label>نام هتل<input value={hotelName} onChange={e=>setHotelName(e.target.value)}/></label>
     <label>شهر<input value={city} onChange={e=>setCity(e.target.value)}/></label>
     <button disabled={busy||hotelName.length<3||city.length<2} onClick={()=>void submit(
      ROOT+'/properties',{name:hotelName,city})}>ثبت محل اقامت داخلی</button>
@@ -145,7 +145,7 @@ export default function Accommodation(){
   <section className="panel" style={{padding:20,marginTop:16}}>
    <h2>۴. مراحل پیگیری داخلی</h2>
    <label>نام مرجع ارائه‌دهنده برای گزارش تماس (حداقل ۶ حرف لاتین)
-    <input maxLength={100} value={supplier} onChange={e=>setSupplier(e.target.value)} placeholder="میز هتل آزمایشی"/>
+    <input maxLength={100} value={supplier} onChange={e=>setSupplier(e.target.value)} placeholder="مثلاً: واحد رزرو هتل"/>
    </label>
    {stays.length===0?<p>برای این پرونده درخواستی موجود نیست یا رضایت فعال نیست.</p>:
     stays.map(s=><div key={s.id} style={{borderTop:'1px solid #d4dde7',padding:'14px 0',display:'grid',gap:10}}>

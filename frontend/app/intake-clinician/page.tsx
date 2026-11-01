@@ -63,7 +63,7 @@ export default function ReviewerWorkspace(){
   e.preventDefault();if(!reviewer||!session)return;
   await run(()=>request('/intake-review/sessions/'+encodeURIComponent(session)+'/assignment',{
    method:'POST',body:JSON.stringify({reviewer_user_id:reviewer})
-  }),'بازبین تنها به این پذیرش آزمایشی منتسب شد؛ تصمیم پزشکی صادر نشد.');
+  }),'بازبین به این پذیرش منتسب شد؛ تصمیم پزشکی هنوز ثبت نشده است.');
  }
  async function recommend(e:React.FormEvent){
   e.preventDefault();if(!session)return;
@@ -77,7 +77,7 @@ export default function ReviewerWorkspace(){
  }
  return <Shell title="بازبینی پذیرش و ارجاع تخصصی">
   <div className="infoBanner">
-   نسخه نمایشی با داده ساختگی. نقش پزشک یا بررسی محلی مدرک به‌تنهایی اعتبار حرفه‌ای مستقل را تأیید نمی‌کند. این پنل به اطلاعات پزشکی خام دسترسی نمی‌دهد؛ تصمیم‌ها باید در فرایند بالینی معتبر و خارج از این نسخه تأیید شوند.
+   این پنل خلاصه اداری پذیرش را برای بازبین تخصصی نمایش می‌دهد و به مدارک پزشکی خام دسترسی نمی‌دهد. تصمیم بالینی در فرایند بالینی مرکز درمانی گرفته و نتیجه آن اینجا ثبت می‌شود.
   </div>
   {loading&&<p>در حال بررسی نقش و مجوز...</p>}
   {error&&<p role="alert" className="errorBox">{error}</p>}

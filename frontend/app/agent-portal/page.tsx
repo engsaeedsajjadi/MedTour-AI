@@ -25,7 +25,7 @@ export default function AgentPortal(){
   }catch(e){setError((e as Error).message);}finally{setBusy(false);}
  }
  return <Shell title="پرتال اختصاصی نماینده">
-  <div className="infoBanner">این پرتال آزمایشی تنها برای ثبت شناسه پیگیری ارجاع بدون اطلاعات بیمار است. نام، شماره تماس، تشخیص، مدارک، پرونده پزشکی یا درخواست مالی را وارد نکنید. هیچ پرداختی در این نسخه فعال نیست.</div>
+  <div className="infoBanner">این پرتال فقط برای ثبت شناسه پیگیری ارجاع است. نام، شماره تماس، تشخیص، مدارک یا پرونده پزشکی بیمار را وارد نکنید. پرداخت کارمزد از این پرتال انجام نمی‌شود.</div>
   {error&&<div className="errorBox" role="alert">{error}</div>}
   {info&&<div className="infoBanner" role="status">{info}</div>}
   {profile&&<section className="panel" style={{padding:20,marginTop:16}}>

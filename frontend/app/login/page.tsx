@@ -56,7 +56,7 @@ export default function Login(){
     <button disabled={busy} className="button full">{busy?'در حال بررسی…':challenge?'تأیید کد دوم':'ورود به پنل'}</button>
     {challenge&&<button type="button" className="button secondary" onClick={()=>{
      setChallenge('');setOtp('');setError('');}}>شروع دوباره ورود</button>}
-   </form><div className="securityNote">🔒 نسخه نمایشی؛ فقط با داده ساختگی استفاده شود.</div>
+   </form><div className="securityNote">🔒 ارتباط رمزنگاری‌شده. ورود دومرحله‌ای برای مدیران و اپراتورها الزامی است.</div>
   </div></div>
  </div>;
 }

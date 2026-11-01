@@ -28,7 +28,7 @@ const STATUS:Record<string,string>={
  // evidence and documents
  unverified:'تأییدنشده',verified:'تأییدشده دستی',locally_attested:'گواهی محلی',locally_recorded:'ثبت محلی',
  locally_reviewed:'بازبینی محلی',access_revoked:'دسترسی لغوشده',encrypted_dev_unscanned:'رمزنگاری‌شده — اسکن‌نشده',
- scanned_private_s3:'اسکن‌شده — مخزن خصوصی',erased:'حذف رمزنگاری‌شده',local_encrypted_unscanned_test:'مخزن محلی رمزنگاری‌شده (آزمایشی)',
+ scanned_private_s3:'اسکن‌شده — مخزن خصوصی',erased:'حذف رمزنگاری‌شده',local_encrypted_unscanned_test:'مخزن محلی رمزنگاری‌شده (فقط محیط توسعه)',
  // finance
  payment_received:'دریافت وجه',refund_issued:'بازپرداخت',service_expense:'هزینه خدمت',agency_fee:'کارمزد نمایندگی',
  // roles

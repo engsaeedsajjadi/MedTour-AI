@@ -75,3 +75,13 @@ def test_patient_portal_sees_public_contact_details_only(seeded):
     assert org["display_name"] == "TEST Clinic" and org["privacy_notice_url"].endswith("/privacy")
     assert "integrations" not in org and "default_currency" not in org
     assert client.get("/api/v1/portal/organization").status_code == 401
+
+
+def test_consent_page_uses_the_organizations_privacy_notice(seeded, monkeypatch):
+    (client, auth, _, _), admin, p, c = seeded
+    monkeypatch.delenv("PUBLIC_PRIVACY_NOTICE_URL", raising=False)
+    link = client.post(f"/api/v1/consent-links/{p['id']}/communication", headers=admin).json()["token"]
+    assert client.get("/api/v1/consent-links/preview", params={"token": link}).json()["privacy_notice_url"] is None
+    assert client.put("/api/v1/organization/profile", headers=admin, json=ORG).status_code == 200
+    preview = client.get("/api/v1/consent-links/preview", params={"token": link}).json()
+    assert preview["privacy_notice_url"] == "https://test-clinic.example/privacy"

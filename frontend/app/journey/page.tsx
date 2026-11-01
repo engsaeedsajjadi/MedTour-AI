@@ -79,12 +79,12 @@ export default function JourneyOperations() {
  ):[]);
  const needsSupervisor=target&&EVIDENCE.has(target);
  return <Shell title="مسیر عملیاتی پرونده">
-  <div className="infoBanner">این صفحه برای هماهنگی اداری در نسخه نمایشی است؛ تشخیص بالینی، رزرو واقعی، پذیرش بیمارستان یا مجوز ورود را تأیید نمی‌کند. از داده واقعی بیمار استفاده نکنید.</div>
+  <div className="infoBanner">این صفحه مسیر اداری هر بیمار را از پذیرش تا سفر نشان می‌دهد. هر مرحله با شواهدی که تیم شما ثبت می‌کند پیش می‌رود؛ تأیید بیمارستان، هتل و سفارت را از خود آن‌ها دریافت کنید.</div>
   {error&&<p role="alert" className="errorBox">{error}</p>}
   {notice&&<p role="status" className="infoBanner">{notice}</p>}
   <section className="panel" style={{padding:20}}>
    <h2>انتخاب پرونده</h2>
-   {loading?<p>در حال بارگذاری...</p>:cases.length===0?<p>ابتدا یک پرونده آزمایشی بسازید.</p>:<>
+   {loading?<p>در حال بارگذاری...</p>:cases.length===0?<p>ابتدا یک پرونده بسازید.</p>:<>
     <select aria-label="پرونده" value={selected} onChange={e=>setSelected(e.target.value)}
      style={{width:'100%',padding:10,marginBottom:14}}>
      {cases.map(c=><option key={c.id} value={c.id}>{c.id.slice(0,8)} — {c.specialty||'بدون تخصص'} — {fa(c.status)}</option>)}
