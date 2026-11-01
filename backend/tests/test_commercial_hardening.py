@@ -352,3 +352,42 @@ def test_provision_tenant_creates_isolated_org_and_admin(context, monkeypatch):
     import io
     monkeypatch.setattr("sys.stdin", io.StringIO("Strong-Password-2026\n"))
     assert provision_tenant.main(["--slug", "Bad Slug", "--name", "X", "--admin-email", "x@y.example", "--password-stdin"]) == 2
+
+
+def test_malware_rejection_is_audited_without_content(monkeypatch):
+    import pytest
+    from fastapi import HTTPException
+    from app import document_storage
+
+    def detect(raw):
+        raise HTTPException(422, "Malware detected; file rejected")
+    monkeypatch.setattr(document_storage, "scan_clamav", detect)
+
+    class DB:
+        def __init__(self): self.rows, self.commits = [], 0
+        def add(self, row): self.rows.append(row)
+        def commit(self): self.commits += 1
+    db = DB()
+    with pytest.raises(HTTPException) as caught:
+        document_storage.scan_or_reject(db, "t-1", "u-1", "c-1", b"%PDF-1.4 TEST", "application/pdf")
+    assert caught.value.status_code == 422
+    assert db.commits == 1 and db.rows[0].event == "document_malware_rejected"
+    assert db.rows[0].tenant_id == "t-1" and "TEST" not in (db.rows[0].detail or "")
+
+
+def test_scanner_outage_is_not_logged_as_malware(monkeypatch):
+    import pytest
+    from fastapi import HTTPException
+    from app import document_storage
+
+    def down(raw):
+        raise HTTPException(503, "Malware scanner unavailable; upload denied")
+    monkeypatch.setattr(document_storage, "scan_clamav", down)
+
+    class DB:
+        rows = []
+        def add(self, row): self.rows.append(row)
+        def commit(self): pass
+    with pytest.raises(HTTPException):
+        document_storage.scan_or_reject(DB(), "t", "u", "c", b"x", "application/pdf")
+    assert DB.rows == []

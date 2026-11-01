@@ -53,6 +53,17 @@ def location(doc_id:str,tenant_id:str):
 def sniff(data:bytes):
     return validate_file(data)[0]
 
+def scan_or_reject(db:Session,tenant_id:str,actor_id:str,case_id:str,raw:bytes,mime:str)->None:
+    """Scan with ClamAV; a detection is recorded in the audit log (no file content) before refusing."""
+    try:
+        scan_clamav(raw)
+    except HTTPException as exc:
+        if exc.status_code==422:
+            db.add(Audit(tenant_id=tenant_id,user_id=actor_id,event='document_malware_rejected',
+                entity_type='Case',entity_id=case_id,detail=f'mime={mime} bytes={len(raw)}'))
+            db.commit()
+        raise
+
 @router.post('/cases/{case_id}',status_code=201)
 async def upload(case_id:str,file:UploadFile=File(...),db:Session=Depends(get_db),user:User=Depends(roles('admin','operator'))):
     if not local_enabled() and not s3_ready():raise HTTPException(503,'Approved medical file storage and scanner are not configured')
@@ -64,7 +75,7 @@ async def upload(case_id:str,file:UploadFile=File(...),db:Session=Depends(get_db
     if len(raw)>MAX_BYTES:raise HTTPException(413,'Document exceeds 8 MiB')
     if not raw:raise HTTPException(422,'Empty document')
     mime, digest=validate_file(raw)
-    if s3_ready():scan_clamav(raw)
+    if s3_ready():scan_or_reject(db,user.tenant_id,user.id,c.id,raw,mime)
     # Store checked files only. Dev encryption remains explicitly unscanned.
     name=cleaned_name(file.filename)
     row=Document(tenant_id=user.tenant_id,patient_id=p.id,case_id=c.id,filename=name,
@@ -94,8 +105,9 @@ async def upload(case_id:str,file:UploadFile=File(...),db:Session=Depends(get_db
 @router.get('/readiness')
 def document_readiness(user:User=Depends(roles('admin','operator'))):
     return {
-        'storage_mode': 'local_encrypted_unscanned_test' if local_enabled() else
-            's3_kms_configured_unverified' if s3_ready() else 'disabled',
+        # Uploads use scanned object storage whenever it is configured, even if the dev store is on.
+        'storage_mode': 's3_kms_configured_unverified' if s3_ready() else
+            'local_encrypted_unscanned_test' if local_enabled() else 'disabled',
         'configured':bool(local_enabled() or s3_ready()),
         'actual_s3_kms_scanner_verified':False,
         'production_ready':False,
@@ -154,7 +166,7 @@ async def patient_upload(case_id:str,file:UploadFile=File(...),
     require_consent(db,p)
     raw=await file.read(MAX_BYTES+1)
     mime,digest=validate_file(raw)
-    if s3_ready():scan_clamav(raw)
+    if s3_ready():scan_or_reject(db,grant.tenant_id,grant.id,c.id,raw,mime)
     name=cleaned_name(file.filename)
     row=Document(tenant_id=grant.tenant_id,patient_id=p.id,case_id=c.id,filename=name,
         category='report',status='scanned_private_s3' if s3_ready() else 'encrypted_dev_unscanned',
