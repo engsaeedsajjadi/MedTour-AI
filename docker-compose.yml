@@ -142,7 +142,8 @@ services:
   # --- Secure medical document storage (docker compose --profile secure-storage up -d) ---
   minio:
     profiles: ["secure-storage"]
-    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    build: ./deploy/minio
+    image: medtour-minio:RELEASE.2025-10-15T17-29-55Z
     entrypoint: ["sh", "-c"]
     # Profile services must not block other compose commands, so required values are checked here.
     command:
@@ -165,7 +166,8 @@ services:
       retries: 12
   minio-init:
     profiles: ["secure-storage"]
-    image: minio/mc:RELEASE.2025-04-16T18-13-26Z
+    image: medtour-minio:RELEASE.2025-10-15T17-29-55Z
+    pull_policy: never
     depends_on:
       minio:
         condition: service_healthy
