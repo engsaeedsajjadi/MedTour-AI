@@ -20,6 +20,11 @@ def _env(name: str) -> str:
     return os.getenv(name, "").strip()
 
 
+def _release_ok() -> bool:
+    from .release_approval import evaluate
+    return evaluate()["authorized"]
+
+
 def checks() -> list[dict]:
     from .secure_media import s3_ready
     from .otp_delivery import configured as otp_configured
@@ -44,6 +49,8 @@ def checks() -> list[dict]:
         ("data_protection_review", "مرجع بررسی حقوقی حفاظت داده سلامت در کشورهای هدف", bool(_env("DATA_PROTECTION_REVIEW_REFERENCE")), "legal"),
         ("provider_contracts", "مرجع قرارداد و تأیید ارائه‌دهندگان (هوش مصنوعی، پیام‌رسان، پرداخت، ذخیره‌سازی)", bool(_env("PROVIDER_CONTRACTS_REFERENCE")), "legal"),
         ("medical_license", "مرجع مجوزهای فعالیت گردشگری سلامت", bool(_env("MEDICAL_TOURISM_LICENSE_REFERENCE")), "legal"),
+        ("rate_limit_store", "ذخیره‌ساز مشترک محدودیت ورود (Redis)", bool(_env("REDIS_URL")), "technical"),
+        ("release_approval", "تأیید انتشار: تست نفوذ، بازبینی ایمنی بالینی و حریم خصوصی، تمرین بازیابی پشتیبان", _release_ok(), "review"),
     ]
     return [{"key": k, "label": label, "passed": bool(ok), "kind": kind} for k, label, ok, kind in items]
 
@@ -51,16 +58,17 @@ def checks() -> list[dict]:
 def readiness() -> dict:
     result = checks()
     ready = all(item["passed"] for item in result)
-    return {"real_patient_data_mode": _env("REAL_PATIENT_DATA_MODE").lower() == "true",
+    return {"real_patient_data_mode": _env("REAL_PATIENT_DATA_MODE").lower() == "true" or _env("APP_ENV") == "production",
             "ready_for_real_patients": ready, "checks": result}
 
 
 def enforce_real_patient_mode() -> None:
-    if _env("REAL_PATIENT_DATA_MODE").lower() != "true":
+    # Production always carries real patient data, so it is held to the full checklist.
+    if _env("REAL_PATIENT_DATA_MODE").lower() != "true" and _env("APP_ENV") != "production":
         return
     failed = [item["key"] for item in checks() if not item["passed"]]
     if failed:
-        raise RuntimeError("REAL_PATIENT_DATA_MODE refused; missing controls: " + ", ".join(failed))
+        raise RuntimeError("Real-patient operation refused; missing controls: " + ", ".join(failed))
 
 
 @router.get("/readiness")

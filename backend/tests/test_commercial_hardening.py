@@ -261,7 +261,8 @@ def test_real_patient_mode_refuses_to_start_without_controls(context, monkeypatc
     assert "privacy_notice" in str(refused.value) and "tenant_isolation" in str(refused.value)
     report = client.get("/api/v1/compliance/readiness", headers=auth("a")).json()
     assert report["ready_for_real_patients"] is False
-    assert {c["kind"] for c in report["checks"]} == {"technical", "legal"}
+    assert {c["kind"] for c in report["checks"]} == {"technical", "legal", "review"}
+    assert "release_approval" in str(refused.value)
     assert client.get("/api/v1/compliance/readiness", headers=auth("a", "operator@example.test")).status_code == 403
 
 
@@ -318,3 +319,36 @@ def test_clamav_clean_file_passes_and_streams_whole_content(monkeypatch):
     payload = b"%PDF-1.4 " + b"x" * 150_000
     secure_media.scan_clamav(payload)
     assert received["data"].startswith(b"zINSTREAM\x00") and payload[-1000:] in received["data"]
+
+
+def test_production_is_held_to_full_checklist_even_without_flag(monkeypatch):
+    from app.compliance import enforce_real_patient_mode
+    monkeypatch.delenv("REAL_PATIENT_DATA_MODE", raising=False)
+    monkeypatch.setenv("APP_ENV", "production")
+    try:
+        with pytest.raises(RuntimeError, match="release_approval"):
+            enforce_real_patient_mode()
+    finally:
+        monkeypatch.setenv("APP_ENV", "test")
+
+
+def test_provision_tenant_creates_isolated_org_and_admin(context, monkeypatch):
+    client, auth, tids, Session = context
+    from app import provision_tenant
+    monkeypatch.setattr(provision_tenant, "SessionLocal", Session)
+    for bad in (("Bad Slug", "Org", "a@b.example", "Strong-Password-2026"),
+                ("clinic-x", "Org", "not-an-email", "Strong-Password-2026"),
+                ("clinic-x", "Org", "a@b.example", "short")):
+        with pytest.raises(ValueError):
+            provision_tenant.provision(*bad)
+    provision_tenant.provision("clinic-x", "Clinic X", "Admin@Clinic-X.example", "Strong-Password-2026")
+    with pytest.raises(ValueError, match="already has users"):
+        provision_tenant.provision("clinic-x", "Clinic X", "second@clinic-x.example", "Strong-Password-2026")
+    login = client.post("/api/v1/auth/login", json={"tenant_slug": "clinic-x", "email": "admin@clinic-x.example",
+                                                   "password": "Strong-Password-2026"})
+    assert login.status_code == 200 and login.json()["role"] == "admin"
+    headers = {"Authorization": "Bearer " + login.json()["access_token"]}
+    assert client.get("/api/v1/patients", headers=headers).json() == []  # sees nothing from tenants a/b
+    import io
+    monkeypatch.setattr("sys.stdin", io.StringIO("Strong-Password-2026\n"))
+    assert provision_tenant.main(["--slug", "Bad Slug", "--name", "X", "--admin-email", "x@y.example", "--password-stdin"]) == 2

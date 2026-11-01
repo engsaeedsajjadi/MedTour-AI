@@ -1,7 +1,8 @@
 import type { NextConfig } from 'next';
 
 const dev = process.env.NODE_ENV !== 'production';
-const api = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const configuredApi = process.env.NEXT_PUBLIC_API_URL;
+const api = configuredApi === undefined ? 'http://localhost:8000' : configuredApi;
 
 // Next.js hydration needs inline scripts; development additionally needs eval and the HMR websocket.
 const csp = [
@@ -11,7 +12,7 @@ const csp = [
   "img-src 'self' data: blob: https:",
   "font-src 'self' data:",
   "media-src 'self' blob:",
-  `connect-src 'self' ${api}${dev ? ' ws: wss:' : ''}`,
+  `connect-src 'self'${api ? ' ' + api : ''}${dev ? ' ws: wss:' : ''}`,
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",

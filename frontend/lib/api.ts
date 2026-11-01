@@ -1,5 +1,7 @@
 import {faError,faNetwork} from './i18n';
-export const API_BASE=process.env.NEXT_PUBLIC_API_URL||'http://localhost:8000';
+// Empty string = same origin (production behind the HTTPS reverse proxy); unset = local API on :8000.
+const configuredApi=process.env.NEXT_PUBLIC_API_URL;
+export const API_BASE=configuredApi===undefined?'http://localhost:8000':configuredApi;
 export type Row=Record<string,unknown>;
 export function getSession():string{if(typeof window==='undefined')return '';return sessionStorage.getItem('medtour_token')||'';}
 const forget=()=>{if(typeof window!=='undefined'){sessionStorage.removeItem('medtour_token');sessionStorage.removeItem('medtour_refresh');}};

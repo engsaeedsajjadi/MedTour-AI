@@ -1,36 +1,38 @@
-"""Section 45: immutable alpha release denial. This tool does not deploy anything.
+"""Section 45: evidence-based release status. This tool does not deploy anything.
 
-Its purpose is to prevent a source checkout from being advertised as certified
-for real patients. No flag, environment variable or CLI switch can approve it.
+A source checkout is certified for real patients only when the committed sign-off file
+backend/release/PRODUCTION_APPROVAL.json records every independent review (see
+backend/app/release_approval.py). No flag, environment variable or CLI switch can approve it.
 """
 from __future__ import annotations
 import json
+import sys
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
+sys.path.insert(0,str(ROOT/"backend"))
+from app.release_approval import APPROVAL_FILE,evaluate  # noqa: E402
 
-def status()->dict:
+def status(path:Path|None=None)->dict:
+    result=evaluate(path or APPROVAL_FILE)
+    ok=result["authorized"]
     return {
-        "release_track":"alpha-development",
-        "production_authorized":False,
-        "real_patient_data_allowed":False,
+        "release_track":"production" if ok else "pilot-synthetic-data",
+        "release_version":result.get("release_version",""),
+        "production_authorized":ok,
+        "real_patient_data_allowed":ok,
         "live_medical_ai_allowed":False,
         "external_booking_authorized":False,
         "payment_capture_authorized":False,
         "telegram_onboarding_only":True,
-        "final_acceptance_verified":False,
-        "missing_prerequisites":[
-            "independent_clinical_security_privacy_reviews",
-            "tenant_rls_production_validation",
-            "merged_release_ci",
-            "live_e2e_and_provider_acceptance",
-            "performance_and_recovery_evidence"
-        ],
+        "final_acceptance_verified":ok,
+        "missing_prerequisites":result["missing"],
     }
 
 def main()->int:
-    print(json.dumps(status(),indent=2))
-    return 1
+    result=status()
+    print(json.dumps(result,indent=2))
+    return 0 if result["production_authorized"] else 1
 
 if __name__=="__main__":
     raise SystemExit(main())

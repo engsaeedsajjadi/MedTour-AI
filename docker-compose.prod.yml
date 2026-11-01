@@ -1,0 +1,95 @@
+# Production overlay. Use together with the base file:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+#     --profile secure-storage up -d --build
+# Only Caddy (80/443) is reachable from outside; every other service is internal.
+# The API refuses to start unless every control in /api/v1/compliance/readiness passes and
+# backend/release/PRODUCTION_APPROVAL.json records the independent release sign-off.
+# .env on the server is created from .env.production.example. For a trial run without the
+# sign-off set APP_ENV=staging in .env.
+
+services:
+  db:
+    ports: !reset []
+    restart: unless-stopped
+
+  redis:
+    restart: unless-stopped
+
+  migrate:
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+
+  api:
+    ports: !reset []
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      RLS_ENFORCEMENT: required
+      CORS_ORIGINS: https://${PUBLIC_DOMAIN:?Set PUBLIC_DOMAIN (e.g. panel.example.com or localhost)}
+      PUBLIC_PORTAL_URL: https://${PUBLIC_DOMAIN}/patient-portal
+      REDIS_URL: redis://redis:6379/0
+    # Behind Caddy: trust X-Forwarded-For so rate limits and audit see the real client address.
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000",
+              "--proxy-headers", "--forwarded-allow-ips", "*", "--workers", "2"]
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: ""
+        NEXT_PUBLIC_ENV_LABEL: ${PANEL_ENV_LABEL:-محیط عملیاتی}
+    ports: !reset []
+    environment:
+      PUBLIC_SITE_URL: https://${PUBLIC_DOMAIN}
+    restart: unless-stopped
+
+  telegram-gateway:
+    ports: !reset []
+
+  minio:
+    restart: unless-stopped
+
+  clamav:
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2.8-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      PUBLIC_DOMAIN: ${PUBLIC_DOMAIN}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - medtour_caddy_data:/data
+      - medtour_caddy_config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_started
+    restart: unless-stopped
+
+  backup:
+    build: ./deploy/backup
+    environment:
+      PGHOST: db
+      PGUSER: medtour
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: medtour
+      BACKUP_PASSPHRASE: ${BACKUP_PASSPHRASE:?Set BACKUP_PASSPHRASE (24+ chars) and store it outside this server}
+      BACKUP_INTERVAL_HOURS: ${BACKUP_INTERVAL_HOURS:-24}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+    volumes:
+      - medtour_backups:/backups
+      - medtour_secure_dev:/data/documents:ro
+      - medtour_minio:/data/minio:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  medtour_caddy_data:
+  medtour_caddy_config:
+  medtour_backups:
