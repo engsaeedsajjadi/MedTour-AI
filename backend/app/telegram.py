@@ -122,6 +122,23 @@ _OPERATOR = {
     "prs": "برای تماس با کارمند و دریافت دعوت‌نامه خصوصی پورتال مصون از راه رسمی زیر استفاده کنید. معلومات طبی را در تلگرام نفرستید.",
 }
 
+_OPERATOR_UNSET = {
+    "fa": "لینک تماس با اپراتور انسانی هنوز توسط مدیر سامانه تنظیم نشده است. لطفاً بعداً دوباره امتحان کنید. اطلاعات پزشکی را اینجا ننویسید.",
+    "ar": "لم يتم إعداد رابط التواصل مع الموظف بعد. حاول لاحقًا. لا ترسل بيانات طبية هنا.",
+    "en": "The human operator contact link has not been configured yet. Please try again later. Do not send medical information here.",
+    "ps": "د کارکوونکي سره د اړیکې لینک لا نه دی ټاکل شوی. وروسته بیا هڅه وکړئ. طبي معلومات دلته مه لېږئ.",
+    "prs": "لینک تماس با کارمند هنوز تنظیم نشده است. لطفاً بعداً دوباره کوشش کنید. معلومات طبی را اینجا نفرستید.",
+}
+
+# One short safety line after information replies instead of repeating the whole welcome text.
+_REMINDER = {
+    "fa": "⚠️ اطلاعات پزشکی، پاسپورت یا عکس مدارک را در تلگرام نفرستید.",
+    "ar": "⚠️ لا ترسل سجلات طبية أو صور جواز السفر هنا.",
+    "en": "⚠️ Do not send medical records or passport photos here.",
+    "ps": "⚠️ طبي اسناد، پاسپورټ یا عکسونه دلته مه لېږئ.",
+    "prs": "⚠️ اسناد طبی، پاسپورت یا عکس مدارک را در تلگرام نفرستید.",
+}
+
 _STOP = {
     "fa": "این ربات هیچ پرونده یا ثبت‌نامی از طریق تلگرام ایجاد نکرده است. برای راهنمایی دوباره /start را بفرستید.",
     "ar": "لم ينشئ هذا الروبوت أي ملف طبي أو تسجيل عبر تيليجرام. أرسل /start للبدء مجددًا.",
@@ -285,18 +302,15 @@ def _safe_reply(update: dict, operator_contact_url: str | None = None) -> tuple[
             return chat_id, _LANGUAGE_GUIDE + "\n\n" + _NOTICE[language]
         return chat_id, _NOTICE[language] + "\n\n" + _HELP[language]
     if command in _INFORMATION[language]:
-        return chat_id, _INFORMATION[language][command] + "\n\n" + _NOTICE[language]
+        return chat_id, _INFORMATION[language][command] + "\n\n" + _REMINDER[language]
     if command == "/operator":
-        message_text = _OPERATOR[language]
         if operator_contact_url:
-            message_text += "\n\n" + operator_contact_url
-        else:
-            message_text += "\n\n" + _NOTICE[language]
-        return chat_id, message_text
+            return chat_id, _OPERATOR[language] + "\n\n" + operator_contact_url
+        return chat_id, _OPERATOR_UNSET[language]
     if command == "/stop":
         return chat_id, _STOP[language]
     if command == "/help":
-        return chat_id, _HELP[language] + "\n\n" + _NOTICE[language]
+        return chat_id, _HELP[language] + "\n\n" + _REMINDER[language]
     if command in ("/start", "/privacy"):
         return chat_id, _NOTICE[language] + "\n\n" + _HELP[language]
     return None

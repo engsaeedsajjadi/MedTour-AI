@@ -101,3 +101,10 @@ td code{white-space:nowrap}
 .statusBullet{margin-left:8px}
 .sidebar .navItem{padding:9px 15px;font-size:13px}
 .sidebar nav{max-height:calc(100vh - 210px)}
+.badge.good{background:#e3f6ec;color:#1a7f4b}
+.tripPlan{justify-items:stretch;width:100%}
+.readyBanner,.pendingBanner{border-radius:12px;padding:16px 18px;line-height:2}
+.readyBanner{background:#e9f8f0;border:1px solid #b9e6cc;color:#16573a}
+.pendingBanner{background:#fff8ea;border:1px solid #f4dfb0;color:#7a5a17}
+.readyBanner h3,.pendingBanner h3{margin:0 0 6px;font-size:17px}
+.pendingBanner ul{margin:4px 0 0;padding-inline-start:20px}

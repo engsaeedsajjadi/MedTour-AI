@@ -27,6 +27,7 @@ class PollingConfig:
     redis_url: str
     secret: str
     privacy_url: str
+    operator_contact_url: str | None = None
 
 
 def config_from_env() -> PollingConfig | None:
@@ -43,6 +44,7 @@ def config_from_env() -> PollingConfig | None:
     secret = os.getenv("TELEGRAM_WEBHOOK_SECRET", "")
     redis_url = os.getenv("REDIS_URL", "")
     privacy_url = os.getenv("PUBLIC_PRIVACY_NOTICE_URL", "")
+    operator_url = os.getenv("PUBLIC_OPERATOR_CONTACT_URL", "")
     if (
         not telegram._BOT_TOKEN.fullmatch(token)
         or not raw_chat_id.isascii() or not raw_chat_id.isdecimal()
@@ -51,9 +53,10 @@ def config_from_env() -> PollingConfig | None:
         or not telegram._SECRET.fullmatch(secret)
         or not redis_url.startswith(("redis://", "rediss://"))
         or (privacy_url and not telegram._public_https_url(privacy_url))
+        or (operator_url and not telegram._public_https_url(operator_url))
     ):
         return None
-    return PollingConfig(token, int(raw_chat_id), redis_url, secret, privacy_url)
+    return PollingConfig(token, int(raw_chat_id), redis_url, secret, privacy_url, operator_url or None)
 
 
 def _safe_failure_code(error: Exception) -> str:
@@ -212,7 +215,7 @@ async def poll_batch(client: httpx.AsyncClient, redis: Redis, cfg: PollingConfig
             greeting = _greeting_locale(update) if saved_locale is None else None
             selected = explicit or saved_locale or greeting
             localized = _with_locale(update, selected) if selected else update
-            safe = telegram._safe_reply(localized)
+            safe = telegram._safe_reply(localized, cfg.operator_contact_url)
             key = telegram._dedup_key(update_id, cfg.secret)
             owner = secrets.token_urlsafe(24)
             claimed = await telegram._claim(cfg.redis_url, key, owner, client=redis)
@@ -229,7 +232,7 @@ async def poll_batch(client: httpx.AsyncClient, redis: Redis, cfg: PollingConfig
                 started = time.monotonic()
                 try:
                     await telegram._send_message(cfg.token, cfg.chat_id, safe[1], cfg.privacy_url,
-                                                 reply_markup=telegram._reply_markup(localized),
+                                                 reply_markup=telegram._reply_markup(localized, cfg.operator_contact_url),
                                                  client=client)
                 except (httpx.HTTPError, ValueError):
                     await telegram._finish(cfg.redis_url, key, owner, sent=False, client=redis)

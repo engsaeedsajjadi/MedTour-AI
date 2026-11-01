@@ -2,7 +2,11 @@
 import {useEffect,useState} from 'react';
 import {API_BASE} from '@/lib/api';
 import {fa,faError,faNetwork,tone} from '@/lib/i18n';
-type Journey={case_id:string,status:string,specialty:string,services:{service:string,status:string}[],confirmed_appointments:{at:string,reference:string}[],approved_quotes:{amount_minor:number,currency:string,id:string}[]};
+type Journey={case_id:string,status:string,specialty:string,services:{service:string,status:string}[],confirmed_appointments:{at:string,reference:string}[],approved_quotes:{amount_minor:number,currency:string,id:string}[],travel?:Travel};
+type Travel={visa:{status:string,visa_type:string,decision:string|null,intended_departure_at:string|null,issued_reported:boolean}[],
+ accommodation:{hotel:string,city:string,check_in:string,check_out:string,room_type:string,guests:number,status:string,confirmed:boolean}[],
+ transfers:{kind:string,starts_at:string,ends_at:string,from:string,to:string,passengers:number,status:string,confirmed:boolean}[],
+ readiness:{ready_to_travel:boolean,pending:string[],departure_at:string|null}};
 type ChatMessage={sender:string,body:string,language:string};
 
 const LANGUAGE_LABELS:Record<string,string>={fa:'فارسی',ar:'العربية',en:'English',ps:'پښتو',prs:'دری'};
@@ -20,6 +24,24 @@ function readInvite():string{
  return hash.startsWith('invite=')?decodeURIComponent(hash.slice(7)):'';
 }
 function money(minor:number,currency:string){const digits=['IRR','JPY','KRW','IQD','AFN'].includes(currency)?0:2;return (minor/10**digits).toLocaleString('fa-IR',{minimumFractionDigits:digits,maximumFractionDigits:digits})+' '+currency;}
+const PENDING_LABEL:Record<string,string>={appointment:'تأیید نوبت پزشک',quote:'تأیید برآورد هزینه',visa:'صدور ویزای درمانی',accommodation:'تأیید رزرو هتل',transfer:'تأیید ترانسفر فرودگاهی',case_approval:'تأیید نهایی پرونده توسط هماهنگ‌کننده'};
+const ZONE:Record<string,string>={airport:'فرودگاه',hotel:'هتل',hospital:'بیمارستان',city_center:'مرکز شهر',not_applicable:'—'};
+const ROOM:Record<string,string>={single:'یک‌تخته',double:'دوتخته',accessible:'مناسب معلولان'};
+function fmtDay(value:string){const d=new Date(value+(value.length===10?'T00:00:00':''));return Number.isNaN(d.getTime())?value:d.toLocaleDateString('fa-IR',{dateStyle:'full'});}
+function TripPlan({t}:{t:Travel}){
+ const r=t.readiness;
+ return <div className="portalBox tripPlan">
+  {r.ready_to_travel?<div className="readyBanner" role="status"><h3>✅ سفر شما آماده است</h3>
+   <p>نوبت پزشک، برآورد هزینه{t.visa.length?'، ویزای درمانی':''}، هتل{t.transfers.length?' و ترانسفر فرودگاهی':''} برای شما تأیید شده است. جزئیات را پایین ببینید.</p>
+   <p className="subtle">پیش از حرکت: گذرنامه معتبر (حداقل ۶ ماه اعتبار)، ویزا و اصل مدارک پزشکی را همراه داشته باشید. برای هر تغییری از گفتگوی امن همین پرتال با هماهنگ‌کننده در تماس باشید. این تأییدها توسط هماهنگ‌کننده ثبت شده‌اند؛ تأییدیه اصلی هر ارائه‌دهنده را نیز نگه دارید.</p></div>
+  :<div className="pendingBanner" role="status"><h3>سفر شما در حال آماده‌سازی است</h3><p>موارد باقی‌مانده:</p><ul>{r.pending.map(k=><li key={k}>{PENDING_LABEL[k]||fa(k)}</li>)}</ul></div>}
+  <div className="portalGrid">
+   <div><h3>ویزای درمانی</h3>{t.visa.length===0?<p className="subtle">درخواست ویزا ثبت نشده است.</p>:t.visa.map((v,i)=><p key={i}><span className={'badge '+(v.issued_reported?'good':tone(v.status))}>{v.issued_reported?'صادر شد':fa(v.decision||v.status)}</span>{v.intended_departure_at&&<><br/>تاریخ حرکت: {fmtDate(v.intended_departure_at)}</>}</p>)}</div>
+   <div><h3>اقامت</h3>{t.accommodation.length===0?<p className="subtle">هتلی رزرو نشده است.</p>:t.accommodation.map((h,i)=><p key={i}><strong dir="auto">{h.hotel}</strong> — {h.city}<br/>ورود: {fmtDay(h.check_in)}<br/>خروج: {fmtDay(h.check_out)}<br/>اتاق {ROOM[h.room_type]||h.room_type} · {h.guests.toLocaleString('fa-IR')} نفر <span className={'badge '+(h.confirmed?'good':tone(h.status))}>{h.confirmed?'تأیید شده':fa(h.status)}</span></p>)}</div>
+   <div><h3>ترانسفر</h3>{t.transfers.length===0?<p className="subtle">ترانسفری ثبت نشده است.</p>:t.transfers.map((x,i)=><p key={i}>{fa(x.kind)}: {ZONE[x.from]||x.from} ← {ZONE[x.to]||x.to}<br/>{fmtDate(x.starts_at)} · {x.passengers.toLocaleString('fa-IR')} نفر <span className={'badge '+(x.confirmed?'good':tone(x.status))}>{x.confirmed?'تأیید شده':fa(x.status)}</span></p>)}</div>
+  </div>
+ </div>;
+}
 function fmtDate(value:string){const d=new Date(value);return Number.isNaN(d.getTime())?value:d.toLocaleString('fa-IR',{dateStyle:'medium',timeStyle:'short'});}
 
 export default function PatientPortal(){
@@ -144,6 +166,7 @@ export default function PatientPortal(){
       <span dir="auto">{d.filename}</span><span className={'badge '+tone(d.status)}>{fa(d.status)}</span><button className="button secondary" disabled={busy} type="button" onClick={()=>downloadDocument(c.case_id,d.id)}>دریافت</button>
      </li>)}</ul>)}
     </div>
+    {c.travel&&<TripPlan t={c.travel}/>}
     <div className="portalGrid">
      <div><h3>خدمات سفر و درمان</h3>{c.services.length===0?<p className="subtle">خدمت فعالی ثبت نشده است.</p>:c.services.map((s,i)=><p key={i}>{fa(s.service)} — <span className={'badge '+tone(s.status)}>{fa(s.status)}</span></p>)}</div>
      <div><h3>نوبت‌های تأییدشده</h3>{c.confirmed_appointments.length===0?<p className="subtle">نوبت تأییدشده‌ای ندارید.</p>:c.confirmed_appointments.map((a,i)=><p key={i}>{fmtDate(a.at)}</p>)}</div>

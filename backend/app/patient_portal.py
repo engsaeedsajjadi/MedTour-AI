@@ -41,6 +41,61 @@ def me(x_patient_access:str|None=Header(None,alias='X-Patient-Access'),db:Sessio
     return {'name':p.full_name,'country':p.country,'language':p.language,'id':p.id,
             'session_expires_at':grant.expires_at,'independent_identity_assurance':False}
 
+VISA_PENDING=('requested','in_review','ready_for_manual_submission','submission_reported')
+STAY_ACTIVE=('requested','internally_held','external_request_reported','external_confirmation_reported')
+TRANSFER_ACTIVE=('requested','internally_allocated','provider_contact_reported','provider_ack_reported')
+
+
+def _iso(value):
+    return value.isoformat() if value is not None else None
+
+
+def travel_summary(db:Session,tenant_id:str,patient_id:str,case:Case,appointments:list,quotes:list)->dict:
+    """Patient-safe view of the trip: statuses, dates and places only. No supplier or authority
+    references, internal notes, or document numbers; each part only with its specific consent."""
+    from .enterprise_models import MedicalVisa,AccommodationStay,AccommodationProperty,TravelAssignment
+    visa=[];stays=[];transfers=[]
+    if active_consent(db,tenant_id,patient_id,'visa_coordination'):
+        for v in db.scalars(select(MedicalVisa).where(MedicalVisa.tenant_id==tenant_id,
+                MedicalVisa.case_id==case.id,MedicalVisa.patient_id==patient_id,
+                MedicalVisa.status.not_in(('blocked','cancelled'))).order_by(MedicalVisa.created_at)).all():
+            visa.append({'status':v.status,'visa_type':v.visa_type,'decision':v.decision_reported,
+                'intended_departure_at':_iso(v.intended_departure_at),
+                'issued_reported':v.status=='outcome_reported' and v.decision_reported=='issued_reported'})
+    if active_consent(db,tenant_id,patient_id,'accommodation_coordination'):
+        rows=db.execute(select(AccommodationStay,AccommodationProperty).join(AccommodationProperty,
+            (AccommodationProperty.id==AccommodationStay.property_id)&(AccommodationProperty.tenant_id==tenant_id)).where(
+            AccommodationStay.tenant_id==tenant_id,AccommodationStay.case_id==case.id,
+            AccommodationStay.patient_id==patient_id,AccommodationStay.status.in_(STAY_ACTIVE)).order_by(
+            AccommodationStay.starts_on)).all()
+        for stay,prop in rows:
+            stays.append({'hotel':prop.name,'city':prop.city,'check_in':_iso(stay.starts_on),
+                'check_out':_iso(stay.ends_on),'room_type':stay.room_type,'guests':stay.guests,
+                'status':stay.status,'confirmed':stay.status=='external_confirmation_reported'})
+    transport=active_consent(db,tenant_id,patient_id,'transport_coordination')
+    interpreter=active_consent(db,tenant_id,patient_id,'interpreter_coordination')
+    for t in db.scalars(select(TravelAssignment).where(TravelAssignment.tenant_id==tenant_id,
+            TravelAssignment.case_id==case.id,TravelAssignment.patient_id==patient_id,
+            TravelAssignment.status.in_(TRANSFER_ACTIVE)).order_by(TravelAssignment.starts_at)).all():
+        if not (interpreter if t.kind=='interpreter_session' else transport):continue
+        transfers.append({'kind':t.kind,'starts_at':_iso(t.starts_at),'ends_at':_iso(t.ends_at),
+            'from':t.origin_zone,'to':t.destination_zone,'passengers':t.passengers,
+            'language':t.language,'status':t.status,'confirmed':t.status=='provider_ack_reported'})
+    pending=[]
+    if not appointments:pending.append('appointment')
+    if not quotes:pending.append('quote')
+    if any(not v['issued_reported'] for v in visa):pending.append('visa')
+    if not stays or any(not x['confirmed'] for x in stays):pending.append('accommodation')
+    if any(not x['confirmed'] for x in transfers):pending.append('transfer')
+    if case.status not in ('travel_planning','arrived','in_treatment','follow_up'):pending.append('case_approval')
+    first_departure=next((v['intended_departure_at'] for v in visa if v['intended_departure_at']),None)
+    return {'visa':visa,'accommodation':stays,'transfers':transfers,
+        'readiness':{'ready_to_travel':not pending,'pending':pending,
+            'departure_at':first_departure,
+            # Statuses are reported by staff; the patient must keep the originals from each provider.
+            'confirmations_independently_verified':False}}
+
+
 @router.get('/journey')
 def journey(x_patient_access:str|None=Header(None,alias='X-Patient-Access'),db:Session=Depends(get_db)):
     grant=portal_session(x_patient_access,db)
@@ -54,7 +109,8 @@ def journey(x_patient_access:str|None=Header(None,alias='X-Patient-Access'),db:S
         data.append({'case_id':c.id,'specialty':c.specialty,'status':c.status,
             'services':[{'service':o.kind,'status':o.status} for o in ops],
             'confirmed_appointments':[{'at':a.requested_at,'reference':a.confirmation_reference} for a in appts],
-            'approved_quotes':[{'amount_minor':q.amount_minor,'currency':q.currency,'id':q.id} for q in quotes]})
+            'approved_quotes':[{'amount_minor':q.amount_minor,'currency':q.currency,'id':q.id} for q in quotes],
+            'travel':travel_summary(db,grant.tenant_id,grant.patient_id,c,appts,quotes)})
     return data
 
 class PatientMessageIn(BaseModel):

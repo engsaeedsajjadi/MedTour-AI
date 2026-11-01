@@ -417,3 +417,33 @@ def test_shared_redis_client_is_not_closed_by_claim_or_finish():
     assert asyncio.run(telegram._claim("redis://unused", "k", "o", client=r)) is True
     asyncio.run(telegram._finish("redis://unused", "k", "o", sent=True, client=r))
     assert R.closed is False
+
+
+def test_poller_uses_operator_contact_link_when_configured(monkeypatch):
+    _env(monkeypatch)
+    monkeypatch.setenv("PUBLIC_OPERATOR_CONTACT_URL", "https://t.me/test_operator_desk")
+    cfg = telegram_poller.config_from_env()
+    assert cfg.operator_contact_url == "https://t.me/test_operator_desk"
+    sent = []
+    async def claim(*args, **_kw): return True
+    async def finish(*args, **kwargs): pass
+    async def send(token, chat, text, privacy, **kw): sent.append((text, kw.get("reply_markup")))
+    monkeypatch.setattr(telegram, "_claim", claim)
+    monkeypatch.setattr(telegram, "_finish", finish)
+    monkeypatch.setattr(telegram, "_send_message", send)
+    asyncio.run(telegram_poller.poll_batch(FakeHTTP([_update(40, 12345, "👤 تماس با اپراتور")]), FakeRedis(), cfg, 0))
+    text, markup = sent[0]
+    assert "https://t.me/test_operator_desk" in text
+    assert markup["inline_keyboard"][0][0]["url"] == "https://t.me/test_operator_desk"
+
+
+def test_unsafe_operator_link_disables_poller(monkeypatch):
+    _env(monkeypatch)
+    monkeypatch.setenv("PUBLIC_OPERATOR_CONTACT_URL", "http://insecure.example/contact")
+    assert telegram_poller.config_from_env() is None
+
+
+def test_operator_button_without_link_does_not_point_to_missing_channel():
+    reply = telegram._safe_reply({"message": {"chat": {"type": "private", "id": 7}, "from": {"id": 7, "language_code": "fa"},
+                                              "text": "👤 تماس با اپراتور"}})
+    assert "تنظیم نشده" in reply[1] and "زیر" not in reply[1]

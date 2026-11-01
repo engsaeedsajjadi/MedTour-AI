@@ -118,6 +118,7 @@ services:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
       PUBLIC_PRIVACY_NOTICE_URL: ${PUBLIC_PRIVACY_NOTICE_URL:-}
+      PUBLIC_OPERATOR_CONTACT_URL: ${PUBLIC_OPERATOR_CONTACT_URL:-}
       REDIS_URL: redis://redis:6379/0
       # Optional outbound HTTP proxy for api.telegram.org only (networks where Telegram is blocked),
       # e.g. http://host.docker.internal:10809. Empty means direct connection.
