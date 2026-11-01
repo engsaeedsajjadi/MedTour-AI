@@ -2,6 +2,7 @@
 import {cachedOrganization} from '@/lib/preferences';
 
 import {useEffect,useState} from 'react';
+import Link from 'next/link';
 import Shell from '@/components/Shell';
 import {request,downloadPdf} from '@/lib/api';
 import {fa} from '@/lib/i18n';
@@ -30,9 +31,6 @@ export default function Quotations(){
  const [versions,setVersions]=useState<Version[]>([]);
  const [role,setRole]=useState('');
  const [reference,setReference]=useState('');
- const [rateFrom,setRateFrom]=useState('EUR'),[rateTo,setRateTo]=useState('USD');
- const [num,setNum]=useState('1'),[den,setDen]=useState('1');
- const [rateRef,setRateRef]=useState(''),[expires,setExpires]=useState('');
  const [notice,setNotice]=useState(''),[error,setError]=useState('');
  const [busy,setBusy]=useState(false);
 
@@ -78,15 +76,6 @@ export default function Quotations(){
   }
   await action(ROOT+'/quotes/'+encodeURIComponent(quoteId)+'/draft','POST',{
    lines:lines.map(x=>({...x,fx_rate_id:x.fx_rate_id||null}))
-  });
- }
- async function createRate(e:React.FormEvent){
-  e.preventDefault();
-  if(!expires||!num||!den)return;
-  await action(ROOT+'/fx-rates','POST',{
-   source_currency:rateFrom,target_currency:rateTo,
-   numerator:Number(num),denominator:Number(den),
-   source_reference:rateRef,expires_at:new Date(expires).toISOString()
   });
  }
  async function exportVersion(id:string){
@@ -161,25 +150,9 @@ export default function Quotations(){
    </div>
    </>}
   </section>
-  {role==='admin'&&<section className="panel" style={{padding:20,marginTop:16}}>
-   <h2>۳. ثبت نرخ ارز مستند به‌دست مدیر</h2>
-   <p>مقدار نمونه یا تخمینی ثبت نکنید. نسبت عدد صحیح «جزء پول مبدأ → جزء پول مقصد» همراه مرجع قابل پیگیری و انقضای حداکثر ۳۰ روز است؛ این سیستم صحت مرجع را به‌صورت مستقل اثبات نمی‌کند.</p>
-   <form onSubmit={e=>void createRate(e)} style={{display:'grid',gap:9,maxWidth:590}}>
-    <label>ارز مبدأ <select value={rateFrom} onChange={e=>setRateFrom(e.target.value)}>
-     {currencies.map(x=><option key={x} value={x}>{fa(x)}</option>)}
-    </select></label>
-    <label>ارز مقصد <select value={rateTo} onChange={e=>setRateTo(e.target.value)}>
-     {currencies.map(x=><option key={x} value={x}>{fa(x)}</option>)}
-    </select></label>
-    <label>صورت نسبت <input required type="number" min="1" max="1000000000000" step="1" value={num} onChange={e=>setNum(e.target.value)}/></label>
-    <label>مخرج نسبت <input required type="number" min="1" max="1000000000000" step="1" value={den} onChange={e=>setDen(e.target.value)}/></label>
-    <label>مرجع مکتوب غیرحساس <input required minLength={6} maxLength={180} pattern="[A-Za-z0-9][A-Za-z0-9._:/-]{5,179}" value={rateRef} onChange={e=>setRateRef(e.target.value)}/></label>
-    <label>انقضا (حداکثر ۳۰ روز) <input required type="datetime-local" value={expires} onChange={e=>setExpires(e.target.value)}/></label>
-    <button disabled={busy||rateFrom===rateTo}>ثبت نرخ دستی قابل ممیزی</button>
-   </form>
-  </section>}
+  <p className="settingsBack">تعرفه خدمات در <Link className="textLink" href="/prices">تنظیمات ← تعرفه خدمات</Link> و نرخ ارز در <Link className="textLink" href="/settings/exchange-rates">تنظیمات ← نرخ ارز</Link> تعریف می‌شوند.</p>
   <section className="panel" style={{padding:20,marginTop:16}}>
-   <h2>۴. نسخه‌های ثبت‌شده و خروجی PDF</h2>
+   <h2>۳. نسخه‌های ثبت‌شده و خروجی PDF</h2>
    <label>مرجع تأیید اداری <input value={reference} minLength={6} maxLength={100}
     pattern="[A-Za-z0-9][A-Za-z0-9._:/-]{5,99}"
     onChange={e=>setReference(e.target.value)}/></label>

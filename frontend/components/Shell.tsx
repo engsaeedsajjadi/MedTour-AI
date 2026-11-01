@@ -16,8 +16,8 @@ const groups:{label:string;links:[string,string][]}[]=[
  {label:'ارتباطات',links:[['conversations','گفت‌وگوها'],['messaging','پیام‌رسانی و ترجمه'],['receptionist','منشی چندزبانه'],['voice','پردازش گفتار'],['ai-orchestration','دستیارهای هوشمند']]},
  {label:'مالی',links:[['quotations','پیش‌فاکتورها'],['prices','تعرفه‌ها'],['finance','تراکنش‌های مالی']]},
  {label:'محتوا و شبکه',links:[['agents','نمایندگان بین‌المللی'],['cms','محتوای وب‌سایت'],['cms-workflow','گردش‌کار محتوا'],['knowledge','پایگاه دانش']]},
- {label:'سازمان',links:[['reports','گزارش‌ها'],['staff','کاربران و دسترسی‌ها'],['tenant-isolation','ممیزی جداسازی سازمان‌ها']]},
- {label:'حساب من',links:[['settings','تنظیمات'],['account-security','امنیت حساب']]},
+ {label:'سازمان',links:[['reports','گزارش‌ها'],['tenant-isolation','ممیزی جداسازی سازمان‌ها']]},
+ {label:'تنظیمات',links:[['settings','تنظیمات و اطلاعات پایه'],['account-security','امنیت حساب']]},
 ];
 
 // Optional environment badge (e.g. «محیط آزمایش» on a staging server); hidden when not set.
@@ -37,7 +37,7 @@ export default function Shell({title,children}:{title:string,children:React.Reac
   refresh();window.addEventListener('medtour-settings',refresh);
   return()=>window.removeEventListener('medtour-settings',refresh);
  },[]);
- const section=path.split('/')[1]||'';
+ const section=path.split('/').filter(Boolean).slice(0,2).join('/');
  const permitted=role?allowedFor(role,section):false;
  const visible=groups.map(g=>({...g,links:g.links.filter(([href])=>allowedFor(role,href))})).filter(g=>g.links.length>0);
  return <div className="appShell">

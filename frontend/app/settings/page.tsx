@@ -9,6 +9,27 @@ import {CURRENCIES,LANGUAGE_NAMES,TIMEZONES,loadOrganization,loadProfile,remembe
 
 const TELEGRAM:Record<string,string>={off:'خاموش',polling_test:'فعال (حالت محلی polling)',webhook:'فعال (webhook روی سرور)'};
 const CODE:Record<string,string>={email:'ایمیل',sms_webhook:'پیامک',not_configured:'تنظیم نشده'};
+type Card={href:string;title:string;text:string;admin?:boolean};
+const BASE:{group:string;cards:Card[]}[]=[
+ {group:'مراکز درمانی و پزشکان',cards:[
+  {href:'/hospitals',title:'بیمارستان‌ها',text:'فهرست مراکز درمانی همکار'},
+  {href:'/hospital-management',title:'مدارک و ظرفیت بیمارستان‌ها',text:'مجوز، خدمات و ظرفیت هر مرکز',admin:true},
+  {href:'/providers',title:'پزشکان',text:'فهرست پزشکان و تخصص‌ها'},
+  {href:'/physician-management',title:'مدارک و برنامه پزشکان',text:'پروانه، همکاری با بیمارستان و ساعات کاری',admin:true}]},
+ {group:'سفر و اقامت',cards:[
+  {href:'/settings/hotels',title:'هتل‌ها و ظرفیت اتاق',text:'هتل‌های طرف قرارداد و اتاق‌های در اختیار',admin:true},
+  {href:'/settings/transport',title:'خودروها و مترجمان',text:'ترانسفر فرودگاهی، مترجم و ساعات در دسترس',admin:true}]},
+ {group:'مالی',cards:[
+  {href:'/prices',title:'تعرفه خدمات',text:'قیمت مستند هر خدمت برای پیش‌فاکتور'},
+  {href:'/settings/exchange-rates',title:'نرخ ارز',text:'نرخ تبدیل ارز با مرجع و تاریخ اعتبار',admin:true}]},
+ {group:'کاربران و همکاران',cards:[
+  {href:'/staff',title:'کاربران و نقش‌ها',text:'حساب کارکنان، نقش و فعال/غیرفعال',admin:true},
+  {href:'/agents',title:'نمایندگان بین‌المللی',text:'نمایندگان، قرارداد و حساب پرتال',admin:true}]},
+ {group:'محتوا و دستیار هوشمند',cards:[
+  {href:'/cms',title:'محتوای وب‌سایت',text:'صفحات عمومی سایت به پنج زبان'},
+  {href:'/knowledge',title:'پایگاه دانش',text:'پاسخ‌های استاندارد برای هماهنگ‌کنندگان'},
+  {href:'/ai-orchestration',title:'دستیارهای هوشمند',text:'فعال‌سازی و حالت کار دستیارها'}]},
+];
 const STORAGE:Record<string,string>={object_storage_scanned:'فعال، با اسکن ویروس و رمزنگاری',not_configured:'تنظیم نشده'};
 
 function Status({ok,children}:{ok:boolean,children:React.ReactNode}){
@@ -16,15 +37,16 @@ function Status({ok,children}:{ok:boolean,children:React.ReactNode}){
 }
 
 export default function SettingsPage(){
- const [tab,setTab]=useState<'me'|'org'>('me');
+ const [tab,setTab]=useState<'me'|'org'|'base'>('me'),[owner,setOwner]=useState(false),[role,setRole]=useState('');
+ useEffect(()=>{const t=new URLSearchParams(window.location.search).get('tab');if(t==='org'||t==='base')setTab(t);},[]);
  const [profile,setProfile]=useState<Profile|null>(null),[name,setName]=useState(''),[zone,setZone]=useState('Asia/Tehran');
  const [org,setOrg]=useState<Organization|null>(null),[editable,setEditable]=useState(false),[integrations,setIntegrations]=useState<Integrations|null>(null);
  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
 
  async function reload(){
   const [p,o]=await Promise.all([loadProfile(),loadOrganization()]);
-  setProfile(p);setName(p.display_name);setZone(p.timezone);
-  setOrg(o.profile);setEditable(o.editable);setIntegrations(o.integrations||null);
+  setProfile(p);setName(p.display_name);setZone(p.timezone);setRole(p.role);
+  setOrg(o.profile);setEditable(o.editable);setOwner(!!o.telegram_bot_owner);setIntegrations(o.integrations||null);
  }
  useEffect(()=>{void reload().catch(e=>setError((e as Error).message));},[]);
 
@@ -55,6 +77,7 @@ export default function SettingsPage(){
   <div className="tabs" role="tablist">
    <button type="button" role="tab" aria-selected={tab==='me'} className={tab==='me'?'active':''} onClick={()=>setTab('me')}>حساب من</button>
    <button type="button" role="tab" aria-selected={tab==='org'} className={tab==='org'?'active':''} onClick={()=>setTab('org')}>سازمان</button>
+   {(role==='admin'||role==='operator')&&<button type="button" role="tab" aria-selected={tab==='base'} className={tab==='base'?'active':''} onClick={()=>setTab('base')}>اطلاعات پایه</button>}
   </div>
   {error&&<div className="errorBox" role="alert">{error}</div>}
   {notice&&<div className="infoBanner" role="status">{notice}</div>}
@@ -99,6 +122,8 @@ export default function SettingsPage(){
       <div className="settingsWide"><span className="fieldLabel">زبان‌های فعال برای بیماران</span>
        <div className="checkRow">{Object.entries(LANGUAGE_NAMES).map(([code,label])=><label key={code} className="checkItem"><input type="checkbox" checked={org.enabled_languages.includes(code)} onChange={()=>toggleLang(code)}/>{label}</label>)}</div></div>
       <label>زبان پیش‌فرض بیمار جدید<select value={org.default_language} onChange={e=>set('default_language',e.target.value)}>{org.enabled_languages.map(code=><option key={code} value={code}>{LANGUAGE_NAMES[code]}</option>)}</select></label>
+      <label>نسخه اطلاعیه حریم خصوصی (با هر رضایت بیمار ثبت می‌شود)<input dir="ltr" required maxLength={40} pattern="[A-Za-z0-9][A-Za-z0-9._-]{0,39}" value={org.privacy_notice_version} onChange={e=>set('privacy_notice_version',e.target.value)} placeholder="2026-11"/></label>
+      <label>لینک «تماس با اپراتور» در ربات تلگرام{!owner&&<span className="subtle"> (ربات این سرور متعلق به سازمان دیگری است)</span>}<input dir="ltr" disabled={!owner} value={org.telegram_operator_url} onChange={e=>set('telegram_operator_url',e.target.value)} placeholder="https://t.me/operator_username"/></label>
       {editable&&<div className="formActions"><button className="button" disabled={busy||!org.enabled_languages.length}>ذخیره تنظیمات سازمان</button></div>}
      </fieldset>
     </form>
@@ -109,9 +134,17 @@ export default function SettingsPage(){
      <p>ارسال کد ورود بیمار: <Status ok={integrations.patient_code_delivery!=='not_configured'}>{CODE[integrations.patient_code_delivery]||integrations.patient_code_delivery}</Status></p>
      <p>مخزن امن مدارک: <Status ok={integrations.secure_document_storage!=='not_configured'}>{STORAGE[integrations.secure_document_storage]||integrations.secure_document_storage}</Status></p>
      <p>ورود دومرحله‌ای کارکنان: <Status ok={integrations.staff_two_factor_required}>{integrations.staff_two_factor_required?'اجباری':'اختیاری'}</Status></p>
-     <p className="subtle">رمز ایمیل، توکن ربات، لینک اپراتور ربات و کلیدهای رمزنگاری عمداً از پنل قابل تغییر نیستند تا با نفوذ به یک حساب مدیر لو نروند. این موارد را مسئول سرور در فایل <code>.env</code> تنظیم می‌کند.</p>
+     <p className="subtle">رمز ایمیل و پیامک، توکن ربات و کلیدهای رمزنگاری عمداً از پنل قابل تغییر نیستند تا با نفوذ به یک حساب مدیر لو نروند. این موارد را مسئول سرور در فایل <code>.env</code> تنظیم می‌کند.</p>
     </div>
    </section>}
+  </>}
+
+  {tab==='base'&&<>
+   <div className="infoBanner">اطلاعاتی که یک بار تعریف می‌شوند و در کار روزانه از آن‌ها انتخاب می‌کنید. موارد دارای «فقط مدیر» را فقط مدیر سازمان می‌تواند تغییر دهد.</div>
+   {BASE.map(g=><section key={g.group} className="panel"><div className="panelHeader"><h2>{g.group}</h2></div>
+    <div className="settingsCards">{g.cards.filter(c=>role==='admin'||!c.admin).map(c=><Link key={c.href} href={c.href} className="settingsCard">
+     <strong>{c.title}</strong><span>{c.text}</span>{c.admin&&<small>فقط مدیر</small>}</Link>)}</div>
+   </section>)}
   </>}
  </Shell>;
 }

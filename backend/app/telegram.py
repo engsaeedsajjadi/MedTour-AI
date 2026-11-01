@@ -91,6 +91,27 @@ def settings() -> TelegramSettings | None:
     return TelegramSettings(token, secret, privacy_url, redis_url, operator_contact_url or None)
 
 
+OPERATOR_URL_KEY = "medtour:telegram:operator_url"
+
+
+async def operator_contact_url(redis_url: str, fallback: str | None, client=None) -> str | None:
+    """Link set by the administrator in Settings (via Redis); the environment value is the fallback."""
+    try:
+        if client is None:
+            from redis.asyncio import Redis
+            own = Redis.from_url(redis_url, socket_connect_timeout=1, socket_timeout=1)
+            try:
+                raw = await own.get(OPERATOR_URL_KEY)
+            finally:
+                await own.aclose()
+        else:
+            raw = await client.get(OPERATOR_URL_KEY)
+    except Exception:
+        return fallback
+    value = raw.decode("utf-8", "replace") if isinstance(raw, bytes) else raw
+    return value if isinstance(value, str) and _public_https_url(value) else fallback
+
+
 def enabled() -> bool:
     return settings() is not None
 
@@ -409,7 +430,8 @@ async def telegram_webhook(request: Request):
     if not 0 <= update_id <= 2**63 - 1:
         raise HTTPException(422, "Invalid update identifier")
 
-    reply = _safe_reply(update, config.operator_contact_url)
+    operator_url = await operator_contact_url(config.redis_url, config.operator_contact_url)
+    reply = _safe_reply(update, operator_url)
     if reply is None:
         return {"ok": True, "ignored": True}
     key = _dedup_key(update_id, config.webhook_secret)
@@ -422,7 +444,7 @@ async def telegram_webhook(request: Request):
         return {"ok": True, "duplicate": True}
     try:
         await _send_message(config.token, reply[0], reply[1], config.privacy_url,
-                            reply_markup=_reply_markup(update, config.operator_contact_url))
+                            reply_markup=_reply_markup(update, operator_url))
     except (httpx.HTTPError, ValueError):
         try:
             await _finish(config.redis_url, key, owner, sent=False)

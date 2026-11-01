@@ -6,10 +6,10 @@ export type Profile={email:string;role:string;organization_slug:string;display_n
  two_factor_enabled:boolean;two_factor_required:boolean;sessions:Session[]};
 export type Organization={display_name:string;contact_email:string;contact_phone:string;website:string;
  privacy_notice_url:string;patient_support_hours:string;default_language:string;enabled_languages:string[];
- timezone:string;default_currency:string};
+ timezone:string;default_currency:string;privacy_notice_version:string;telegram_operator_url:string};
 export type Integrations={telegram:{mode:string;operator_link_configured:boolean};patient_code_delivery:string;
  secure_document_storage:string;staff_two_factor_required:boolean;environment:string;managed_on_server:string[]};
-export type OrganizationView={profile:Organization;editable:boolean;integrations?:Integrations};
+export type OrganizationView={profile:Organization;editable:boolean;telegram_bot_owner?:boolean;integrations?:Integrations};
 
 const TZ_KEY='medtour_tz',ORG_KEY='medtour_org';
 

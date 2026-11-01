@@ -152,6 +152,10 @@ class OrganizationIn(BaseModel):
     enabled_languages: list[Literal["fa", "ar", "en", "ps", "prs"]] = Field(default_factory=lambda: list(LANGS))
     timezone: str = Field(default="Asia/Tehran", max_length=64)
     default_currency: Literal["USD", "EUR", "IRR", "AED", "TRY", "IQD", "AFN", "GBP"] = "USD"
+    # Version label of the published privacy notice; recorded with every consent the patient gives.
+    privacy_notice_version: str = Field(default="v1", min_length=1, max_length=40, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$")
+    # Public link the Telegram bot's "contact operator" button opens (e.g. https://t.me/<operator>).
+    telegram_operator_url: str = Field(default="", max_length=300)
 
     @field_validator("contact_email")
     @classmethod
@@ -169,7 +173,7 @@ class OrganizationIn(BaseModel):
             raise ValueError("Invalid phone number")
         return value
 
-    @field_validator("website", "privacy_notice_url")
+    @field_validator("website", "privacy_notice_url", "telegram_operator_url")
     @classmethod
     def https(cls, value: str) -> str:
         value = value.strip()
@@ -207,28 +211,62 @@ def organization_profile(db: Session, tenant_id: str) -> dict:
     return {**defaults, **{k: v for k, v in stored.items() if k in defaults}}
 
 
-def _integrations(user: User) -> dict:
+OPERATOR_URL_KEY = "medtour:telegram:operator_url"
+
+
+def bot_owner(db: Session, tenant_id: str) -> bool:
+    """One Telegram bot per deployment: it belongs to TELEGRAM_OWNER_TENANT_SLUG, or to the first
+    organization created when that is not set (a single-organization installation)."""
+    slug = os.getenv("TELEGRAM_OWNER_TENANT_SLUG", "").strip().lower()
+    from .tenant_context import system_scope
+    with system_scope(db):
+        if slug:
+            owner = db.scalar(select(Tenant.id).where(Tenant.slug == slug))
+        else:
+            owner = db.scalar(select(Tenant.id).order_by(Tenant.created_at, Tenant.id).limit(1))
+    return owner == tenant_id
+
+
+def publish_operator_url(url: str) -> bool:
+    """Hand the link to the Telegram services through Redis (they have no database access)."""
+    uri = os.getenv("REDIS_URL", "")
+    if not uri:
+        return False
+    try:
+        import redis
+        client = redis.Redis.from_url(uri, socket_connect_timeout=1, socket_timeout=2)
+        if url:
+            client.set(OPERATOR_URL_KEY, url)
+        else:
+            client.delete(OPERATOR_URL_KEY)
+        return True
+    except Exception:
+        return False
+
+
+def _integrations(user: User, operator_url: str = "") -> dict:
     from . import otp_delivery
     from .secure_media import s3_ready
     polling = os.getenv("TELEGRAM_POLLING_ENABLED", "").lower() == "true"
     webhook = os.getenv("TELEGRAM_BOT_ENABLED", "").lower() == "true"
     return {
         "telegram": {"mode": "webhook" if webhook else "polling_test" if polling else "off",
-                     "operator_link_configured": bool(os.getenv("PUBLIC_OPERATOR_CONTACT_URL"))},
+                     "operator_link_configured": bool(operator_url or os.getenv("PUBLIC_OPERATOR_CONTACT_URL"))},
         "patient_code_delivery": otp_delivery.provider() if otp_delivery.configured() else "not_configured",
         "secure_document_storage": "object_storage_scanned" if s3_ready() else "not_configured",
         "staff_two_factor_required": staff_mfa_required(user.role) or staff_mfa_required("admin"),
         "environment": os.getenv("APP_ENV", "development"),
-        "managed_on_server": ["SMTP_PASSWORD", "TELEGRAM_BOT_TOKEN", "PUBLIC_OPERATOR_CONTACT_URL",
-                              "MEDICAL_MASTER_KEY", "MFA_ENCRYPTION_KEY"],
+        "managed_on_server": ["SMTP_PASSWORD", "TELEGRAM_BOT_TOKEN", "MEDICAL_MASTER_KEY", "MFA_ENCRYPTION_KEY"],
     }
 
 
 @router.get("/organization/profile")
 def read_organization(db: Session = Depends(get_db), user: User = Depends(current_user)):
-    data = {"profile": organization_profile(db, user.tenant_id), "editable": user.role == "admin"}
+    profile = organization_profile(db, user.tenant_id)
+    owner = bot_owner(db, user.tenant_id)
+    data = {"profile": profile, "editable": user.role == "admin", "telegram_bot_owner": owner}
     if user.role == "admin":
-        data["integrations"] = _integrations(user)
+        data["integrations"] = _integrations(user, profile["telegram_operator_url"] if owner else "")
     return data
 
 
@@ -237,7 +275,13 @@ def update_organization(body: OrganizationIn, db: Session = Depends(get_db), use
     value = body.model_dump()
     if value["default_language"] not in value["enabled_languages"]:
         raise HTTPException(422, "Default language must be one of the enabled languages")
+    owner = bot_owner(db, user.tenant_id)
+    if not owner:
+        # Only the organization that owns this deployment's bot may point its button somewhere.
+        value["telegram_operator_url"] = organization_profile(db, user.tenant_id)["telegram_operator_url"]
     _write(db, user, ORG_KEY, value, "organization_profile_updated")
+    if owner:
+        publish_operator_url(value["telegram_operator_url"])
     return read_organization(db, user)
 
 
@@ -253,4 +297,4 @@ def portal_organization(x_patient_access: str | None = Header(None, alias="X-Pat
     grant = portal_session(x_patient_access, db)
     p = organization_profile(db, grant.tenant_id)
     return {k: p[k] for k in ("display_name", "contact_email", "contact_phone", "website",
-                              "privacy_notice_url", "patient_support_hours", "timezone")}
+                              "privacy_notice_url", "privacy_notice_version", "patient_support_hours", "timezone")}

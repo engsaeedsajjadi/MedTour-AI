@@ -117,3 +117,12 @@ td code{white-space:nowrap}
 .checkRow{display:flex;flex-wrap:wrap;gap:10px}
 .checkItem{flex-direction:row!important;align-items:center;gap:7px!important;border:1px solid #d9e2e8;border-radius:9px;padding:9px 13px;font-weight:600!important}
 .portalContact a{color:#087e74;font-weight:700}
+.settingsCards{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;padding:16px 20px 20px}
+.settingsCard{display:flex;flex-direction:column;gap:6px;border:1px solid var(--line);border-radius:12px;padding:16px;background:#fbfdfd;transition:border-color .15s,transform .15s}
+.settingsCard:hover{border-color:#9cdbd1;transform:translateY(-2px)}
+.settingsCard strong{font-size:14px;color:var(--ink)}
+.settingsCard span{font-size:12px;color:var(--muted);line-height:1.8}
+.settingsCard small{font-size:10px;color:#9a6a1f;background:#fff4df;border-radius:6px;padding:2px 7px;align-self:flex-start}
+.settingsBack{margin:0 0 12px}
+.inlineLabel{display:flex;align-items:center;gap:8px;font-size:12px;color:#586b78}
+.inlineLabel select{border:1px solid #d9e2e8;border-radius:9px;padding:8px 10px;max-width:320px}

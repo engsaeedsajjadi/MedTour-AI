@@ -1,5 +1,6 @@
 'use client';
 import {useEffect,useState} from 'react';
+import Link from 'next/link';
 import Shell from '@/components/Shell';
 import {request} from '@/lib/api';
 import {fa} from '@/lib/i18n';
@@ -25,8 +26,7 @@ const later=(d:number)=>{const x=new Date(Date.now()+d*86400000);return new Date
 export default function TravelCoordination(){
  const [role,setRole]=useState(''),[cases,setCases]=useState<Case[]>([]),[caseId,setCaseId]=useState('');
  const [resources,setResources]=useState<Resource[]>([]),[resourceId,setResourceId]=useState('');
- const [kind,setKind]=useState('airport_pickup'),[labelResource,setLabelResource]=useState(''),[city,setCity]=useState('');
- const [seats,setSeats]=useState(4),[language,setLanguage]=useState('fa');
+ const [kind,setKind]=useState('airport_pickup');
  const [start,setStart]=useState(later(7)),[end,setEnd]=useState(later(7).slice(0,11)+'16:00');
  const [passengers,setPassengers]=useState(2),[origin,setOrigin]=useState('airport'),[dest,setDest]=useState('hotel');
  const [reference,setReference]=useState(''),[supplier,setSupplier]=useState('');
@@ -94,44 +94,22 @@ export default function TravelCoordination(){
   <div className="infoBanner">خودروها، مترجمان و زمان‌های در دسترس آن‌ها را ثبت کنید. مجوز راننده یا مترجم را پیش از ثبت بررسی کنید. شماره پرواز، نام همراه، آدرس، گذرنامه یا اطلاعات درمانی را در این صفحه وارد نکنید. رضایت «هماهنگی ترانسفر» یا «هماهنگی مترجم» بیمار باید فعال باشد.</div>
   {error&&<div className="errorBox" role="alert">{error}</div>}
   {notice&&<div className="infoBanner" role="status">{notice}</div>}
-  {role==='admin'&&<section className="panel" style={{padding:20,marginTop:16}}>
-   <h2>۱. منبع همکاری (ثبت داخلی و بدون تأیید مجوز)</h2>
-   <div style={{display:'grid',gap:10,maxWidth:610}}>
-    <label>نوع<select value={type} onChange={e=>setKind(e.target.value==='interpreter'?'interpreter_session':'airport_pickup')}>
-     <option value="vehicle">خودرو</option><option value="interpreter">مترجم</option>
-    </select></label>
-    <label>نام خودرو یا مترجم (بدون اطلاعات شخصی)<input value={labelResource} onChange={e=>setLabelResource(e.target.value)}/></label>
-    <label>شهر<input value={city} onChange={e=>setCity(e.target.value)}/></label>
-    {type==='vehicle'?<label>ظرفیت صندلی پیشنهادی<input type="number" min={1} max={8} value={seats} onChange={e=>setSeats(Number(e.target.value))}/></label>:
-     <label>زبان مترجم<select value={language} onChange={e=>setLanguage(e.target.value)}>
-      {['fa','en','ar','ps','prs'].map(x=><option key={x} value={x}>{fa(x)}</option>)}
-     </select></label>}
-    <button disabled={busy||labelResource.length<3||city.length<2} onClick={()=>void send(ROOT+'/resources',{
-     kind:type,label:labelResource,city,seats:type==='vehicle'?seats:1,language:type==='interpreter'?language:null
-    })}>ثبت منبع اداری</button>
-   </div>
-  </section>}
+  <p className="settingsBack">خودروها، مترجمان و زمان‌های در دسترس آن‌ها در <Link className="textLink" href="/settings/transport">تنظیمات ← خودروها و مترجمان</Link> تعریف می‌شوند.</p>
   <section className="panel" style={{padding:20,marginTop:16}}>
-   <h2>۲. بازه زمانی و ظرفیت پیشنهادی</h2>
+   <h2>۱. انتخاب خودرو یا مترجم و زمان</h2>
    <div style={{display:'grid',gap:10,maxWidth:610}}>
     <label>منبع<select value={resourceId} onChange={e=>{setResourceId(e.target.value);void loadWindows(e.target.value).catch(x=>setError((x as Error).message));}}>
      <option value="">انتخاب منبع</option>{resources.map(r=><option key={r.id} value={r.id}>{r.label} ({label(r.kind)})</option>)}
     </select></label>
     <label>شروع<input type="datetime-local" value={start} onChange={e=>setStart(e.target.value)}/></label>
     <label>پایان<input type="datetime-local" value={end} onChange={e=>setEnd(e.target.value)}/></label>
-    <label>مرجع اداری غیرحساس<input value={reference} onChange={e=>setReference(e.target.value)}/></label>
-    {role==='admin'&&<button disabled={busy||!resourceId||!start||!end||end<=start||reference.length<6}
-      onClick={()=>void send(ROOT+'/resources/'+resourceId+'/windows',{
-       starts_at:new Date(start).toISOString(),ends_at:new Date(end).toISOString(),reference
-      })}>ثبت بازه پیشنهادی</button>}
     {windows.map(w=><div key={w.id} style={{padding:8,borderTop:'1px solid #d4dde7'}}>
      <span>{new Date(w.starts_at).toLocaleString('fa-IR')} تا {new Date(w.ends_at).toLocaleString('fa-IR')} · {fa(w.status)}</span>
-     {role==='admin'&&w.status==='proposed'&&<button disabled={busy} onClick={()=>void send(ROOT+'/windows/'+w.id+'/revoke',{})}>لغو بازه آزاد</button>}
     </div>)}
    </div>
   </section>
   <section className="panel" style={{padding:20,marginTop:16}}>
-   <h2>۳. درخواست برای پرونده بیمار</h2>
+   <h2>۲. درخواست برای پرونده بیمار</h2>
    <div style={{display:'grid',gap:10,maxWidth:610}}>
     <label>پرونده<select value={caseId} onChange={e=>{setCaseId(e.target.value);void loadCase(e.target.value).catch(x=>setError((x as Error).message));}}>
      <option value="">انتخاب پرونده</option>{cases.map(x=><option key={x.id} value={x.id}>{x.id.slice(0,8)} · {fa(x.status)}</option>)}
@@ -154,7 +132,8 @@ export default function TravelCoordination(){
    </div>
   </section>
   <section className="panel" style={{padding:20,marginTop:16}}>
-   <h2>۴. تخصیص و پیگیری انسانی</h2>
+   <h2>۳. تخصیص و تأیید ارائه‌دهنده</h2>
+   <label>شماره مرجع (لاتین، حداقل ۶ نویسه)<input dir="ltr" value={reference} onChange={e=>setReference(e.target.value)}/></label>
    <label>عنوان میز ارائه‌دهنده (فقط برای گزارش تماس)<input value={supplier} onChange={e=>setSupplier(e.target.value)} placeholder="مثلاً: واحد اعزام شرکت ترانسفر"/></label>
    {rows.map(x=><div key={x.id} style={{padding:'14px 0',borderTop:'1px solid #d4dde7'}}>
     <strong>{label(x.kind)} · {label(x.status)} · {new Date(x.starts_at).toLocaleString('fa-IR')}</strong>

@@ -7,7 +7,7 @@ type Travel={visa:{status:string,visa_type:string,decision:string|null,intended_
  accommodation:{hotel:string,city:string,check_in:string,check_out:string,room_type:string,guests:number,status:string,confirmed:boolean}[],
  transfers:{kind:string,starts_at:string,ends_at:string,from:string,to:string,passengers:number,status:string,confirmed:boolean}[],
  readiness:{ready_to_travel:boolean,pending:string[],departure_at:string|null}};
-type Org={display_name:string,contact_email:string,contact_phone:string,website:string,privacy_notice_url:string,patient_support_hours:string};
+type Org={privacy_notice_version:string,display_name:string,contact_email:string,contact_phone:string,website:string,privacy_notice_url:string,patient_support_hours:string};
 type ChatMessage={sender:string,body:string,language:string};
 
 const LANGUAGE_LABELS:Record<string,string>={fa:'فارسی',ar:'العربية',en:'English',ps:'پښتو',prs:'دری'};
@@ -48,7 +48,7 @@ function fmtDate(value:string){const d=new Date(value);return Number.isNaN(d.get
 export default function PatientPortal(){
  const [invite,setInvite]=useState(''),[otp,setOtp]=useState(''),[otpBusy,setOtpBusy]=useState(false);
  const [org,setOrg]=useState<Org|null>(null);
- const [consents,setConsents]=useState<Record<string,boolean>>({}),[consentNotice,setConsentNotice]=useState('v1');
+ const [consents,setConsents]=useState<Record<string,boolean>>({});
  const [token,setToken]=useState(''),[patient,setPatient]=useState<{name:string,language:string}|null>(null),[journey,setJourney]=useState<Journey[]>([]);
  const [intake,setIntake]=useState<{id:string;case_id:string;status:string;next_prompt:string|null;language:string;stage:number}|null>(null);
  const [intakeAnswer,setIntakeAnswer]=useState('');
@@ -114,7 +114,7 @@ export default function PatientPortal(){
   if(!accepted&&!window.confirm('با لغو این رضایت، نشست شما بسته می‌شود و برای ورود دوباره به دعوت جدید نیاز دارید. ادامه می‌دهید؟'))return;
   setBusy(true);setError('');
   try{
-   await call('/consents',{method:'POST',body:JSON.stringify({purpose,accepted,notice_version:consentNotice})});
+   await call('/consents',{method:'POST',body:JSON.stringify({purpose,accepted,notice_version:org?.privacy_notice_version||'v1'})});
    if(!accepted){await logout();setNotice('رضایت لغو و نشست بسته شد. برای دسترسی دوباره دعوت جدید لازم است.');}
    else setConsents(x=>({...x,[purpose]:true}));
   }catch(e){setError((e as Error).message);}finally{setBusy(false);}
@@ -154,11 +154,11 @@ export default function PatientPortal(){
    <section className="panel portalPanel">
     <h2>رضایت‌های من</h2>
     <p className="subtle">هر تغییر ثبت می‌شود. لغو هر رضایت، نشست فعلی را می‌بندد.</p>
-    <label className="noticeField">نسخه اطلاعیه حریم خصوصی<input dir="ltr" required value={consentNotice} onChange={e=>setConsentNotice(e.target.value)} maxLength={40}/></label>
+    {org?.privacy_notice_url&&<p><a className="textLink" href={org.privacy_notice_url} target="_blank" rel="noopener noreferrer">پیش از تصمیم، اطلاعیه حریم خصوصی را بخوانید</a></p>}
     <div className="consentList">{Object.entries(consents).map(([purpose,accepted])=><div key={purpose} className="consentRow">
      <span>{fa(purpose)}</span>
      <span className={'badge '+(accepted?'':'muted')}>{accepted?'فعال':'غیرفعال'}</span>
-     <button className={accepted?'button secondary':'button'} disabled={busy||!consentNotice.trim()} onClick={()=>void changeConsent(purpose,!accepted)}>{accepted?'لغو رضایت':'اعطای رضایت'}</button>
+     <button className={accepted?'button secondary':'button'} disabled={busy} onClick={()=>void changeConsent(purpose,!accepted)}>{accepted?'لغو رضایت':'اعطای رضایت'}</button>
     </div>)}</div>
    </section>
    {journey.map(c=><section key={c.case_id} className="panel portalPanel">

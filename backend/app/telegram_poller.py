@@ -215,7 +215,8 @@ async def poll_batch(client: httpx.AsyncClient, redis: Redis, cfg: PollingConfig
             greeting = _greeting_locale(update) if saved_locale is None else None
             selected = explicit or saved_locale or greeting
             localized = _with_locale(update, selected) if selected else update
-            safe = telegram._safe_reply(localized, cfg.operator_contact_url)
+            operator_url = await telegram.operator_contact_url(cfg.redis_url, cfg.operator_contact_url, client=redis)
+            safe = telegram._safe_reply(localized, operator_url)
             key = telegram._dedup_key(update_id, cfg.secret)
             owner = secrets.token_urlsafe(24)
             claimed = await telegram._claim(cfg.redis_url, key, owner, client=redis)
@@ -232,7 +233,7 @@ async def poll_batch(client: httpx.AsyncClient, redis: Redis, cfg: PollingConfig
                 started = time.monotonic()
                 try:
                     await telegram._send_message(cfg.token, cfg.chat_id, safe[1], cfg.privacy_url,
-                                                 reply_markup=telegram._reply_markup(localized, cfg.operator_contact_url),
+                                                 reply_markup=telegram._reply_markup(localized, operator_url),
                                                  client=client)
                 except (httpx.HTTPError, ValueError):
                     await telegram._finish(cfg.redis_url, key, owner, sent=False, client=redis)
