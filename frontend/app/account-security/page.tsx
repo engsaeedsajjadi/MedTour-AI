@@ -3,27 +3,35 @@ import Shell from '@/components/Shell';
 import {request,logout} from '@/lib/api';
 import {useEffect,useState} from 'react';
 import {fa} from '@/lib/i18n';
+import QRCode from 'qrcode';
 type Status={enabled:boolean;enrollment_pending:boolean;method:string;recovery_codes_configured:boolean};
 type Enroll={secret:string;otpauth_uri:string;expires_in:number};
 type Staff={id:string;email:string;role:string;active:boolean;auth_version:number};
 export default function SecurityPage(){
  const [status,setStatus]=useState<Status|null>(null),[members,setMembers]=useState<Staff[]>([]);
  const [role,setRole]=useState('');
- const [secret,setSecret]=useState(''),[uri,setUri]=useState('');
+ const [secret,setSecret]=useState(''),[uri,setUri]=useState(''),[qr,setQr]=useState('');
  const [code,setCode]=useState(''),[pwd,setPwd]=useState(''),[newPwd,setNewPwd]=useState('');
  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
  async function reload(){
   const [s,me]=await Promise.all([request<Status>('/auth/mfa/status'),
    request<{role:string}>('/auth/me')]);
   setStatus(s);setRole(me.role);
-  if(me.role==='admin')setMembers((await request<{items:Staff[]}>('/auth/staff')).items);
+  // The staff list is only reachable after the second factor is active; never let it block enrolment.
+  if(me.role==='admin'&&s.enabled){
+   try{setMembers((await request<{items:Staff[]}>('/auth/staff')).items);}catch{setMembers([]);}
+  }
  }
  useEffect(()=>{void reload().catch(e=>setError((e as Error).message));},[]);
+ // QR is drawn locally in the browser; the enrolment key never leaves this page.
+ useEffect(()=>{if(!uri){setQr('');return;}
+  QRCode.toDataURL(uri,{margin:1,width:220,errorCorrectionLevel:'M'}).then(setQr).catch(()=>setQr(''));},[uri]);
  async function action<T>(path:string,data?:object,method='POST'):Promise<T|null>{
   setBusy(true);setError('');setNotice('');
   try{
    const result=await request<T>(path,{method,body:data?JSON.stringify(data):undefined});
-   await reload();return result;
+   // A failed refresh must not hide a successful action (e.g. the one-time enrolment key).
+   await reload().catch(()=>{});return result;
   }catch(e){setError((e as Error).message);return null;}finally{setBusy(false);}
  }
  async function setup(){
@@ -35,7 +43,7 @@ export default function SecurityPage(){
   const result=await action<{enabled:boolean;access_token:string;refresh_token:string}>('/auth/mfa/confirm',{code});
   if(result){sessionStorage.setItem('medtour_token',result.access_token);
    sessionStorage.setItem('medtour_refresh',result.refresh_token);
-   setSecret('');setUri('');setCode('');setNotice('عامل دوم فعال و نشست‌های قبلی باطل شدند.');}
+   setSecret('');setUri('');setQr('');setCode('');setNotice('عامل دوم فعال و نشست‌های قبلی باطل شدند.');}
  }
  async function change(){
   const result=await action<{changed:boolean}>('/auth/password/change',{current_password:pwd,new_password:newPwd});
@@ -50,10 +58,11 @@ export default function SecurityPage(){
    <p>وضعیت: <strong>{status?.enabled?'فعال':'غیرفعال'}</strong> · روش: کد یک‌بارمصرف زمان‌دار · کدهای بازیابی: ارائه نشده‌اند</p>
    {!status?.enabled&&<button className="button" disabled={busy} onClick={()=>void setup()}>ساخت کلید راه‌اندازی ورود دومرحله‌ای</button>}
    {secret&&<div style={{marginTop:15}}>
-    <p>کلید محرمانه برای افزودن دستی به برنامه احراز هویت:</p>
+    <p>۱) در Google Authenticator یا برنامه مشابه، گزینه «اسکن کد QR» را بزنید و این کد را اسکن کنید:</p>
+    {qr&&<img src={qr} width={220} height={220} alt="کد QR راه‌اندازی ورود دومرحله‌ای" style={{background:'#fff',padding:8,borderRadius:8}}/>}
+    <p>اگر اسکن ممکن نیست، گزینه «وارد کردن کلید راه‌اندازی» را بزنید و این کلید را وارد کنید:</p>
     <code dir="ltr" style={{display:'block',overflowWrap:'anywhere'}}>{secret}</code>
-    <p>می‌توانید با برنامه احراز هویت، پیوند زیر را نیز باز کنید:</p>
-    <code dir="ltr" style={{display:'block',overflowWrap:'anywhere'}}>{uri}</code>
+    <p>۲) کد شش‌رقمی که برنامه نشان می‌دهد را وارد کنید:</p>
     <label>کد شش‌رقمی<input dir="ltr" type="text" inputMode="numeric"
      maxLength={6} pattern="[0-9]{6}" value={code} onChange={e=>setCode(e.target.value)}/></label>
     <button className="button" disabled={busy||!/^[0-9]{6}$/.test(code)} onClick={()=>void confirm()}>تأیید و فعال‌سازی</button>
