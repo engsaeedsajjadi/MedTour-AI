@@ -24,11 +24,25 @@ services:
       interval: 5s
       timeout: 3s
       retries: 15
+  migrate:
+    build: ./backend
+    env_file: .env
+    environment:
+      # Migrations run as the database owner; the API never does.
+      DATABASE_URL: ${MIGRATION_DATABASE_URL:-postgresql+psycopg://medtour:${POSTGRES_PASSWORD}@db:5432/medtour}
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["sh", "-c", "python -m alembic upgrade head && python -m app.provision_db"]
+    restart: "no"
   api:
     build: ./backend
     env_file: .env
     environment:
       PRIVATE_DOCUMENT_DIR: /home/appuser/.medtour_documents
+      # Non-privileged role: no superuser, no BYPASSRLS. Row-level security isolates tenants.
+      DATABASE_URL: postgresql+psycopg://medtour_app:${APP_DB_PASSWORD:?Set APP_DB_PASSWORD in .env (16+ letters and digits)}@db:5432/medtour
+      RLS_ENFORCEMENT: ${RLS_ENFORCEMENT:-required}
     volumes:
       - medtour_secure_dev:/home/appuser/.medtour_documents
     ports:
@@ -38,7 +52,9 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: ["sh", "-c", "python -m alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+      migrate:
+        condition: service_completed_successfully
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health/ready', timeout=3)"]
       interval: 10s
@@ -48,12 +64,18 @@ services:
     profiles: ["messaging"]
     build: ./backend
     env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://medtour_app:${APP_DB_PASSWORD:?Set APP_DB_PASSWORD in .env}@db:5432/medtour
+      # The delivery worker processes the outbox of every tenant.
+      MEDTOUR_WORKER_SCOPE: system
     command: ["python", "-m", "app.outbound_worker"]
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     restart: on-failure
     healthcheck:
       test: ["CMD", "python", "-m", "app.worker_healthcheck"]
@@ -61,6 +83,55 @@ services:
       timeout: 5s
       start_period: 15s
       retries: 3
+  telegram-gateway:
+    profiles: ["telegram"]
+    build: ./backend
+    command: ["uvicorn", "app.telegram_entrypoint:app", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      TELEGRAM_BOT_ENABLED: ${TELEGRAM_BOT_ENABLED:-false}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
+      PUBLIC_PRIVACY_NOTICE_URL: ${PUBLIC_PRIVACY_NOTICE_URL:-}
+      PUBLIC_OPERATOR_CONTACT_URL: ${PUBLIC_OPERATOR_CONTACT_URL:-}
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "127.0.0.1:8001:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+  telegram-poller:
+    # DEVELOPMENT / ALLOWLISTED TEST ONLY; does not expose a port or clinical APIs.
+    profiles: ["telegram-polling"]
+    build: ./backend
+    command: ["python", "-m", "app.telegram_poller"]
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      TELEGRAM_POLLING_ENABLED: ${TELEGRAM_POLLING_ENABLED:-false}
+      TELEGRAM_POLLING_TEST_MODE: ${TELEGRAM_POLLING_TEST_MODE:-false}
+      TELEGRAM_POLLING_CHAT_ID: ${TELEGRAM_POLLING_CHAT_ID:-}
+      TELEGRAM_BOT_ENABLED: ${TELEGRAM_BOT_ENABLED:-false}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
+      PUBLIC_PRIVACY_NOTICE_URL: ${PUBLIC_PRIVACY_NOTICE_URL:-}
+      PUBLIC_OPERATOR_CONTACT_URL: ${PUBLIC_OPERATOR_CONTACT_URL:-}
+      REDIS_URL: redis://redis:6379/0
+      # Optional outbound HTTP proxy for api.telegram.org only (networks where Telegram is blocked),
+      # e.g. http://host.docker.internal:10809. Empty means direct connection.
+      HTTPS_PROXY: ${TELEGRAM_HTTPS_PROXY:-}
+      NO_PROXY: redis,localhost,127.0.0.1
+    depends_on:
+      redis:
+        condition: service_healthy
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
   web:
     build: ./frontend
     environment:
@@ -68,11 +139,80 @@ services:
       INTERNAL_API_URL: http://api:8000
       PUBLIC_SITE_URL: ${PUBLIC_SITE_URL:-}
     ports:
-      - "127.0.0.1:3000:3000"
+      # Change WEB_PORT in .env when 3000 is taken (also add that origin to CORS_ORIGINS).
+      - "127.0.0.1:${WEB_PORT:-3000}:3000"
     depends_on:
       api:
         condition: service_healthy
+  # --- Secure medical document storage (docker compose --profile secure-storage up -d) ---
+  minio:
+    profiles: ["secure-storage"]
+    build: ./deploy/minio
+    image: medtour-minio:RELEASE.2025-10-15T17-29-55Z
+    entrypoint: ["sh", "-c"]
+    # Profile services must not block other compose commands, so required values are checked here.
+    command:
+      - |
+        if [ -z "$$MINIO_ROOT_USER" ] || [ "$${#MINIO_ROOT_PASSWORD}" -lt 12 ]; then
+          echo "Set MINIO_ROOT_USER and MINIO_ROOT_PASSWORD (12+ chars) in .env for --profile secure-storage" >&2; exit 1
+        fi
+        exec minio server /data --console-address :9001
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-}
+    volumes:
+      - medtour_minio:/data
+    ports:
+      - "127.0.0.1:9001:9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+  minio-init:
+    profiles: ["secure-storage"]
+    image: medtour-minio:RELEASE.2025-10-15T17-29-55Z
+    pull_policy: never
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        set -e
+        for v in MINIO_ROOT_USER MINIO_ROOT_PASSWORD AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY; do
+          eval "x=\$$$$v"; [ -n "$$x" ] || { echo "Set $$v in .env for --profile secure-storage" >&2; exit 1; }
+        done
+        mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"
+        mc mb --ignore-existing local/"$$MEDICAL_S3_BUCKET"
+        mc anonymous set none local/"$$MEDICAL_S3_BUCKET"
+        mc version enable local/"$$MEDICAL_S3_BUCKET"
+        # The API user may only read, write and delete objects in the medical bucket.
+        printf '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:GetObject","s3:PutObject","s3:DeleteObject","s3:GetObjectVersion","s3:DeleteObjectVersion"],"Resource":["arn:aws:s3:::%s/*"]},{"Effect":"Allow","Action":["s3:ListBucket","s3:GetBucketLocation","s3:ListBucketVersions"],"Resource":["arn:aws:s3:::%s"]}]}' "$$MEDICAL_S3_BUCKET" "$$MEDICAL_S3_BUCKET" > /tmp/medtour-medical-rw.json
+        mc admin policy create local medtour-medical-rw /tmp/medtour-medical-rw.json
+        mc admin user add local "$$AWS_ACCESS_KEY_ID" "$$AWS_SECRET_ACCESS_KEY"
+        mc admin policy attach local medtour-medical-rw --user "$$AWS_ACCESS_KEY_ID" || echo "policy already attached"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-}
+      MEDICAL_S3_BUCKET: ${MEDICAL_S3_BUCKET:-medtour-medical}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+    restart: "no"
+  clamav:
+    profiles: ["secure-storage"]
+    image: clamav/clamav:1.4
+    volumes:
+      - medtour_clamav:/var/lib/clamav
+    healthcheck:
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      start_period: 300s
+      retries: 10
 volumes:
+  medtour_minio:
+  medtour_clamav:
   medtour_secure_dev:
   medtour_redis:
   medtour_pg:

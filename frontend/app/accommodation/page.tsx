@@ -1,7 +1,10 @@
 'use client';
 import {useEffect,useState} from 'react';
+import Link from 'next/link';
 import Shell from '@/components/Shell';
+import OrgList from '@/components/OrgList';
 import {request} from '@/lib/api';
+import {fa,fmtDateTime} from '@/lib/i18n';
 
 type Hotel={id:string;name:string;city:string;status:string};
 type Capacity={id:string;room_type:string;proposed_rooms:number;starts_on:string;ends_on:string;status:string;reference:string};
@@ -28,9 +31,8 @@ const afterWeek=()=>new Date(Date.now()+7*86400000).toISOString().slice(0,10);
 export default function Accommodation(){
  const [role,setRole]=useState(''),[hotels,setHotels]=useState<Hotel[]>([]),[cases,setCases]=useState<CaseRow[]>([]);
  const [caseId,setCaseId]=useState(''),[propertyId,setPropertyId]=useState('');
- const [hotelName,setHotelName]=useState(''),[city,setCity]=useState('');
- const [roomType,setRoomType]=useState('double'),[start,setStart]=useState(tomorrow()),[end,setEnd]=useState(afterWeek());
- const [rooms,setRooms]=useState(1),[guests,setGuests]=useState(2),[inventoryCount,setInventoryCount]=useState(1);
+  const [roomType,setRoomType]=useState('double'),[start,setStart]=useState(tomorrow()),[end,setEnd]=useState(afterWeek());
+ const [rooms,setRooms]=useState(1),[guests,setGuests]=useState(2);
  const [reference,setReference]=useState(''),[supplier,setSupplier]=useState('');
  const [capacity,setCapacity]=useState<Capacity[]>([]),[stays,setStays]=useState<Stay[]>([]);
  const [history,setHistory]=useState<Record<string,Event[]>>({});
@@ -83,21 +85,13 @@ export default function Accommodation(){
  }
  return <Shell title="هماهنگی اقامت و هتل">
   <div className="infoBanner">
-   فقط داده ساختگی در محیط توسعه. فهرست هتل‌ها و ظرفیت‌های آن‌ها صرفاً ثبت محلی هستند و با سامانه واقعی هتل همگام‌سازی نمی‌شوند. تخصیص داخلی یا ثبت پاسخ مثبت ارائه‌دهنده، به معنی رزرو تأییدشده نیست. این صفحه برای اطلاعات هویتی، گذرنامه و شرح پزشکی بیمار نیست.
+   هتل‌ها و ظرفیت‌ها توسط تیم شما ثبت می‌شوند و به سامانه رزرو هتل متصل نیستند. رزرو فقط زمانی قطعی است که تأییدیه کتبی هتل دریافت و شماره آن در «ثبت تأیید هتل» وارد شود. اطلاعات هویتی، گذرنامه یا شرح پزشکی بیمار را اینجا وارد نکنید.
   </div>
   {error&&<div className="errorBox" role="alert">{error}</div>}
   {notice&&<div className="infoBanner" role="status">{notice}</div>}
-  {role==='admin'&&<section className="panel" style={{padding:20,marginTop:16}}>
-   <h2>۱. معرفی محل اقامت (ثبت داخلی)</h2>
-   <div style={{display:'grid',gap:10,maxWidth:540}}>
-    <label>نام هتل آزمایشی<input value={hotelName} onChange={e=>setHotelName(e.target.value)}/></label>
-    <label>شهر<input value={city} onChange={e=>setCity(e.target.value)}/></label>
-    <button disabled={busy||hotelName.length<3||city.length<2} onClick={()=>void submit(
-     ROOT+'/properties',{name:hotelName,city})}>ثبت محل اقامت داخلی</button>
-   </div>
-  </section>}
+  <p className="settingsBack">هتل‌ها و ظرفیت اتاق‌ها در <Link className="textLink" href="/settings/hotels">تنظیمات ← هتل‌ها و ظرفیت اتاق</Link> تعریف می‌شوند.</p>
   <section className="panel" style={{padding:20,marginTop:16}}>
-   <h2>۲. ظرفیت پیشنهادی اتاق</h2>
+   <h2>۱. انتخاب هتل و تاریخ اقامت</h2>
    <div style={{display:'grid',gap:10,maxWidth:590}}>
     <label>محل اقامت<select value={propertyId} onChange={e=>{
      setPropertyId(e.target.value);
@@ -107,31 +101,21 @@ export default function Accommodation(){
      {roomTypes.map(x=><option key={x} value={x}>{label(x)}</option>)}</select></label>
     <label>ورود (شامل این شب)<input type="date" min={today()} value={start} onChange={e=>setStart(e.target.value)}/></label>
     <label>خروج (روز خروج شامل اقامت نیست)<input type="date" min={start} value={end} onChange={e=>setEnd(e.target.value)}/></label>
-    {role==='admin'&&<>
-     <label>تعداد اتاق پیشنهادی<input type="number" min={1} max={100} value={inventoryCount} onChange={e=>setInventoryCount(Number(e.target.value))}/></label>
-     <label>مرجع اداری غیرحساس<input value={reference} onChange={e=>setReference(e.target.value)}/></label>
-     <button disabled={busy||!propertyId||!start||!end||end<=start||reference.length<6}
-      onClick={()=>void submit(ROOT+'/properties/'+propertyId+'/inventory',{
-       room_type:roomType,starts_on:start,ends_on:end,
-       proposed_rooms:inventoryCount,reference
-      })}>ثبت ظرفیت پیشنهادی (نه موجودی زنده)</button>
-    </>}
    </div>
    <div style={{marginTop:12}}>
     {capacity.map(c=><div key={c.id} style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'center',borderTop:'1px solid #d4dde7',padding:'10px 0'}}>
      <span>{label(c.room_type)} · {c.proposed_rooms} اتاق · {c.starts_on} تا {c.ends_on} · {label(c.status)}</span>
-     {role==='admin'&&c.status==='proposed'&&<button disabled={busy} onClick={()=>void submit(ROOT+'/inventory/'+c.id+'/revoke',{})}>لغو ظرفیت آزاد</button>}
     </div>)}
    </div>
   </section>
   <section className="panel" style={{padding:20,marginTop:16}}>
-   <h2>۳. درخواست اقامت برای پرونده</h2>
+   <h2>۲. درخواست اقامت برای پرونده</h2>
    <p>رضایت «پذیرش اولیه» و رضایت جداگانه «هماهنگی اقامت» باید برای بیمار فعال باشد. فعال‌سازی رضایت از مسیر امن و با اطلاع بیمار انجام می‌شود.</p>
    <div style={{display:'grid',gap:10,maxWidth:590}}>
     <label>پرونده<select value={caseId} onChange={e=>{
      setCaseId(e.target.value);setHistory({});
      void loadStays(e.target.value).catch(x=>setError((x as Error).message));
-    }}><option value="">انتخاب پرونده</option>{cases.map(c=><option key={c.id} value={c.id}>{c.id.slice(0,8)} · {c.status}</option>)}</select></label>
+    }}><option value="">انتخاب پرونده</option>{cases.map(c=><option key={c.id} value={c.id}>{c.id.slice(0,8)} · {fa(c.status)}</option>)}</select></label>
     <label>تعداد اتاق برای پرونده<input type="number" min={1} max={5} value={rooms} onChange={e=>setRooms(Number(e.target.value))}/></label>
     <label>تعداد مهمان (بدون نام و اطلاعات هویتی)<input type="number" min={1} max={20} value={guests} onChange={e=>setGuests(Number(e.target.value))}/></label>
     <button disabled={busy||!caseId||!propertyId||!start||!end||end<=start}
@@ -142,9 +126,10 @@ export default function Accommodation(){
    </div>
   </section>
   <section className="panel" style={{padding:20,marginTop:16}}>
-   <h2>۴. مراحل پیگیری داخلی</h2>
+   <h2>۳. پیگیری و تأیید هتل</h2>
+   <label>شماره مرجع (لاتین، حداقل ۶ نویسه؛ مثلاً شماره تأییدیه هتل)<input dir="ltr" value={reference} onChange={e=>setReference(e.target.value)}/></label>
    <label>نام مرجع ارائه‌دهنده برای گزارش تماس (حداقل ۶ حرف لاتین)
-    <input maxLength={100} value={supplier} onChange={e=>setSupplier(e.target.value)} placeholder="Synthetic Hotel Desk"/>
+    <input maxLength={100} dir="ltr" list="supplier-desks" value={supplier} onChange={e=>setSupplier(e.target.value)} placeholder="از فهرست تنظیمات انتخاب کنید"/><OrgList id="supplier-desks" kind="supplier_desks"/>
    </label>
    {stays.length===0?<p>برای این پرونده درخواستی موجود نیست یا رضایت فعال نیست.</p>:
     stays.map(s=><div key={s.id} style={{borderTop:'1px solid #d4dde7',padding:'14px 0',display:'grid',gap:10}}>
@@ -163,7 +148,7 @@ export default function Accommodation(){
        <button disabled={busy||reference.length<6} onClick={()=>transition(s.id,'cancel')}>لغو درخواست داخلی</button>}
      </div>}
      <button disabled={busy} onClick={()=>void historyFor(s.id)}>نمایش سوابق</button>
-     {history[s.id]?.map((e,i)=><p key={i}>{new Date(e.at).toLocaleString('fa-IR')} · {e.action} · {label(e.previous)} → {label(e.current)} · {e.reference}</p>)}
+     {history[s.id]?.map((e,i)=><p key={i}>{fmtDateTime(e.at)} · {fa(e.action)} · {label(e.previous)} → {label(e.current)} · {e.reference}</p>)}
     </div>)}
   </section>
  </Shell>;

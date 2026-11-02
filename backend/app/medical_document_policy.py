@@ -102,7 +102,11 @@ def load_document(row, tenant_id: str, *, local_enabled: bool, cipher_factory) -
     if row.status == "scanned_private_s3":
         if not s3_ready():
             raise HTTPException(503, "Approved object storage not configured")
-        raw = s3_load(row.storage_key, tenant_id, row.id, row.sha256_hex or "")
+        if getattr(row, "wrapped_key", None):
+            from .secure_media import s3_load_encrypted
+            raw = s3_load_encrypted(row.storage_key, tenant_id, row.id, row.sha256_hex or "", row.wrapped_key)
+        else:
+            raw = s3_load(row.storage_key, tenant_id, row.id, row.sha256_hex or "")
     else:
         if not local_enabled:
             raise HTTPException(503, "Development document store disabled")

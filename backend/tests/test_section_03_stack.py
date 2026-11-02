@@ -1,5 +1,6 @@
 """Synthetic architecture and worker tests. No internet, accounts or real patient data."""
 import os
+import pytest
 
 from app import delivery, outbound_worker, stack_health
 from app.enterprise_models import OutboundMessage
@@ -45,6 +46,7 @@ def _ready_outbound(seeded):
     return queued.json()["id"], Session
 
 
+@pytest.mark.skipif(bool(os.environ.get("MEDTOUR_TEST_PG")), reason="SQLite-only: PostgreSQL readiness checks the Alembic head")
 def test_stack_ready_dev_is_explicit_about_skipped_migration(context, monkeypatch):
     client, _, _, _ = context
     monkeypatch.delenv("REDIS_URL", raising=False)

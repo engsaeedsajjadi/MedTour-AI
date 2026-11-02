@@ -1,8 +1,11 @@
 'use client';
+import {cachedOrganization} from '@/lib/preferences';
 
 import {useEffect,useState} from 'react';
+import Link from 'next/link';
 import Shell from '@/components/Shell';
 import {request,downloadPdf} from '@/lib/api';
+import {fa,fmtDateTime} from '@/lib/i18n';
 
 type Quote={id:string;case_id:string;currency:string;amount_minor:number;status:string};
 type CaseRow={id:string;status:string};
@@ -23,13 +26,11 @@ export default function Quotations(){
  const [quoteId,setQuoteId]=useState('');
  const [caseId,setCaseId]=useState('');
  const [currency,setCurrency]=useState('USD');
+ useEffect(()=>{const c=cachedOrganization()?.default_currency;if(c)setCurrency(c);},[]);
  const [lines,setLines]=useState<QuoteLine[]>([freshLine()]);
  const [versions,setVersions]=useState<Version[]>([]);
  const [role,setRole]=useState('');
  const [reference,setReference]=useState('');
- const [rateFrom,setRateFrom]=useState('EUR'),[rateTo,setRateTo]=useState('USD');
- const [num,setNum]=useState('1'),[den,setDen]=useState('1');
- const [rateRef,setRateRef]=useState(''),[expires,setExpires]=useState('');
  const [notice,setNotice]=useState(''),[error,setError]=useState('');
  const [busy,setBusy]=useState(false);
 
@@ -62,7 +63,7 @@ export default function Quotations(){
   setBusy(true);setNotice('');setError('');
   try{
    const result=await request<{id?:string}>(path,{method,body:JSON.stringify(body)});
-   setNotice('ثبت در سیستم داخلی انجام شد؛ این نتیجه تأیید مالی یا رزرو واقعی ارائه‌دهنده نیست.');
+   setNotice('در سامانه ثبت شد. تأیید نهایی مالی و رزرو با ارائه‌دهنده جداگانه انجام می‌شود.');
    await refresh();
    if(result.id&&path==='/quotes'){
     setQuoteId(result.id);await readVersions(result.id);
@@ -77,15 +78,6 @@ export default function Quotations(){
    lines:lines.map(x=>({...x,fx_rate_id:x.fx_rate_id||null}))
   });
  }
- async function createRate(e:React.FormEvent){
-  e.preventDefault();
-  if(!expires||!num||!den)return;
-  await action(ROOT+'/fx-rates','POST',{
-   source_currency:rateFrom,target_currency:rateTo,
-   numerator:Number(num),denominator:Number(den),
-   source_reference:rateRef,expires_at:new Date(expires).toISOString()
-  });
- }
  async function exportVersion(id:string){
   setError('');
   try{await downloadPdf(ROOT+'/versions/'+encodeURIComponent(id)+'/pdf','medtour-quotation-'+id+'.pdf')}
@@ -93,7 +85,7 @@ export default function Quotations(){
  }
  return <Shell title="پیش‌فاکتورها و نسخه‌های مالی">
   <div className="infoBanner">
-   محیط توسعه، فقط داده ساختگی. قیمت‌ها و نرخ ارز باید از منابع واقعی به‌صورت دستی بررسی و مستند شوند؛ سامانه دریافت نرخ زنده، محاسبه قانونی مالیات، تأیید صورتحساب بیمارستان یا پرداخت واقعی ندارد. نسبت FX بر حسب کوچک‌ترین واحد پول مبدا به مقصد است، نه نرخ هر واحد اصلی.
+   قیمت‌ها و نرخ ارز را از منابع معتبر (تعرفه بیمارستان و نرخ رسمی ارز) وارد و مستند کنید؛ نرخ ارز به‌صورت خودکار دریافت نمی‌شود و پرداخت از این صفحه انجام نمی‌شود. نسبت نرخ ارز بر حسب کوچک‌ترین واحد پول مبدأ به مقصد است، نه نرخ هر واحد اصلی.
   </div>
   {error&&<div role="alert" className="errorBox">{error}</div>}
   {notice&&<div role="status" className="infoBanner">{notice}</div>}
@@ -102,16 +94,16 @@ export default function Quotations(){
    <div style={{display:'flex',gap:12,flexWrap:'wrap',alignItems:'end'}}>
     <label>پرونده
      <select value={caseId} onChange={e=>setCaseId(e.target.value)}>
-      {cases.map(x=><option key={x.id} value={x.id}>{x.id.slice(0,8)} · {x.status}</option>)}
+      {cases.map(x=><option key={x.id} value={x.id}>{x.id.slice(0,8)} · {fa(x.status)}</option>)}
      </select>
     </label>
     <label>ارز خروجی
      <select value={currency} onChange={e=>setCurrency(e.target.value)}>
-      {currencies.map(x=><option key={x} value={x}>{x}</option>)}
+      {currencies.map(x=><option key={x} value={x}>{fa(x)}</option>)}
      </select>
     </label>
     <button disabled={busy||!caseId} onClick={()=>void action('/quotes','POST',{
-     case_id:caseId,currency,amount_minor:0,details:'Managed source-bound quote'
+     case_id:caseId,currency,amount_minor:0,details:'پیش‌فاکتور مبتنی بر منابع قیمت مستند'
     })}>ایجاد پیش‌فاکتور بدون مبلغ دستی</button>
    </div>
   </section>
@@ -120,10 +112,11 @@ export default function Quotations(){
    <label>پیش‌فاکتور
     <select value={quoteId} onChange={e=>{setQuoteId(e.target.value);setLines([freshLine()])}}>
      <option value="">انتخاب</option>
-     {quotes.map(x=><option key={x.id} value={x.id}>{x.id.slice(0,8)} · {x.currency} · {x.status}</option>)}
+     {quotes.map(x=><option key={x.id} value={x.id}>{x.id.slice(0,8)} · {x.currency} · {fa(x.status)}</option>)}
     </select>
    </label>
    <p>ارز نهایی: <strong>{quoteCurrency}</strong> · تعداد ردیف‌ها: {lines.length} از ۵۰</p>
+   {selected&&selected.status!=='draft'?<div className="infoBanner" role="status">این پیش‌فاکتور «{fa(selected.status)}» و قفل است؛ ردیف‌ها قابل تغییر نیستند. برای برآورد تازه، پیش‌فاکتور جدیدی بسازید.</div>:<>
    {lines.map((line,i)=>{
     const source=prices.find(p=>p.id===line.price_id);
     const fxOptions=rates.filter(r=>r.source_currency===source?.currency&&r.target_currency===quoteCurrency);
@@ -143,7 +136,7 @@ export default function Quotations(){
       <select value={line.fx_rate_id||''} onChange={e=>changeLine(i,{fx_rate_id:e.target.value||null})}>
        <option value="">انتخاب مدرک نرخ ارز</option>
        {fxOptions.map(r=><option key={r.id} value={r.id}>
-        {r.numerator}/{r.denominator} · {r.source_reference} · تا {new Date(r.expires_at).toLocaleString('fa-IR')}
+        {r.numerator}/{r.denominator} · {r.source_reference} · تا {fmtDateTime(r.expires_at)}
        </option>)}
       </select>
      </label>}
@@ -155,32 +148,17 @@ export default function Quotations(){
     <button type="button" disabled={busy||!quoteId||selected?.status!=='draft'}
      onClick={()=>void createVersion()}>محاسبه و ذخیره نسخه جدید</button>
    </div>
+   </>}
   </section>
-  {role==='admin'&&<section className="panel" style={{padding:20,marginTop:16}}>
-   <h2>۳. ثبت نرخ ارز مستند به‌دست مدیر</h2>
-   <p>مقدار نمونه یا تخمینی ثبت نکنید. نسبت عدد صحیح «جزء پول مبدأ → جزء پول مقصد» همراه مرجع قابل پیگیری و انقضای حداکثر ۳۰ روز است؛ این سیستم صحت مرجع را به‌صورت مستقل اثبات نمی‌کند.</p>
-   <form onSubmit={e=>void createRate(e)} style={{display:'grid',gap:9,maxWidth:590}}>
-    <label>ارز مبدأ <select value={rateFrom} onChange={e=>setRateFrom(e.target.value)}>
-     {currencies.map(x=><option key={x} value={x}>{x}</option>)}
-    </select></label>
-    <label>ارز مقصد <select value={rateTo} onChange={e=>setRateTo(e.target.value)}>
-     {currencies.map(x=><option key={x} value={x}>{x}</option>)}
-    </select></label>
-    <label>صورت نسبت <input required type="number" min="1" max="1000000000000" step="1" value={num} onChange={e=>setNum(e.target.value)}/></label>
-    <label>مخرج نسبت <input required type="number" min="1" max="1000000000000" step="1" value={den} onChange={e=>setDen(e.target.value)}/></label>
-    <label>مرجع مکتوب غیرحساس <input required minLength={6} maxLength={180} pattern="[A-Za-z0-9][A-Za-z0-9._:/-]{5,179}" value={rateRef} onChange={e=>setRateRef(e.target.value)}/></label>
-    <label>انقضا (حداکثر ۳۰ روز) <input required type="datetime-local" value={expires} onChange={e=>setExpires(e.target.value)}/></label>
-    <button disabled={busy||rateFrom===rateTo}>ثبت نرخ دستی قابل ممیزی</button>
-   </form>
-  </section>}
+  <p className="settingsBack">تعرفه خدمات در <Link className="textLink" href="/prices">تنظیمات ← تعرفه خدمات</Link> و نرخ ارز در <Link className="textLink" href="/settings/exchange-rates">تنظیمات ← نرخ ارز</Link> تعریف می‌شوند.</p>
   <section className="panel" style={{padding:20,marginTop:16}}>
-   <h2>۴. نسخه‌های ثبت‌شده و خروجی PDF</h2>
+   <h2>۳. نسخه‌های ثبت‌شده و خروجی PDF</h2>
    <label>مرجع تأیید اداری <input value={reference} minLength={6} maxLength={100}
     pattern="[A-Za-z0-9][A-Za-z0-9._:/-]{5,99}"
     onChange={e=>setReference(e.target.value)}/></label>
    {versions.length===0?<p>نسخه‌ای برای این پیش‌فاکتور وجود ندارد.</p>:versions.map(v=>
     <div key={v.id} style={{padding:12,borderBottom:'1px solid #d4dde7'}}>
-     <strong>نسخه {v.version} · {v.status} · {v.total_minor} {v.currency} (جزء ارز)</strong>
+     <strong>نسخه {v.version} · {fa(v.status)} · {v.total_minor} {v.currency} (جزء ارز)</strong>
      {v.lines.map((l,i)=><p key={i}>{i+1}. {l.label}: {l.units} واحد · جمع {l.line_total_minor} {v.currency}
       {l.fx_source_reference?' · FX دستی: '+l.fx_source_reference:''}</p>)}
      {v.status==='draft'&&role==='admin'&&<button disabled={busy||reference.length<6}

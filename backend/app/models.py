@@ -27,6 +27,7 @@ class User(TenantEntity, Base):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[str] = mapped_column(String(30), nullable=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    auth_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     __table_args__ = (UniqueConstraint('tenant_id', 'email'),)
 
 class Patient(TenantEntity, Base):
@@ -64,6 +65,9 @@ class Document(TenantEntity, Base):
     mime_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
     size_bytes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     sha256_hex: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    wrapped_key: Mapped[str | None] = mapped_column(String(200), nullable=True, default=None)
+    legal_hold: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    erased_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
 
 class Physician(TenantEntity, Base):
     __tablename__ = 'physicians'
@@ -136,3 +140,4 @@ class Audit(TenantEntity, Base):
     event: Mapped[str] = mapped_column(String(100))
     entity_type: Mapped[str] = mapped_column(String(60))
     entity_id: Mapped[str] = mapped_column(String(36))
+    detail: Mapped[str | None] = mapped_column(String(300), nullable=True, default=None)

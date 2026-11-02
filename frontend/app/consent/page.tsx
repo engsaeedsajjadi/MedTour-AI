@@ -1,26 +1,49 @@
 'use client';
 import {API_BASE} from '@/lib/api';
+import {fa,faError,faNetwork} from '@/lib/i18n';
 import {useEffect,useState} from 'react';
 const description:Record<string,string>={
- intake:'Collect initial non-diagnostic health service inquiry details.',
- medical_documents:'Receive and securely store medical files for qualified review.',
- communication:'Contact you about administrative treatment coordination.',
- ai_processing:'Use an approved AI processor to assist administrative translation and document summaries.'
+ intake:'دریافت اطلاعات اولیه درخواست خدمت درمانی، بدون تشخیص پزشکی.',
+ medical_documents:'دریافت و نگهداری امن مدارک پزشکی برای بررسی توسط افراد صلاحیت‌دار.',
+ communication:'تماس با شما درباره هماهنگی اداری درمان.',
+ ai_processing:'استفاده از پردازشگر هوش مصنوعی تأییدشده برای کمک به ترجمه اداری و خلاصه‌سازی مدارک.',
+ hospital_coordination:'به اشتراک گذاشتن شناسه اداری پرونده با بیمارستان برای هماهنگی.',
 };
 type Preview={purpose:string;privacy_notice_url:string|null;privacy_notice_version:string;production_notice_configured:boolean};
+async function readJson(r:Response){return r.json().catch(()=>({}));}
 export default function Consent(){
- const [token,setToken]=useState(''),[data,setData]=useState<Preview|null>(null),[choice,setChoice]=useState(false),[result,setResult]=useState(''),[error,setError]=useState('');
- useEffect(()=>{const frag=window.location.hash.slice(1);const params=new URLSearchParams(frag);const key=params.get('token')||'';window.history.replaceState({},'',window.location.pathname);setToken(key);if(!key)return;
- fetch(`${API_BASE}/api/v1/consent-links/preview?token=${encodeURIComponent(key)}`,{cache:'no-store'}).then(async r=>{const v=await r.json();if(!r.ok)throw new Error(v.detail||'Link expired');return v}).then(setData).catch(e=>setError((e as Error).message));},[]);
- async function respond(accepted:boolean){setError('');setResult('');if(!data)return;try{const r=await fetch(`${API_BASE}/api/v1/consent-links/respond`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,notice_version:data.privacy_notice_version,accepted})});const v=await r.json();if(!r.ok)throw new Error(v.detail||'Unable to save');setResult(accepted?'Consent recorded. You may close this page.':'Declined. You may close this page.');setToken('');setData(null)}catch(e){setError((e as Error).message)}}
- return <main dir="auto" style={{margin:'6vh auto',maxWidth:650,padding:28,fontFamily:'system-ui, sans-serif',border:'1px solid #dbe6ea',borderRadius:14}}>
- <h1>MedTour AI | Privacy consent</h1><p>Required for confidential international patient coordination. This is not a medical diagnosis or an emergency service.</p>
- {error&&<p role="alert" style={{color:'#a93434'}}>{error}</p>}{result&&<p role="status">{result}</p>}
- {data&&<><h2>{data.purpose}</h2><p>{description[data.purpose]||'Purpose-specific data processing'}</p>
- <p>Notice version: {data.privacy_notice_version}</p>
- {data.privacy_notice_url?<p><a href={data.privacy_notice_url} target="_blank" rel="noopener noreferrer">Read the privacy notice before deciding</a></p>:<p style={{color:'#9a6500'}}>Development environment: final legal privacy notice is not configured. Do not use with real patients.</p>}
- <label style={{display:'block',margin:'22px 0'}}><input type="checkbox" checked={choice} onChange={e=>setChoice(e.target.checked)}/> I have read the notice and I agree to this specific purpose.</label>
- <div style={{display:'flex',gap:12}}><button disabled={!choice} onClick={()=>respond(true)}>I agree</button><button onClick={()=>respond(false)}>Decline</button></div></>}
- {!token&&!data&&!result&&<p>A private consent invitation link is required.</p>}
- </main>
+ const [token,setToken]=useState(''),[data,setData]=useState<Preview|null>(null),[choice,setChoice]=useState(false),[result,setResult]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false);
+ useEffect(()=>{
+  const params=new URLSearchParams(window.location.hash.slice(1));const key=params.get('token')||'';
+  window.history.replaceState({},'',window.location.pathname);setToken(key);if(!key)return;
+  fetch(`${API_BASE}/api/v1/consent-links/preview?token=${encodeURIComponent(key)}`,{cache:'no-store'})
+   .then(async r=>{const v=await readJson(r);if(!r.ok)throw new Error(faError(v.detail,r.status));return v as Preview;})
+   .then(setData).catch(e=>setError(faNetwork(e)));
+ },[]);
+ async function respond(accepted:boolean){
+  setError('');setResult('');if(!data)return;setBusy(true);
+  try{
+   const r=await fetch(`${API_BASE}/api/v1/consent-links/respond`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,notice_version:data.privacy_notice_version,accepted})});
+   const v=await readJson(r);if(!r.ok)throw new Error(faError(v.detail,r.status));
+   setResult(accepted?'رضایت شما ثبت شد. می‌توانید این صفحه را ببندید.':'انصراف شما ثبت شد. می‌توانید این صفحه را ببندید.');setToken('');setData(null);
+  }catch(e){setError(faNetwork(e));}finally{setBusy(false);}
+ }
+ return <main className="publicCard">
+  <div className="publicBrand"><span className="brandMark" aria-hidden="true">✚</span><strong>MedTour AI</strong></div>
+  <h1>رضایت‌نامه حریم خصوصی</h1>
+  <p className="publicLead">این رضایت برای هماهنگی محرمانه درمان بین‌المللی لازم است. این صفحه تشخیص پزشکی یا خدمات اورژانس ارائه نمی‌دهد.</p>
+  {error&&<div role="alert" className="errorBox">{error}</div>}
+  {result&&<div role="status" className="successBox">{result}</div>}
+  {data&&<>
+   <h2>{fa(data.purpose)}</h2>
+   <p>{description[data.purpose]||'پردازش داده فقط برای همین هدف مشخص.'}</p>
+   <p className="subtle">نسخه اطلاعیه: <span dir="ltr">{data.privacy_notice_version}</span></p>
+   {data.privacy_notice_url
+    ?<p><a className="textLink" href={data.privacy_notice_url} target="_blank" rel="noopener noreferrer">پیش از تصمیم، اطلاعیه حریم خصوصی را بخوانید</a></p>
+    :<div className="infoBanner">متن اطلاعیه حریم خصوصی این سازمان هنوز منتشر نشده است. پیش از موافقت، درباره نحوه استفاده از اطلاعات خود از هماهنگ‌کننده بپرسید.</div>}
+   <label className="checkRow"><input type="checkbox" checked={choice} onChange={e=>setChoice(e.target.checked)}/> اطلاعیه را خوانده‌ام و با همین هدف مشخص موافقم.</label>
+   <div className="buttonRow"><button className="button" disabled={!choice||busy} onClick={()=>respond(true)}>موافقم</button><button className="button secondary" disabled={busy} onClick={()=>respond(false)}>موافق نیستم</button></div>
+  </>}
+  {!token&&!data&&!result&&!error&&<div className="infoBanner">برای ثبت رضایت به لینک دعوت اختصاصی نیاز است.</div>}
+ </main>;
 }

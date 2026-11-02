@@ -3,6 +3,7 @@ import Link from 'next/link';
 import {useEffect,useState} from 'react';
 import Shell from '@/components/Shell';
 import {request} from '@/lib/api';
+import {fa,fmtDate} from '@/lib/i18n';
 
 type Directory={
  physician_id:string;name:string;specialty:string;city:string;
@@ -63,7 +64,7 @@ export default function PhysicianAdministration(){
  const chosen=items.find(p=>p.physician_id===doctor);
  return <Shell title="مدیریت پروفایل و دسترسی پزشکان">
   <div className="infoBanner">
-   فقط داده‌های ساختگی. تأیید محلی شواهد مجوز، ارتباط بیمارستان یا حضور پیشنهادی، به معنی تأیید توسط نظام پزشکی، مجوز کار بالینی یا نوبت واقعی نیست. دسترسی مستقل پزشک تنها پس از ثبت حساب متصل و مدرک محلی معتبر امکان‌پذیر است.
+   مدارک پروانه پزشک را پیش از تأیید با استعلام از سازمان نظام پزشکی بررسی کنید. دسترسی پزشک به پرتال فقط پس از ثبت حساب متصل و مدرک معتبر فعال می‌شود.
   </div>
   {loading&&<p>در حال بارگذاری...</p>}
   {error&&<p className="errorBox" role="alert">{error}</p>}
@@ -73,7 +74,7 @@ export default function PhysicianAdministration(){
    <section className="panel" style={{padding:20}}>
     <div className="panelHeader"><h2>فهرست و انتخاب پزشک</h2>
      <Link href="/providers">ثبت پزشک جدید در فهرست</Link></div>
-    <label>پزشک آزمایشی
+    <label>پزشک
      <select value={doctor} onChange={e=>setDoctor(e.target.value)}
       style={{display:'block',width:'100%',padding:10}}>
       <option value="">انتخاب پروفایل</option>
@@ -83,8 +84,8 @@ export default function PhysicianAdministration(){
      </select>
     </label>
     {chosen&&<p>
-     وضعیت فهرست: {chosen.directory_status} · شواهد مجوز: <strong>{chosen.evidence_status}</strong>
-     {chosen.evidence_expiry?' · تاریخ انقضا: '+new Date(chosen.evidence_expiry).toLocaleDateString('fa-IR'):''}
+     وضعیت فهرست: {chosen.directory_status} · شواهد مجوز: <strong>{fa(chosen.evidence_status)}</strong>
+     {chosen.evidence_expiry?' · تاریخ انقضا: '+fmtDate(chosen.evidence_expiry):''}
      {' · '}حساب متصل: {chosen.linked_user_id?.slice(0,12)||'ندارد'}
     </p>}
     <p>شمار پزشکان در محدوده: {items.length} · احراز مستقل مجوز توسط مرجع تخصصی: خیر</p>
@@ -92,7 +93,7 @@ export default function PhysicianAdministration(){
    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(300px,1fr))',gap:16,marginTop:16}}>
     <section className="panel" style={{padding:20}}>
      <h2>اتصال حساب پزشک</h2>
-     <p>ابتدا از صفحه کاربران، حسابی با نقش physician بسازید.</p>
+     <p>ابتدا از صفحه کاربران، حسابی با نقش «پزشک» بسازید.</p>
      <label>حساب فعال
       <select value={staffId} onChange={e=>setStaffId(e.target.value)}
        style={{width:'100%',padding:10}}>
@@ -150,7 +151,7 @@ export default function PhysicianAdministration(){
         void action(ROOT+'/physicians/'+encodeURIComponent(doctor)+'/affiliations/'+encodeURIComponent(hospitalId)+'/revoke','POST')}}
       >لغو ارتباط</button>
      </div>
-     <p>هیچ بیمارستانی تأیید اشتغال واقعی پزشک را از این مسیر اعلام نمی‌کند.</p>
+     <p>همکاری پزشک با بیمارستان را با مدرک کتبی بیمارستان تأیید کنید.</p>
     </section>
     <section className="panel" style={{padding:20}}>
      <h2>زمان‌های پیشنهادی حضور</h2>
@@ -165,7 +166,7 @@ export default function PhysicianAdministration(){
        onChange={e=>setEndsAt(e.target.value)}/></label>
       <button disabled={busy||!doctor}>ثبت بازه پیشنهادی</button>
      </form>
-     <p>این بازه رزرو نیست و به تقویم واقعی پزشک یا بیمارستان متصل نیست.</p>
+     <p>این بازه ظرفیت اعلام‌شده پزشک است و با تقویم مطب یا بیمارستان به‌صورت خودکار همگام نمی‌شود.</p>
     </section>
    </div>
   </>}

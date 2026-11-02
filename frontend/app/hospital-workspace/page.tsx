@@ -2,6 +2,7 @@
 import {useEffect,useState} from 'react';
 import Shell from '@/components/Shell';
 import {request} from '@/lib/api';
+import {fa,fmtDateTime} from '@/lib/i18n';
 
 type Profile={hospital_id:string;name:string;city:string;evidence_status:string;
  regulator_license_verified:boolean;hospital_capacity_live_verified:boolean};
@@ -33,29 +34,29 @@ export default function HospitalWorkspace(){
   }catch(e){setError((e as Error).message)}finally{setBusy(false)}
  }
  return <Shell title="پرتال محدود بیمارستان">
-  <div className="infoBanner">فقط محیط آزمایشی با اطلاعات ساختگی. این صفحه صرفاً شناسه‌های اداری درخواست‌های متعلق به همین بیمارستان را نمایش می‌دهد و مجوز دسترسی به مدارک پزشکی، تماس بیمار، پذیرش واقعی یا تأیید رزرو ندارد.</div>
+  <div className="infoBanner">این صفحه درخواست‌های هماهنگی مربوط به بیمارستان شما را نمایش می‌دهد. مدارک پزشکی و اطلاعات تماس بیماران در این پرتال نمایش داده نمی‌شوند.</div>
   {loading&&<p>در حال اعتبارسنجی ارتباط حساب و مدرک محلی...</p>}
   {error&&<p className="errorBox" role="alert">{error}</p>}
   {notice&&<p className="infoBanner" role="status">{notice}</p>}
   {me&&<>
    <section className="panel" style={{padding:20}}>
     <h2>{me.name}</h2>
-    <p>شهر: {me.city} · وضعیت شواهد محلی: {me.evidence_status}</p>
+    <p>شهر: {me.city} · وضعیت شواهد محلی: {fa(me.evidence_status)}</p>
     <p>تأیید مستقل مجوز: <strong>خیر</strong> · ظرفیت قابل رزرو: <strong>تأیید نشده</strong></p>
    </section>
    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(320px,1fr))',gap:16,marginTop:16}}>
     <section className="panel" style={{padding:20}}>
      <h2>بازه‌های ظرفیت پیشنهادی</h2>
      {slots.length===0?<p>ظرفیت پیشنهادی فعالی وجود ندارد.</p>:slots.map(x=>
-      <p key={x.id}>{x.service_code} · {x.proposed_units} واحد · از {new Date(x.starts_at).toLocaleString('fa-IR')} تا {new Date(x.ends_at).toLocaleString('fa-IR')}</p>)}
-     <p>اطلاعات این فهرست به تقویم و ظرفیت واقعی بیمارستان متصل نیست.</p>
+      <p key={x.id}>{fa(x.service_code)} · {x.proposed_units} واحد · از {fmtDateTime(x.starts_at)} تا {fmtDateTime(x.ends_at)}</p>)}
+     <p>این فهرست به‌صورت خودکار با تقویم و ظرفیت داخلی بیمارستان همگام نمی‌شود.</p>
     </section>
     <section className="panel" style={{padding:20}}>
      <h2>درخواست‌های هماهنگی داخلی</h2>
      {requests.length===0?<p>درخواست مجاز فعالی موجود نیست.</p>:requests.map(x=>
       <div key={x.id} style={{padding:10,borderBottom:'1px solid #d4dde3'}}>
        <strong>پرونده اداری {x.case_reference.slice(0,10)}</strong>
-       <p>خدمت: {x.service_code} · وضعیت: {x.status}</p>
+       <p>خدمت: {fa(x.service_code)} · وضعیت: {fa(x.status)}</p>
        {x.status==='requested'&&<button disabled={busy} onClick={()=>void receipt(x.id)}>ثبت دریافت اداری</button>}
       </div>)}
      <p>ثبت دریافت اداری، به معنی تأیید رزرو، نوبت، پذیرش یا ارسال پیام بیرونی نیست.</p>

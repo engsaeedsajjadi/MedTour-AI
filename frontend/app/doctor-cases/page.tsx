@@ -2,6 +2,7 @@
 import Shell from '@/components/Shell';
 import {request} from '@/lib/api';
 import {useEffect,useState} from 'react';
+import {fa} from '@/lib/i18n';
 type Case={id:string;specialty:string;status:string};
 export default function DoctorCases(){
  const [cases,setCases]=useState<Case[]>([]);
@@ -13,7 +14,7 @@ export default function DoctorCases(){
   <section className="panel" style={{padding:20,marginTop:16}}>
    <h2>پرونده‌های مجاز</h2>
    {cases.length===0?<p>هنوز پرونده مجازی به این حساب اختصاص داده نشده است.</p>:
-    <div className="tableScroll"><table><thead><tr><th>شناسه پرونده</th><th>تخصص</th><th>وضعیت</th></tr></thead><tbody>{cases.map(x=><tr key={x.id}><td dir="ltr">{x.id.slice(0,12)}…</td><td>{x.specialty||'ثبت نشده'}</td><td>{x.status}</td></tr>)}</tbody></table></div>}
+    <div className="tableScroll"><table><thead><tr><th>شناسه پرونده</th><th>تخصص</th><th>وضعیت</th></tr></thead><tbody>{cases.map(x=><tr key={x.id}><td dir="ltr">{x.id.slice(0,12)}…</td><td>{x.specialty||'ثبت نشده'}</td><td>{fa(x.status)}</td></tr>)}</tbody></table></div>}
   </section>
  </Shell>;
 }

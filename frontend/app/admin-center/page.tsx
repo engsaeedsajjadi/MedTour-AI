@@ -4,6 +4,7 @@ import Link from 'next/link';
 import {useEffect,useState} from 'react';
 import Shell from '@/components/Shell';
 import {request} from '@/lib/api';
+import {fa} from '@/lib/i18n';
 
 type Stats={
  patients:number;cases:number;active_cases:number;staff_active:number;
@@ -110,7 +111,7 @@ export default function AdminCenter(){
   }catch(e){setError((e as Error).message)}finally{setBusy(false)}
  }
  return <Shell title="مرکز کنترل مدیریتی">
-  <div className="infoBanner">این پنل فقط برای مدیر سازمان و داده‌های آزمایشی است. آمار مستقیماً از دیتابیس همان سازمان خوانده می‌شود؛ وضعیت اتصال و تأیید خارجی خدمات از آن استنباط نمی‌شود. متن پزشکی و فایل بیمار در جستجو یا صف نمایش داده نمی‌شوند.</div>
+  <div className="infoBanner">این پنل مخصوص مدیر سازمان است و آمار را مستقیماً از اطلاعات همین سازمان می‌خواند. متن پزشکی و فایل بیماران در جستجو و صف‌ها نمایش داده نمی‌شوند.</div>
   {error&&<div role="alert" className="errorBox">{error}</div>}
   {notice&&<div role="status" className="infoBanner">{notice}</div>}
   {loading&&<p>در حال بررسی دسترسی...</p>}
@@ -132,7 +133,7 @@ export default function AdminCenter(){
      <tbody>{queue?.items.length?queue.items.map(x=><tr key={x.category+'-'+x.id}>
       <td>{x.priority==='urgent'?'فوری':x.priority==='high'?'بالا':'عادی'}</td>
       <td>{categories.find(c=>c[0]===x.category)?.[1]||x.category}</td>
-      <td>{x.case_id?.slice(0,8)||'—'}</td><td>{x.status}</td>
+      <td>{x.case_id?.slice(0,8)||'—'}</td><td>{fa(x.status)}</td>
       <td><Link href={x.destination}>بازکردن گردش‌کار مرتبط</Link></td>
      </tr>):<tr><td colSpan={5}>موردی در محدوده نمایش یافت نشد.</td></tr>}</tbody></table></div>
    </section>
@@ -141,7 +142,7 @@ export default function AdminCenter(){
     <form onSubmit={search} className="formGrid">
      <label>عبارت حداقل سه کاراکتر
       <input value={term} onChange={e=>setTerm(e.target.value)} maxLength={80}
-       minLength={3} required placeholder="شناسه، نام بیمار آزمایشی یا وضعیت پرونده"/>
+       minLength={3} required placeholder="شناسه، نام بیمار یا وضعیت پرونده"/>
      </label>
      <label>دامنه
       <select value={domain} onChange={e=>setDomain(e.target.value)}>
@@ -159,7 +160,7 @@ export default function AdminCenter(){
      </tr>)}</tbody></table></div>
     {overview&&<div style={{marginTop:12,padding:14,border:'1px solid #ccd8df',borderRadius:8}}>
      <h3>نمای خلاصه پرونده {selectedCase.slice(0,12)}</h3>
-     <p>وضعیت: {overview.status} · مسئول: {overview.assigned_operator_id?.slice(0,8)||'تعیین‌نشده'}</p>
+     <p>وضعیت: {fa(overview.status)} · مسئول: {overview.assigned_operator_id?.slice(0,8)||'تعیین‌نشده'}</p>
      <p>رضایت پذیرش: {overview.intake_consent?'موجود':'ناموجود'} · رضایت ارتباطات: {overview.communication_consent?'موجود':'ناموجود'}</p>
      <p>پیگیری‌های باز: {overview.open_followups} · خدمات معلق: {overview.pending_operations}</p>
      <p>تأیید بالینی: انجام نشده · اطلاعات پزشکی خام: ارائه نشده</p>
@@ -172,7 +173,7 @@ export default function AdminCenter(){
     <div style={{display:'flex',flexWrap:'wrap',gap:10}}>
      <select aria-label="کارمند مورد نظر" value={target} onChange={e=>setTarget(e.target.value)}>
       <option value="">انتخاب حساب فعال</option>
-      {staff.filter(x=>x.active&&x.id!==selfId).map(x=><option key={x.id} value={x.id}>{x.email} ({x.role})</option>)}
+      {staff.filter(x=>x.active&&x.id!==selfId).map(x=><option key={x.id} value={x.id}>{x.email} ({fa(x.role)})</option>)}
      </select>
      <button type="button" disabled={!target||busy} onClick={()=>void deactivate()}>غیرفعال‌سازی با تأیید</button>
     </div>

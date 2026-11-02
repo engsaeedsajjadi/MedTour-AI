@@ -348,19 +348,41 @@ def propose_availability(
 
 @router.post("/availability/{slot_id}/cancel")
 def cancel_availability(
-    slot_id: str, db: Session = Depends(get_db), user: User = Depends(admin),
+    slot_id: str, cancel_appointments: bool = Query(False),
+    db: Session = Depends(get_db), user: User = Depends(admin),
 ):
+    from .enterprise_models import AppointmentSlot
     slot = db.scalar(select(PhysicianAvailability).where(
         PhysicianAvailability.id == slot_id,
         PhysicianAvailability.tenant_id == user.tenant_id,
     ).with_for_update())
     if slot is None:
         raise HTTPException(404, "Slot not found")
+    # Never silently orphan bookings that were allocated inside this capacity.
+    active = db.scalars(select(AppointmentSlot).where(
+        AppointmentSlot.tenant_id == user.tenant_id,
+        AppointmentSlot.availability_id == slot.id,
+        AppointmentSlot.status.in_(("requested", "internally_confirmed")),
+    ).with_for_update()).all()
+    if active and not cancel_appointments:
+        raise HTTPException(409, f"Availability has {len(active)} active appointment(s); cancel them first or confirm cascading cancellation")
+    for booking in active:
+        booking.status = "cancelled"
+        booking.reviewed_by = user.id
+        booking.review_reference = "AVAILABILITY-CANCELLED"
+        appointment = db.scalar(select(Appointment).where(
+            Appointment.tenant_id == user.tenant_id, Appointment.id == booking.appointment_id))
+        if appointment is not None:
+            appointment.status = "cancelled"
+        db.add(Audit(tenant_id=user.tenant_id, user_id=user.id, event="calendar_cancelled",
+                     entity_type="Appointment", entity_id=booking.appointment_id,
+                     detail="reason=availability_cancelled"))
     if slot.status != "cancelled":
         slot.status = "cancelled"
         event(db, user, "availability_cancelled", "PhysicianAvailability", slot.id)
-        db.commit()
-    return {"id": slot.id, "status": "cancelled", "external_provider_notified": False}
+    db.commit()
+    return {"id": slot.id, "status": "cancelled", "cancelled_appointments": len(active),
+            "external_provider_notified": False}
 
 
 def current_physician(db: Session, user: User) -> Physician:

@@ -3,6 +3,7 @@ import Link from 'next/link';
 import {useEffect,useState} from 'react';
 import Shell from '@/components/Shell';
 import {request} from '@/lib/api';
+import {fa} from '@/lib/i18n';
 
 type Hospital={hospital_id:string;name:string;city:string;legacy_directory_status:string;
  evidence_status:string;evidence_expiry:string|null;linked_user_ids:string[];
@@ -48,7 +49,7 @@ export default function HospitalManagement(){
  }
  const chosen=items.find(x=>x.hospital_id===hospital);
  return <Shell title="مدیریت سازمانی بیمارستان‌ها">
-  <div className="infoBanner">فقط داده ساختگی. ثبت مدرک، خدمات و ظرفیت پیشنهادی اثبات مجوز بیمارستان، ظرفیت واقعی یا پذیرش پزشکی نیست. درخواست داخلی به‌معنی ارسال پیام به بیمارستان یا رزرو تخت نیست.</div>
+  <div className="infoBanner">مدارک مجوز، خدمات و ظرفیت هر بیمارستان را پس از بررسی اسناد آن ثبت کنید. ثبت درخواست در این صفحه به معنی ارسال پیام به بیمارستان یا رزرو تخت نیست؛ تأیید پذیرش را از بیمارستان دریافت و ثبت کنید.</div>
   {loading&&<p>در حال بررسی نقش و بیمارستان‌ها...</p>}
   {error&&<p className="errorBox" role="alert">{error}</p>}
   {notice&&<p className="infoBanner" role="status">{notice}</p>}
@@ -56,21 +57,21 @@ export default function HospitalManagement(){
   {role==='admin'&&<>
    <section className="panel" style={{padding:20}}>
     <h2>فهرست مراکز و وضعیت مدارک</h2>
-    <Link href="/hospitals">افزودن بیمارستان آزمایشی</Link>
+    <Link href="/hospitals">افزودن بیمارستان</Link>
     <label>مرکز
      <select value={hospital} onChange={e=>setHospital(e.target.value)} style={{display:'block',padding:10,width:'100%'}}>
       <option value="">انتخاب مرکز</option>
       {items.map(x=><option key={x.hospital_id} value={x.hospital_id}>{x.name} — {x.city}</option>)}
      </select>
     </label>
-    {chosen&&<p>وضعیت قدیمی فهرست: {chosen.legacy_directory_status} · شواهد محلی: <strong>{chosen.evidence_status}</strong> ·
+    {chosen&&<p>وضعیت قدیمی فهرست: {fa(chosen.legacy_directory_status)} · شواهد محلی: <strong>{fa(chosen.evidence_status)}</strong> ·
      خدمات ثبت‌شده: {chosen.service_codes.join(', ')||'بدون خدمت'} · حساب‌های فعال: {chosen.linked_user_ids.length}</p>}
     <p>تأیید مستقل نهاد صادرکننده مجوز: <strong>انجام نشده</strong></p>
    </section>
    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(310px,1fr))',gap:16,marginTop:16}}>
     <section className="panel" style={{padding:20}}>
      <h2>حساب پرتال بیمارستان</h2>
-     <p>ابتدا از <Link href="/staff">صفحه کاربران</Link>، حسابی با نقش hospital بسازید.</p>
+     <p>ابتدا از <Link href="/staff">صفحه کاربران</Link>، حسابی با نقش «کارمند بیمارستان» بسازید.</p>
      <label>حساب کاربر
       <select value={staff} onChange={e=>setStaff(e.target.value)} style={{width:'100%',padding:10}}>
        <option value="">انتخاب</option>{users.map(x=><option value={x.id} key={x.id}>{x.email}</option>)}
@@ -102,7 +103,7 @@ export default function HospitalManagement(){
     <section className="panel" style={{padding:20}}>
      <h2>کاتالوگ خدمات اداری</h2>
      <label>خدمت<select value={service} onChange={e=>setService(e.target.value)} style={{display:'block',padding:10,width:'100%'}}>
-      {SERVICES.map(s=><option key={s} value={s}>{s}</option>)}
+      {SERVICES.map(s=><option key={s} value={s}>{fa(s)}</option>)}
      </select></label>
      <div style={{display:'flex',gap:8,marginTop:9}}>
       <button disabled={busy||!hospital} onClick={()=>void doAction(ROOT+'/hospitals/'+hospital+'/services','POST',{service_code:service})}>ثبت خدمت</button>
@@ -127,11 +128,11 @@ export default function HospitalManagement(){
    </div>
    <section className="panel" style={{padding:20,marginTop:16}}>
     <h2>درخواست هماهنگی با مرکز</h2>
-    <p>ثبت این درخواست به دو رضایت فعال intake و hospital_coordination نیاز دارد. مرجع اداری نباید داده پزشکی داشته باشد.</p>
+    <p>ثبت این درخواست به دو رضایت فعال «پذیرش اولیه» و «هماهنگی بیمارستان» نیاز دارد. مرجع اداری نباید داده پزشکی داشته باشد.</p>
     <form onSubmit={e=>{e.preventDefault();void doAction(ROOT+'/hospitals/'+hospital+'/coordinations','POST',{
      case_id:caseId,service_code:service,reference})}} style={{display:'grid',gap:9,maxWidth:610}}>
      <label>پرونده<select required value={caseId} onChange={e=>setCaseId(e.target.value)} style={{width:'100%',padding:10}}>
-      <option value="">انتخاب پرونده</option>{cases.map(x=><option value={x.id} key={x.id}>{x.id.slice(0,8)} — {x.status}</option>)}
+      <option value="">انتخاب پرونده</option>{cases.map(x=><option value={x.id} key={x.id}>{x.id.slice(0,8)} — {fa(x.status)}</option>)}
      </select></label>
      <label>شناسه مرجع اداری <input required minLength={6} maxLength={100} pattern="[A-Za-z0-9][A-Za-z0-9._:/-]{5,99}" value={reference} onChange={e=>setReference(e.target.value)}/></label>
      <button disabled={busy||!hospital||!caseId}>ثبت درخواست بدون ارسال پیام</button>

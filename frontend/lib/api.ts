@@ -1,4 +1,7 @@
-export const API_BASE=process.env.NEXT_PUBLIC_API_URL||'http://localhost:8000';
+import {faError,faNetwork} from './i18n';
+// Empty string = same origin (production behind the HTTPS reverse proxy); unset = local API on :8000.
+const configuredApi=process.env.NEXT_PUBLIC_API_URL;
+export const API_BASE=configuredApi===undefined?'http://localhost:8000':configuredApi;
 export type Row=Record<string,unknown>;
 export function getSession():string{if(typeof window==='undefined')return '';return sessionStorage.getItem('medtour_token')||'';}
 const forget=()=>{if(typeof window!=='undefined'){sessionStorage.removeItem('medtour_token');sessionStorage.removeItem('medtour_refresh');}};
@@ -8,10 +11,11 @@ let inFlight:Promise<string>|null=null;
 export async function request<T=unknown>(path:string,options:RequestInit={}):Promise<T>{
  const token=getSession();if(!token)throw new Error('ابتدا وارد حساب شوید.');
  async function send(credential:string){return fetch(`${API_BASE}/api/v1${path}`,{...options,cache:'no-store',headers:{'Content-Type':'application/json',Authorization:`Bearer ${credential}`,...options.headers}})}
- let result=await send(token);
- if(result.status===401){try{if(!inFlight)inFlight=rotate().finally(()=>{inFlight=null});const newToken=await inFlight;result=await send(newToken);}catch{forget();if(typeof window!=='undefined')window.location.href='/login';throw new Error('نشست شما منقضی شده است.');}}
+ let result:Response;try{result=await send(token);}catch(e){throw new Error(faNetwork(e));}
+ if(result.status===401){try{if(!inFlight)inFlight=rotate().finally(()=>{inFlight=null});const newToken=await inFlight;try{result=await send(newToken);}catch(e){throw new Error(faNetwork(e));}}catch(e){if(e instanceof Error&&e.message.startsWith('ارتباط'))throw e;forget();if(typeof window!=='undefined')window.location.href='/login';throw new Error('نشست شما منقضی شده است.');}}
  const data=await result.json().catch(()=>({detail:result.statusText}));
- if(!result.ok)throw new Error(typeof data.detail==='string'?data.detail:`HTTP ${result.status}`);
+ if(result.status===403&&data.detail==='Two-factor authentication required'&&typeof window!=='undefined'&&window.location.pathname!=='/account-security'){window.location.href='/account-security';}
+ if(!result.ok)throw new Error(faError(data.detail,result.status));
  return data as T;
 }
 
@@ -22,7 +26,7 @@ export async function downloadPdf(path:string,filename:string):Promise<void>{
  const load=(token:string)=>fetch(`${API_BASE}/api/v1${path}`,{
   method:'GET',headers:{Authorization:`Bearer ${token}`},cache:'no-store'
  });
- let response=await load(initial);
+ let response:Response;try{response=await load(initial);}catch(e){throw new Error(faNetwork(e));}
  if(response.status===401){
   try{
    if(!inFlight)inFlight=rotate().finally(()=>{inFlight=null});
@@ -31,7 +35,7 @@ export async function downloadPdf(path:string,filename:string):Promise<void>{
  }
  if(!response.ok){
   const body=await response.json().catch(()=>({detail:'دریافت سند ناموفق بود.'}));
-  throw new Error(typeof body.detail==='string'?body.detail:'HTTP '+response.status);
+  throw new Error(faError(body.detail,response.status));
  }
  const mime=response.headers.get('content-type')||'';
  if(!mime.includes('application/pdf'))throw new Error('فرمت پاسخ PDF نیست.');

@@ -46,19 +46,21 @@ def audit_status(db:Session):
        SELECT count(*) FROM pg_policies
        WHERE schemaname='public' AND policyname='mt26_principal_isolation'
     """))
-    safe_role=not any(row[2:])
-    # Common API dependency still uses shared DATABASE_URL and has no
-    # full authenticated pre-auth / patient portal / webhook routing.
+    from .tenant_rls import runtime_status
+    live=runtime_status(db.connection())
+    # Report what PostgreSQL actually enforces for this connection, not what migrations intend.
     return {"database":"postgresql",
         "tenant_scoped_tables":scoped,
         "composite_tenant_fks":fks,
-        "rls_policy_tables":policies,
+        "rls_policy_tables":live["rls_enforced_tables"],
         "rls_force_tables":forced,
-        "runtime_role_nonprivileged":safe_role,
-        "authenticated_tenant_role":False,
-        "verified_end_to_end_routing":False,
+        "runtime_role_nonprivileged":live["runtime_role_nonprivileged"],
+        "authenticated_tenant_role":live["rls_effective"],
+        "verified_end_to_end_routing":live["rls_effective"],
         "production_ready":False,
-        "reason":"Legacy shared get_db, pre-auth routes and runtime DB role migration outstanding"}
+        "reason":("Row-level security is enforced for every tenant table on a non-privileged role"
+                  if live["rls_effective"] else
+                  "Not effective: connect the API as the non-privileged application role and run migrations")}
 
 @router.get("/status")
 def status(db:Session=Depends(get_db),user:User=Depends(ADMIN)):

@@ -35,7 +35,7 @@ def setup(monkeypatch):
         if owned.get(key) == owner and not sent:
             del owned[key]
 
-    async def send(_token, chat_id, reply, privacy_url):
+    async def send(_token, chat_id, reply, privacy_url, **_kw):
         out.append((chat_id, reply, privacy_url))
 
     monkeypatch.setattr(telegram, '_claim', claim)
@@ -142,7 +142,7 @@ def test_sender_missing_or_callback_ignored(setup):
 
 def test_upstream_failure_releases_reservation_and_returns_retryable_error(setup, monkeypatch):
     client, owned, out = setup
-    async def reject(*args):
+    async def reject(*args, **_kw):
         raise httpx.ReadTimeout('synthetic')
     monkeypatch.setattr(telegram,'_send_message',reject)
     resp = post(client, update())
@@ -183,3 +183,147 @@ def test_standalone_public_entrypoint_only_exposes_telegram_route(setup):
     assert paths == {("/api/v1/webhooks/telegram", ("POST",))}
     for path in ("/docs", "/openapi.json", "/api/v1/patients", "/api/v1/auth/login"):
         assert public_client.get(path).status_code == 404
+
+
+# Telegram menu / human handoff regression tests, synthetic only.
+@pytest.mark.parametrize('command,expected', [
+    ('/help', 'Commands:'),
+    ('/privacy', 'medical records'),
+    ('/language', 'Available languages'),
+    ('/language fa', 'پاسپورت'),
+    ('/lang prs', 'اسناد طبی'),
+    ('/operator', 'human operator'),
+    ('/stop', 'not created a patient record'),
+])
+def test_public_menu_commands_do_not_store_or_echo_content(setup, command, expected):
+    client, owned, out = setup
+    response = post(client, update(text=command))
+    assert response.status_code == 200, response.text
+    assert response.json() == {'ok': True, 'sent_generic_notice': True}
+    assert len(out) == 1 and expected in out[0][1]
+    assert 'patient_id' not in out[0][1]
+
+
+def test_operator_contact_is_optional_and_url_is_public_only(setup, monkeypatch):
+    client, _, out = setup
+    monkeypatch.setenv('PUBLIC_OPERATOR_CONTACT_URL', 'https://example.invalid/contact')
+    assert post(client, update(text='/operator')).status_code == 200
+    assert 'https://example.invalid/contact' in out[-1][1]
+    assert 'private' in out[-1][1]
+    assert telegram.settings().operator_contact_url == 'https://example.invalid/contact'
+
+
+@pytest.mark.parametrize('unsafe_url', [
+    'http://example.invalid/contact',
+    'https://user:secret@example.invalid/',
+    'https://example.invalid/contact?patient=abc',
+    'https://example.invalid/#private',
+    'https://localhost/contact',
+    'https://example.invalid:8080/contact',
+])
+def test_unsafe_operator_contact_prevents_enabling_bot(setup, monkeypatch, unsafe_url):
+    client, _, out = setup
+    monkeypatch.setenv('PUBLIC_OPERATOR_CONTACT_URL', unsafe_url)
+    assert post(client, update(text='/operator')).status_code == 503
+    assert not out
+
+
+def test_unknown_commands_ignored_and_free_text_not_echoed(setup):
+    client, _, out = setup
+    assert post(client, update(text='/unrecognized')).json() == {'ok': True, 'ignored': True}
+    assert not out
+    sensitive = 'Synthetic medical details 4242 not to be repeated'
+    assert post(client, update(update_id=2, text=sensitive)).status_code == 200
+    assert len(out) == 1
+    assert sensitive not in out[0][1]
+
+
+def test_language_help_never_promises_consented_clinical_service(setup):
+    client, _, out = setup
+    assert post(client, update(text='/language xx')).status_code == 200
+    assert 'Available languages' in out[-1][1]
+    assert post(client, update(text='/help', update_id=2, lang='ar')).status_code == 200
+    assert 'الأوامر' in out[-1][1]
+
+
+@pytest.mark.parametrize('command,needle', [
+    ('/services', 'booking'),
+    ('/process', 'secure portal'),
+    ('/emergency', 'local emergency'),
+])
+def test_patient_journey_commands_are_nonclinical(setup, command, needle):
+    client, _, out = setup
+    r = post(client, update(text=command))
+    assert r.status_code == 200
+    assert needle in out[-1][1]
+    assert 'medical records' in out[-1][1]
+    assert 'diagnosis' not in out[-1][1].lower()
+
+
+def test_media_is_not_processed_or_accepted_as_medical_input(setup):
+    client, _, out = setup
+    incoming = update(text=None)
+    incoming['message'].pop('text')
+    incoming['message']['document'] = {'file_id':'synthetic-sensitive-id'}
+    assert post(client, incoming).status_code == 200
+    assert len(out) == 1
+    assert 'synthetic-sensitive-id' not in out[-1][1]
+    assert 'Do not send' in out[-1][1]
+
+
+def _labels(markup):
+    return [button['text'] for row in markup['keyboard'] for button in row]
+
+
+@pytest.mark.parametrize('language', ['fa', 'ar', 'en', 'ps', 'prs'])
+def test_every_menu_button_maps_to_a_fixed_command_reply(language):
+    markup = telegram._reply_markup(update(text='/start ' + language))
+    assert markup['is_persistent'] is True and markup['resize_keyboard'] is True
+    labels = _labels(markup)
+    assert len(labels) == 8
+    for label in labels:
+        reply = telegram._safe_reply(update(text=label, lang=language))
+        assert reply is not None and reply[0] == 1234
+        assert label not in reply[1]
+
+
+def test_button_tap_gives_same_reply_as_typed_command():
+    assert telegram._safe_reply(update(text='🩺 خدمات', lang='fa')) == telegram._safe_reply(update(text='/services', lang='fa'))
+    assert telegram._safe_reply(update(text='🚨 Emergency', lang='en')) == telegram._safe_reply(update(text='/emergency', lang='en'))
+
+
+def test_language_button_opens_language_keyboard_and_switches_language():
+    markup = telegram._reply_markup(update(text='🌐 تغییر زبان', lang='fa'))
+    assert 'English' in _labels(markup) and 'العربية' in _labels(markup)
+    reply = telegram._safe_reply(update(text='English', lang='fa'))
+    assert 'medical records' in reply[1]
+    assert '🩺 Services' in _labels(telegram._reply_markup(update(text='English', lang='fa')))
+
+
+def test_stop_removes_keyboard_and_operator_uses_public_url_button():
+    assert telegram._reply_markup(update(text='⏹ پایان', lang='fa')) == {'remove_keyboard': True}
+    markup = telegram._reply_markup(update(text='/operator', lang='en'), 'https://example.org/contact')
+    assert markup['inline_keyboard'][0][0]['url'] == 'https://example.org/contact'
+
+
+def test_free_text_resembling_a_button_is_not_a_command():
+    sensitive = '🩺 خدمات - my diagnosis is synthetic-TEST-123'
+    reply = telegram._safe_reply(update(text=sensitive, lang='fa'))
+    assert sensitive not in reply[1] and 'پاسپورت' in reply[1]
+    assert '🩺 خدمات' in _labels(telegram._reply_markup(update(text=sensitive, lang='fa')))
+
+
+def test_send_message_includes_keyboard_only_when_given(monkeypatch):
+    received = []
+    class MockClient:
+        def __init__(self, **kwargs): pass
+        async def __aenter__(self): return self
+        async def __aexit__(self, *args): pass
+        async def post(self, url, json):
+            received.append(json)
+            return httpx.Response(200, json={'ok': True}, request=httpx.Request('POST', url))
+    monkeypatch.setattr(telegram.httpx, 'AsyncClient', MockClient)
+    import asyncio
+    markup = telegram._reply_markup(update(text='/start fa'))
+    asyncio.run(telegram._send_message(TOKEN, 42, 'generic', '', reply_markup=markup))
+    assert received[0]['reply_markup'] == markup

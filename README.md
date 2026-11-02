@@ -211,4 +211,4 @@ Section 26: [Tenant-scoped PostgreSQL composite FK hardening, private database p
 Section 26 continuation: [Strict synthetic-only FastAPI and Worker tenant-principal RLS cutover pilot](docs/SECTION_26_RUNTIME_CUTOVER_FA.md). Real backend routes are exercised against two PostgreSQL FORCE RLS logins in disposable GitHub CI. Live Compose and legacy shared get_db have NOT been migrated or permitted for real patient PHI.
 
 
-Section 27: [Staff AES-GCM TOTP enrollment, staged and legacy login MFA verification, case-scoped doctor grants, remaining credential and legal gates](docs/SECTION_27_IDENTITY_MFA_DOCTOR_FA.md). Not real patient PHI-ready.
+Section 27: [Staff MFA (encrypted TOTP), one-use login challenge, auth_version session revocation and administrator user lifecycle](docs/SECTION_27_IDENTITY_ACCESS_MFA_FA.md). UI /account-security. MFA is opt-in for synthetic development; production SSO/Passkey, secure recovery and strict tenant gateway integration remain external gates.

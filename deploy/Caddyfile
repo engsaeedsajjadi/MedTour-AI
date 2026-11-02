@@ -1,0 +1,39 @@
+# HTTPS entry point for production. PUBLIC_DOMAIN=panel.example.com gets a Let's Encrypt
+# certificate automatically; PUBLIC_DOMAIN=localhost uses Caddy's internal CA for local trials.
+{$PUBLIC_DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	request_body {
+		max_size 10MB
+	}
+
+	# API schema and interactive docs are not published in production.
+	@internal path /docs /docs/* /redoc /redoc/* /openapi.json
+	respond @internal 404
+
+	# Telegram webhook goes to the isolated gateway, which has no database credentials.
+	@telegram path /api/v1/webhooks/telegram /api/v1/webhooks/telegram/*
+	handle @telegram {
+		reverse_proxy telegram-gateway:8000
+	}
+
+	handle /api/* {
+		reverse_proxy api:8000
+	}
+
+	handle {
+		reverse_proxy web:3000
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}

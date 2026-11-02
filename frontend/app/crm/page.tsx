@@ -2,6 +2,7 @@
 import {useEffect,useState} from 'react';
 import Shell from '@/components/Shell';
 import {request} from '@/lib/api';
+import {fa,fmtDateTime} from '@/lib/i18n';
 
 type Patient={id:string;full_name:string;language:string};
 type CaseItem={id:string;patient_id:string;status:string;assigned_operator_id:string|null};
@@ -69,7 +70,7 @@ export default function PatientCRM(){
    method:'POST',body:JSON.stringify(action==='cancel'?{action}:{
     action,outcome_code:outcome,reference:followupReference
    })
-  }),'نتیجه پیگیری در CRM و سابقه پرونده ثبت شد.');
+  }),'نتیجه پیگیری در سابقه بیمار و پرونده ثبت شد.');
   setFollowupReference('');
  }
  async function candidatesFor(){
@@ -89,22 +90,22 @@ export default function PatientCRM(){
   setReviewReference('');
  }
  const visibleCases=cases.filter(c=>c.patient_id===patientId);
- return <Shell title="Patient CRM — مدیریت ارتباط بیمار">
-  <div className="infoBanner">CRM فقط برای هماهنگی اداری و اطلاعات ساختگی است؛ تشخیص هویت، ادغام پرونده، ارسال پیام و تصمیم درمانی خودکار انجام نمی‌شود. تاریخ و ساعت پیگیری با منطقه زمانی دستگاه شما ثبت می‌شود.</div>
+ return <Shell title="مدیریت ارتباط با بیمار">
+  <div className="infoBanner">این بخش برای پیگیری اداری بیماران است. ادغام پرونده، ارسال پیام و تصمیم درمانی به‌صورت خودکار انجام نمی‌شود و نیاز به تأیید کارشناس دارد. تاریخ و ساعت پیگیری با منطقه زمانی دستگاه شما ثبت می‌شود.</div>
   {error&&<div role="alert" className="errorBox">{error}</div>}
   {notice&&<div role="status" className="infoBanner">{notice}</div>}
   <section className="panel" style={{padding:20}}>
    <h2>پرونده‌ها، مسئول هماهنگی و منبع جذب</h2>
-   <label>بیمار آزمایشی
+   <label>بیمار
     <select value={patientId} onChange={e=>{setPatientId(e.target.value);setCandidates([])}} style={{display:'block',width:'100%',padding:10}}>
      <option value="">انتخاب بیمار</option>
      {patients.map(p=><option key={p.id} value={p.id}>{p.full_name} · {p.language}</option>)}
     </select>
    </label>
    <p>پرونده‌های مرتبط: {visibleCases.length}</p>
-   {visibleCases.map(c=><p key={c.id}>پرونده {c.id.slice(0,8)} — {c.status} — مسئول: {c.assigned_operator_id?.slice(0,8)||'تعیین‌نشده'}</p>)}
+   {visibleCases.map(c=><p key={c.id}>پرونده {c.id.slice(0,8)} — {fa(c.status)} — مسئول: {c.assigned_operator_id?.slice(0,8)||'تعیین‌نشده'}</p>)}
    {role==='admin'&&patientId&&<div style={{display:'flex',gap:10,flexWrap:'wrap',margin:'10px 0'}}>
-    <select value={assignee} onChange={e=>setAssignee(e.target.value)}>
+    <select aria-label="مسئول هماهنگی" value={assignee} onChange={e=>setAssignee(e.target.value)}>
      {people.map(x=><option key={x.id} value={x.id}>{x.email}</option>)}
     </select>
     <button type="button" disabled={working||!assignee} onClick={()=>
@@ -122,10 +123,10 @@ export default function PatientCRM(){
    <form onSubmit={schedule} style={{display:'grid',gap:12,maxWidth:680}}>
     <label>پرونده<select required value={caseId} onChange={e=>setCaseId(e.target.value)} style={{display:'block',width:'100%',padding:10}}>
      <option value="">انتخاب پرونده</option>
-     {cases.map(c=><option key={c.id} value={c.id}>{c.id.slice(0,8)} — {c.status}</option>)}
+     {cases.map(c=><option key={c.id} value={c.id}>{c.id.slice(0,8)} — {fa(c.status)}</option>)}
     </select></label>
     <label>دلیل اداری<select value={reason} onChange={e=>setReason(e.target.value)} style={{display:'block',width:'100%',padding:10}}>
-     {REASONS.map(x=><option key={x} value={x}>{x}</option>)}
+     {REASONS.map(x=><option key={x} value={x}>{fa(x)}</option>)}
     </select></label>
     <label>مسئول پیگیری<select value={assignee} onChange={e=>setAssignee(e.target.value)} style={{display:'block',width:'100%',padding:10}}>
      {(role==='admin'?people:[{id:myId,email:'خودم',role:'operator',active:true}]).map(x=><option key={x.id} value={x.id}>{x.email}</option>)}
@@ -135,14 +136,14 @@ export default function PatientCRM(){
    </form>
    <h3>پیگیری‌های باز (فقط موارد مجاز)</h3>
    <label>کد نتیجه دستی<select value={outcome} onChange={e=>setOutcome(e.target.value)}>
-    {OUTCOMES.map(x=><option key={x} value={x}>{x}</option>)}
+    {OUTCOMES.map(x=><option key={x} value={x}>{fa(x)}</option>)}
    </select></label>
    <label>مرجع انجام تماس (بدون نام یا متن پزشکی)
     <input value={followupReference} onChange={e=>setFollowupReference(e.target.value)}
      pattern="[A-Za-z0-9][A-Za-z0-9._:/-]{5,99}" minLength={6} maxLength={100}/>
    </label>
    {items.length===0?<p>پیگیری بازی در این محدوده وجود ندارد.</p>:items.map(x=><div key={x.id} style={{padding:12,borderBottom:'1px solid #cdd7df'}}>
-    <strong>{x.case_id.slice(0,8)}</strong> — {x.reason_code} — {new Date(x.due_at).toLocaleString('fa-IR')}
+    <strong>{x.case_id.slice(0,8)}</strong> — {x.reason_code} — {fmtDateTime(x.due_at)}
     <button type="button" disabled={working||!followupReference} style={{margin:6}} onClick={()=>resolve(x.id,'complete')}>ثبت نتیجه</button>
     <button type="button" disabled={working} onClick={()=>resolve(x.id,'cancel')}>لغو</button>
    </div>)}

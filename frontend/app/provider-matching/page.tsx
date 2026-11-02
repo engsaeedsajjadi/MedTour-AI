@@ -2,6 +2,7 @@
 import {useEffect,useState} from 'react';
 import Shell from '@/components/Shell';
 import {request} from '@/lib/api';
+import {fa} from '@/lib/i18n';
 type Case={id:string;status:string;specialty:string};
 type Option={physician_id:string;name:string;specialty:string;city:string;reason:string};
 type Proposal={id:string;physician_id:string;hospital_id:string|null;status:string;review_reference:string|null;clinical_suitability_determined:boolean};
@@ -49,7 +50,7 @@ export default function ProviderMatching(){
   }catch(e){setError((e as Error).message)}finally{setBusy(false)}
  }
  return <Shell title="تطبیق اداری بیمار با ارائه‌دهندگان خدمات">
-  <div className="infoBanner">این ابزار صرفاً گزینه‌های اداری را بر اساس متن تخصص و شواهد محلی بررسی‌نشده توسط مرجع مستقل معرفی می‌کند. تطبیق پزشکی، تشخیص، رتبه‌بندی بالینی، معرفی قطعی پزشک و رزرو خودکار انجام نمی‌شود. فقط داده ساختگی.</div>
+  <div className="infoBanner">این ابزار پزشکان و بیمارستان‌های تأییدشده را بر اساس تخصص پیشنهاد می‌دهد. انتخاب نهایی پزشک با بررسی کارشناس انجام می‌شود و رزرو خودکار صورت نمی‌گیرد.</div>
   {loading&&<p>در حال بارگذاری...</p>}
   {error&&<div role="alert" className="errorBox">{error}</div>}
   {notice&&<div role="status" className="infoBanner">{notice}</div>}
@@ -58,7 +59,7 @@ export default function ProviderMatching(){
     <h2>پرونده و گزینه‌های اولیه</h2>
     <label>پرونده
      <select value={caseId} onChange={e=>{const v=e.target.value;setCaseId(v);setError('');void reload(v).catch(err=>setError((err as Error).message))}} style={{display:'block',width:'100%',padding:10}}>
-      {cases.map(c=><option key={c.id} value={c.id}>{c.id.slice(0,8)} — {c.specialty} — {c.status}</option>)}
+      {cases.map(c=><option key={c.id} value={c.id}>{c.id.slice(0,8)} — {c.specialty} — {fa(c.status)}</option>)}
      </select>
     </label>
     <p>گزینه‌های مطابق متن تخصص: {options.length}. این فهرست تضمین‌کننده پوشش جامع یا کیفیت پزشکی نیست.</p>
@@ -82,7 +83,7 @@ export default function ProviderMatching(){
      <input value={reference} minLength={6} maxLength={100} pattern="[A-Za-z0-9][A-Za-z0-9._:/-]{5,99}" onChange={e=>setReference(e.target.value)}/>
     </label>
     {proposals.length===0?<p>پیشنهادی ثبت نشده است.</p>:proposals.map(p=><div key={p.id} style={{padding:12,borderBottom:'1px solid #dde2e8'}}>
-     <p>پزشک {p.physician_id.slice(0,10)} · {p.status} · بیمارستان {p.hospital_id?.slice(0,10)||'ندارد'}</p>
+     <p>پزشک {p.physician_id.slice(0,10)} · {fa(p.status)} · بیمارستان {p.hospital_id?.slice(0,10)||'ندارد'}</p>
      {role==='admin'&&p.status==='pending_human_review'&&<div style={{display:'flex',gap:9}}>
       <button disabled={busy||reference.length<6} onClick={()=>void action(ROOT+'/proposals/'+encodeURIComponent(p.id)+'/review',{decision:'administratively_shortlisted',reference})}>تأیید فقط برای فهرست اداری</button>
       <button disabled={busy||reference.length<6} onClick={()=>void action(ROOT+'/proposals/'+encodeURIComponent(p.id)+'/review',{decision:'rejected',reference})}>رد پیشنهاد</button>

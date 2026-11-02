@@ -2,6 +2,7 @@
 import Shell from '@/components/Shell';
 import {request,Row} from '@/lib/api';
 import {useEffect,useState} from 'react';
+import {fa} from '@/lib/i18n';
 
 const languages=[['fa','فارسی'],['ar','العربية'],['en','English'],['ps','پښتو'],['prs','دری']];
 const templates=['case_update_available','appointment_update_available','please_check_secure_portal'];
@@ -48,7 +49,7 @@ export default function Messaging(){
  <section className="panel" aria-label="مسیر واتس‌اپ و جایگزین امن">
  <div className="panelHeader"><h2>مسیر ارتباطی اصلی و جایگزین</h2></div>
  <div style={{padding:18}}>
-  <p>کانال اصلی: <strong>WhatsApp</strong>. کانال جایگزین برای پرونده بیمار: <strong>دعوت انسانی به پرتال امن</strong>. تلگرام فقط راهنمای عمومی است و برای شناسایی بیمار به کار نمی‌رود.</p>
+  <p>کانال اصلی: <strong>واتس‌اپ</strong>. کانال جایگزین برای پرونده بیمار: <strong>دعوت انسانی به پرتال امن</strong>. تلگرام فقط راهنمای عمومی است و برای شناسایی بیمار به کار نمی‌رود.</p>
   <div style={{display:'flex',flexWrap:'wrap',gap:12,marginBottom:14}}>
    {Object.entries(channelOverview).map(([key,state])=><span className="badge" key={key}>
     {key}: {state.configured?'تنظیم‌شده (نه تأیید زنده)':'غیرفعال'} · {state.live_verified?'تأیید زنده':'بدون تأیید زنده'}
@@ -58,7 +59,7 @@ export default function Messaging(){
    <label>پرونده برای ارجاع انسانی به پرتال امن
     <select value={handoffCaseId} onChange={e=>setHandoffCaseId(e.target.value)}>
      <option value="">انتخاب پرونده</option>
-     {handoffCases.map(c=><option key={c.id} value={c.id}>{c.id.slice(0,8)} — {c.status}</option>)}
+     {handoffCases.map(c=><option key={c.id} value={c.id}>{c.id.slice(0,8)} — {fa(c.status)}</option>)}
     </select>
    </label>
    <div className="formActions">
@@ -74,17 +75,17 @@ export default function Messaging(){
  <div style={{padding:18}}>
  <p>وضعیت: <strong>{telegramStatus}</strong></p>
  <p>این کانال فعلاً فقط پنج زبان و اطلاع‌رسانی عمومی را پشتیبانی می‌کند. برای دریافت اسناد و اطلاعات پزشکی از پرتال امن با رضایت بیمار استفاده کنید؛ اطلاعات حساس را در ربات ارسال نکنید.</p>
- <p>برای ساخت ربات از <a href="https://t.me/BotFather" target="_blank" rel="noopener noreferrer">BotFather رسمی تلگرام</a> استفاده کنید. Token و Webhook Secret فقط در تنظیمات سرور قرار می‌گیرند، نه در این پنل.</p>
+ <p>برای ساخت ربات از <a href="https://t.me/BotFather" target="_blank" rel="noopener noreferrer">ربات رسمی BotFather تلگرام</a> استفاده کنید. توکن ربات و کلید امنیتی وب‌هوک فقط در تنظیمات سرور قرار می‌گیرند، نه در این پنل.</p>
  </div></section>
  <div className="dashboardLower"><section className="panel"><div className="panelHeader"><h2>درخواست پیام واتساپ</h2></div><form className="formGrid" onSubmit={queue}>
  <label>شناسه مکالمه واتساپ<input required value={conversationId} onChange={e=>setConversationId(e.target.value)}/></label>
  <label>زبان قالب<select value={locale} onChange={e=>setLocale(e.target.value)}>{languages.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></label>
- <label>قالب غیرپزشکی<select value={template} onChange={e=>setTemplate(e.target.value)}>{templates.map(s=><option key={s} value={s}>{s}</option>)}</select></label>
+ <label>قالب غیرپزشکی<select value={template} onChange={e=>setTemplate(e.target.value)}>{templates.map(s=><option key={s} value={s}>{fa(s)}</option>)}</select></label>
  <div className="formActions"><button className="button" disabled={busy}>ثبت درخواست بدون ارسال</button></div></form></section>
  <section className="panel"><div className="panelHeader"><h2>ترجمه با بازبینی انسانی</h2></div><form className="formGrid" onSubmit={draft}>
  <label>زبان مبدأ<select value={sourceLang} onChange={e=>setSourceLang(e.target.value)}>{languages.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></label>
  <label>زبان مقصد<select value={targetLang} onChange={e=>setTargetLang(e.target.value)}>{languages.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></label>
  <label style={{gridColumn:'1/-1'}}>متن اصلی (فقط با رضایت بیمار)<textarea required value={source} onChange={e=>setSource(e.target.value)}/></label>
- <div className="formActions"><button className="button secondary" disabled={busy||!conversationId}>ایجاد پیش‌نویس AI</button></div></form>
+ <div className="formActions"><button className="button secondary" disabled={busy||!conversationId}>ایجاد پیش‌نویس با هوش مصنوعی</button></div></form>
  {translationId&&<div style={{padding:20}}><label>متن بازبینی‌شده<textarea style={{width:'100%'}} value={translation} onChange={e=>setTranslation(e.target.value)}/></label><button className="button" disabled={busy||!translation} onClick={publish}>تأیید برای وب‌چت</button></div>}</section></div>
  <section className="panel"><div className="panelHeader"><h2>پیام‌های خروجی در صف</h2><button className="button secondary" onClick={refresh}>بروزرسانی</button></div><div className="tableScroll"><table><thead><tr><th>شناسه</th><th>قالب</th><th>زبان</th><th>وضعیت</th><th>اقدام</th></tr></thead><tbody>{items.map(x=><tr key={String(x.id)}><td>{String(x.id).slice(0,8)}</td><td dir="ltr">{String(x.template_name)}</td><td>{String(x.locale)}</td><td>{String(x.status)}</td><td>{x.status==='pending_approval'&&<button className="button secondary" onClick={()=>approve(String(x.id))}>تأیید مدیر</button>}</td></tr>)}</tbody></table></div></section></Shell>}

@@ -15,7 +15,7 @@ from .models import (
     Appointment, Case, Consent, Conversation, Document, Physician,
     Quote, Referral, TravelRequest, User,
 )
-from .enterprise_models import CaseTimeline, Operation, PatientIntake, AccommodationStay, TravelAssignment
+from .enterprise_models import CaseTimeline, Operation, PatientIntake, AccommodationStay, TravelAssignment, MedicalVisa
 from .security import roles
 
 router = APIRouter(prefix="/api/v1/cases", tags=["case mission"])
@@ -116,7 +116,13 @@ def mission_evidence(db: Session, case: Case) -> dict:
             "interpreter_coordination" if x.kind == "interpreter_session" else "transport_coordination")
         for x in resource_requests
     )
-    unresolved_travel = unresolved_resources or unresolved_stays or any(
+    # A visa still being prepared or awaiting a decision blocks arrival; a reported decision or a
+    # cancelled record resolves it (a refusal is then handled by cancelling the case).
+    visas = _rows(db, MedicalVisa, t, MedicalVisa.case_id == case.id,
+                  MedicalVisa.patient_id == case.patient_id)
+    unresolved_visa = any(x.status in ("requested", "in_review", "ready_for_manual_submission",
+                                       "submission_reported") for x in visas)
+    unresolved_travel = unresolved_visa or unresolved_resources or unresolved_stays or any(
         x.status not in ("confirmed", "cancelled") or
         (x.status == "confirmed" and not x.external_reference)
         for x in travel
@@ -154,7 +160,8 @@ def mission_evidence(db: Session, case: Case) -> dict:
             "has_staff_conversation": bool(conversations) and communication,
             "human_handoff": any(x.human_handoff for x in conversations),
             "documents_recorded": len(docs),
-            "travel_services_requested": len(travel) + len(travel_ops) + len(stays) + len(resource_requests),
+            "travel_services_requested": len(travel) + len(travel_ops) + len(stays) + len(resource_requests) + len(visas),
+            "visa_records_recorded": len(visas),
             "travel_services_unresolved": unresolved_travel,
             "accommodation_requests_recorded": len(stays),
             "resource_coordination_requests_recorded": len(resource_requests),

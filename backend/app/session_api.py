@@ -9,17 +9,18 @@ from sqlalchemy.orm import Session
 from .database import get_db
 from .security import current_user,token_for,secret
 from .models import User,Audit
-from .enterprise_models import RefreshSession,RevokedAccess
-from .staff_mfa import row_for
+from .enterprise_models import RefreshSession,RevokedAccess,StaffTotp,StaffMFA
+from .tenant_context import bind_tenant,system_scope
 
 router=APIRouter(prefix='/api/v1/auth',tags=['staff sessions'])
 
 def hash_token(raw:str):return hashlib.sha256(raw.encode()).hexdigest()
 
-def issue_refresh(db:Session,user:User):
+def issue_refresh(db:Session,user:User,*,mfa_verified:bool=False):
     raw=secrets.token_urlsafe(48)
     session=RefreshSession(tenant_id=user.tenant_id,user_id=user.id,refresh_hash=hash_token(raw),
-        family_id=str(__import__('uuid').uuid4()),expires_at=datetime.now(timezone.utc)+timedelta(days=7))
+        family_id=str(__import__('uuid').uuid4()),expires_at=datetime.now(timezone.utc)+timedelta(days=7),
+        mfa_verified=mfa_verified)
     db.add(session);db.commit()
     return raw
 
@@ -28,6 +29,11 @@ class RefreshIn(BaseModel):
 
 @router.post('/refresh')
 def refresh(body:RefreshIn,db:Session=Depends(get_db)):
+    # The refresh secret identifies the tenant; resolve it, then drop to that tenant only.
+    with system_scope(db):
+        owner=db.scalar(select(RefreshSession.tenant_id).where(RefreshSession.refresh_hash==hash_token(body.refresh_token)))
+    if not owner:raise HTTPException(401,'Invalid refresh credential')
+    bind_tenant(db,owner)
     previous=db.scalar(select(RefreshSession).where(RefreshSession.refresh_hash==hash_token(body.refresh_token)).with_for_update())
     if not previous:raise HTTPException(401,'Invalid refresh credential')
     # A reused refresh token invalidates the entire family; never reactivate a session.
@@ -39,14 +45,24 @@ def refresh(body:RefreshIn,db:Session=Depends(get_db)):
     if expiration<=datetime.now(timezone.utc):raise HTTPException(401,'Refresh expired')
     user=db.scalar(select(User).where(User.tenant_id==previous.tenant_id,User.id==previous.user_id,User.active==True))
     if not user:raise HTTPException(401,'Account disabled')
+    factor=db.scalar(select(StaffTotp.id).where(StaffTotp.tenant_id==user.tenant_id,
+        StaffTotp.user_id==user.id,StaffTotp.enabled.is_(True)))
+    legacy=db.scalar(select(StaffMFA.id).where(StaffMFA.tenant_id==user.tenant_id,
+        StaffMFA.user_id==user.id,StaffMFA.enabled.is_(True)))
+    if (factor or legacy) and not previous.mfa_verified:
+        db.execute(update(RefreshSession).where(
+            RefreshSession.tenant_id==user.tenant_id,
+            RefreshSession.family_id==previous.family_id).values(revoked_at=datetime.now(timezone.utc)))
+        db.commit()
+        raise HTTPException(401,'Second factor required')
     now=datetime.now(timezone.utc)
     previous.revoked_at=now;previous.last_rotated_at=now
     raw=secrets.token_urlsafe(48)
     newer=RefreshSession(tenant_id=user.tenant_id,user_id=user.id,refresh_hash=hash_token(raw),
-        family_id=previous.family_id,expires_at=now+timedelta(days=7))
+        family_id=previous.family_id,expires_at=now+timedelta(days=7),
+        mfa_verified=previous.mfa_verified)
     db.add(newer);db.commit()
-    return {'access_token':token_for(user,mfa_verified=bool(
-        (enrollment:=row_for(db,user.tenant_id,user.id)) and enrollment.enabled)),'refresh_token':raw,'token_type':'bearer','expires_in':1800}
+    return {'access_token':token_for(user,mfa_verified=bool(previous.mfa_verified)),'refresh_token':raw,'token_type':'bearer','expires_in':1800}
 
 @router.post('/logout')
 def logout(authorization:str|None=Header(None),user:User=Depends(current_user),db:Session=Depends(get_db)):

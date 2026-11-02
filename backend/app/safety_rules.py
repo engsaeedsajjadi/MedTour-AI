@@ -22,20 +22,25 @@ CONSENT_PURPOSES = frozenset({
 
 
 def assert_safe_runtime(environment: str | None = None) -> None:
-    """Fail closed until production RLS, identity, clinical/privacy review exist.
+    """Fail closed in production until an independent release board has signed off.
 
-    Deliberately does not accept a bypass environment variable. A future
-    independently reviewed release must replace this gate with evidence-based
-    production authorization, including migrations and provider sign-off.
+    Authorization comes only from the committed sign-off file checked by
+    ``release_approval`` (penetration test, clinical safety, privacy impact,
+    backup-restore drill, provider contracts, two approvers). No environment
+    variable can grant it. The API additionally refuses to start in production
+    unless every technical and legal control in ``compliance`` passes.
     """
     mode = (environment if environment is not None else
             os.getenv("APP_ENV", "development")).strip().lower()
     if mode == "production":
-        raise RuntimeError(
-            "MedTour 0.5.0-alpha is NOT authorized for production PHI. "
-            "Complete tenant RLS migration, identity assurance, independent "
-            "clinical/privacy/security reviews and provider approvals first."
-        )
+        from .release_approval import evaluate
+        result = evaluate()
+        if not result["authorized"]:
+            raise RuntimeError(
+                "MedTour is NOT authorized for production PHI: missing release sign-off "
+                + ", ".join(result["missing"])
+                + ". Record the independent reviews in backend/release/PRODUCTION_APPROVAL.json."
+            )
 
 
 def active_consent(db: Session, tenant_id: str, patient_id: str, purpose: str) -> bool:

@@ -24,6 +24,9 @@ os.environ["WHATSAPP_PHONE_NUMBER_ID"]="100001"
 os.environ["META_APP_SECRET"]="only-synthetic-meta-secret"
 os.environ["META_VERIFY_TOKEN"]="only-synthetic-verification"
 os.environ["JWT_SECRET"]="synthetic_cutover_jwt_key_more_than_32_bytes"
+import base64
+os.environ["MFA_ENCRYPTION_KEY"]=base64.urlsafe_b64encode(
+    b"0123456789abcdef0123456789abcdef").decode()
 
 from app.models import uid
 from app.security import password_hash
@@ -197,24 +200,56 @@ with TestClient(gateway) as client:
     assert second["processed"]==0 and observed==[],second
     assert poll_provisioned_tenant(registry=registry,tenant_id=tenants[0],
         sender=None)["status"]=="provider_binding_required"
-    # MFA on real restricted tenant PostgreSQL roles must not be bypassable
-    # through the staged pre-auth endpoint or an already-issued JWT.
-    import base64 as _base64, time as _time
-    from app.staff_mfa import totp
-    os.environ["STAFF_MFA_ENCRYPTION_KEY"]=_base64.urlsafe_b64encode(b"z"*32).decode()
-    started=client.post("/api/v1/identity/mfa/setup",headers=headers[0])
-    assert started.status_code==200,started.text
-    encoded=started.json()["manual_secret"]
-    seed=_base64.b32decode(encoded+"="*(-len(encoded)%8))
-    otp=totp(seed,int(_time.time()//30))
-    done=client.post("/api/v1/identity/mfa/activate",headers=headers[0],
-        json={"code":otp})
-    assert done.status_code==200,done.text
-    assert client.get("/api/v1/patients",headers=headers[0]).status_code==401
-    wrong=client.post("/api/v1/auth/login",json={
+    # Staff MFA through real principal-bound FastAPI routes: enrollment,
+    # signed tenant-MAC login challenge, one-time TOTP verification, and
+    # authenticated routed refresh. No global SessionLocal fallback.
+    import time
+    from unittest.mock import patch
+    from app import identity_access
+    enrollment=client.post("/api/v1/auth/mfa/enroll",headers=headers[0])
+    assert enrollment.status_code==200,enrollment.text
+    assert enrollment.headers["cache-control"].startswith("no-store")
+    seed=enrollment.json()["secret"]
+    step=int(time.time())//30
+    confirm=client.post("/api/v1/auth/mfa/confirm",headers=headers[0],json={
+        "code":identity_access.code_for(seed,step)})
+    assert confirm.status_code==200,confirm.text
+    assert confirm.json()["refresh_token"].startswith("mt1.")
+    assert client.get("/api/v1/auth/me",headers=headers[0]).status_code==401
+    headers[0]={"Authorization":"Bearer "+confirm.json()["access_token"]}
+    post_mfa_refresh=client.post("/api/v1/auth/refresh",json={
+        "refresh_token":confirm.json()["refresh_token"]})
+    assert post_mfa_refresh.status_code==200,post_mfa_refresh.text
+    assert post_mfa_refresh.json()["refresh_token"].startswith("mt1.")
+    pending=client.post("/api/v1/auth/login",json={
         "tenant_slug":"cutover-a","email":"admin@example.test",
         "password":"synthetic_password_12345"})
-    assert wrong.status_code==401,wrong.text
+    assert pending.status_code==202,pending.text
+    ticket=pending.json()["challenge_token"]
+    assert ticket.startswith("mt1.") and pending.json()["access_token_issued"] is False
+    assert "access_token" not in pending.json() and "refresh_token" not in pending.json()
+    assert client.post("/api/v1/auth/mfa/verify",json={
+        "challenge_token":ticket,"code":"000000" if
+        identity_access.code_for(seed,step)!="000000" else "999999"}).status_code==401
+    # Move only synthetic test clock by 70s to avoid waiting for the next
+    # TOTP time-window after enrollment (keyring TTL is still 5 minutes).
+    moment=step*30+70
+    with patch.object(identity_access.time,"time",return_value=moment):
+        verified=client.post("/api/v1/auth/mfa/verify",json={
+            "challenge_token":ticket,
+            "code":identity_access.code_for(seed,moment//30)})
+    assert verified.status_code==200,verified.text
+    assert verified.json()["refresh_token"].startswith("mt1.")
+    assert client.post("/api/v1/auth/mfa/verify",json={
+        "challenge_token":ticket,
+        "code":identity_access.code_for(seed,moment//30)}).status_code==401
+    rotate=client.post("/api/v1/auth/refresh",json={
+        "refresh_token":verified.json()["refresh_token"]})
+    assert rotate.status_code==200,rotate.text
+    assert client.get("/api/v1/auth/me",headers={
+        "Authorization":"Bearer "+verified.json()["access_token"]}).status_code==200
+    # Second tenant remains password-only and isolated from first tenant MFA.
+    assert client.get("/api/v1/patients",headers=headers[1]).status_code==200
     # A cross-worker epoch cutover MUST deny existing staff JWT routes
     # before entering an old or privileged connection.
     epoch.active=False

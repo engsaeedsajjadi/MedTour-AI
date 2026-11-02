@@ -2,6 +2,7 @@
 import {useEffect,useState} from 'react';
 import Shell from '@/components/Shell';
 import {request} from '@/lib/api';
+import {fa,fmtDateTime} from '@/lib/i18n';
 type Case={id:string;status:string;specialty:string};
 type Doctor={id:string;full_name:string;specialty:string};
 type Booking={id:string;physician_id:string;starts_at:string;ends_at:string;status:string;external_booking_confirmed:boolean};
@@ -28,7 +29,7 @@ export default function Appointments(){
   }catch(e){setError((e as Error).message)}finally{setBusy(false)}
  }
  return <Shell title="تقویم و مدیریت نوبت‌های اداری">
-  <div className="infoBanner">فقط محیط توسعه با داده ساختگی. پیش‌نیاز: ظرفیت پیشنهادی در مدیریت پزشکان ثبت شده باشد. زمان‌ها بر اساس منطقه زمانی مرورگر وارد و به UTC تبدیل می‌شوند. تأیید داخلی به معنی تأیید نوبت از پزشک یا بیمارستان نیست.</div>
+  <div className="infoBanner">پیش‌نیاز: ظرفیت نوبت‌دهی پزشک در «مدیریت پزشکان» ثبت شده باشد. زمان‌ها با منطقه زمانی تنظیم‌شده در «تنظیمات» نمایش داده می‌شوند. نوبت فقط پس از دریافت تأیید پزشک یا بیمارستان و ثبت شماره آن قطعی است.</div>
   {error&&<div className="errorBox" role="alert">{error}</div>}
   {notice&&<div className="infoBanner" role="status">{notice}</div>}
   <section className="panel" style={{padding:20}}>
@@ -52,9 +53,9 @@ export default function Appointments(){
    <h2>نوبت‌های ثبت‌شده در سیستم داخلی</h2>
    <label>مرجع اداری بازبینی <input minLength={6} maxLength={100} value={ref} onChange={e=>setRef(e.target.value)}/></label>
    {rows.map(x=><div key={x.id} style={{padding:12,borderBottom:'1px solid #ddd'}}>
-    <p>پزشک {x.physician_id.slice(0,8)} · {new Date(x.starts_at).toLocaleString('fa-IR')} — {new Date(x.ends_at).toLocaleString('fa-IR')} · {x.status}</p>
-    {role==='admin'&&x.status==='requested'&&<div style={{display:'flex',gap:8}}>
-     <button disabled={busy||ref.length<6} onClick={()=>void act('/appointment-calendar/requests/'+x.id+'/review',{action:'internally_confirmed',reference:ref})}>تأیید داخلی</button>
+    <p>پزشک {x.physician_id.slice(0,8)} · {fmtDateTime(x.starts_at)} — {fmtDateTime(x.ends_at)} · {fa(x.status)}</p>
+    {role==='admin'&&(x.status==='requested'||x.status==='internally_confirmed')&&<div style={{display:'flex',gap:8}}>
+     {x.status==='requested'&&<button disabled={busy||ref.length<6} onClick={()=>void act('/appointment-calendar/requests/'+x.id+'/review',{action:'internally_confirmed',reference:ref})}>تأیید داخلی</button>}
      <button disabled={busy||ref.length<6} onClick={()=>void act('/appointment-calendar/requests/'+x.id+'/review',{action:'cancelled',reference:ref})}>لغو</button>
     </div>}
     <small>وضعیت رزرو خارجی: تأیید نشده</small>

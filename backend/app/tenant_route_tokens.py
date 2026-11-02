@@ -28,6 +28,7 @@ _RANDOM_PATTERN = re.compile(r"[A-Za-z0-9_-]{43}\Z")
 _TAG_PATTERN = re.compile(r"[A-Za-z0-9_-]{43}\Z")
 _MAX_TTL_SECONDS = MappingProxyType({
     "refresh": 7 * 24 * 60 * 60,
+    "mfa": 5 * 60,
     "portal": 2 * 60 * 60,
     "consent": 30 * 60,
 })

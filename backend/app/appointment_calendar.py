@@ -123,9 +123,24 @@ def review(appointment_id:str,body:ReviewIn,db:Session=Depends(get_db),user:User
     s=db.scalar(select(AppointmentSlot).where(
         AppointmentSlot.tenant_id==user.tenant_id,
         AppointmentSlot.appointment_id==appointment_id).with_for_update())
+    if s.status=="internally_confirmed" and body.action=="cancelled":
+        # A confirmed internal allocation can always be released; consent state does not block cancelling.
+        s.status="cancelled";a.status="cancelled"
+        s.reviewed_by=user.id;s.review_reference=body.reference
+        db.add(Audit(tenant_id=user.tenant_id,user_id=user.id,event="calendar_cancelled",
+            entity_type="Appointment",entity_id=a.id,detail="from=internally_confirmed"))
+        db.commit()
+        return view(a,s)
     valid_case(db,user,s.case_id)
     if s.status!="requested":raise HTTPException(409,"Appointment not pending")
     if body.action=="internally_confirmed":
+        # The physician capacity this request was booked against must still be offered.
+        capacity=db.scalar(select(PhysicianAvailability).where(
+            PhysicianAvailability.tenant_id==user.tenant_id,
+            PhysicianAvailability.id==s.availability_id))
+        if (capacity is None or capacity.status!="proposed"
+                or utc(capacity.starts_at)>utc(a.requested_at) or utc(capacity.ends_at)<utc(s.ends_at)):
+            raise HTTPException(409,"Proposed availability is no longer active")
         # Never claim a provider-confirmed booking based on an internal reference.
         available_without_self=db.scalar(select(AppointmentSlot).join(
             Appointment,Appointment.id==AppointmentSlot.appointment_id).where(
@@ -134,7 +149,7 @@ def review(appointment_id:str,body:ReviewIn,db:Session=Depends(get_db),user:User
             AppointmentSlot.status.in_(ACTIVE),Appointment.requested_at<utc(s.ends_at),
             AppointmentSlot.ends_at>utc(a.requested_at)).limit(1))
         if available_without_self:raise HTTPException(409,"Resource conflict")
-        s.status="internally_confirmed"
+        s.status="internally_confirmed";a.status="internally_confirmed"
     else:s.status="cancelled"
     s.reviewed_by=user.id;s.review_reference=body.reference
     if s.status=="cancelled":a.status="cancelled"

@@ -1,4 +1,5 @@
 'use client';
+import {fmtDateTime} from '@/lib/i18n';
 import {useEffect,useState} from 'react';
 import Shell from '@/components/Shell';
 import {request} from '@/lib/api';
@@ -25,7 +26,7 @@ export default function AgentPortal(){
   }catch(e){setError((e as Error).message);}finally{setBusy(false);}
  }
  return <Shell title="پرتال اختصاصی نماینده">
-  <div className="infoBanner">این پرتال آزمایشی تنها برای ثبت شناسه پیگیری ارجاع بدون اطلاعات بیمار است. نام، شماره تماس، تشخیص، مدارک، پرونده پزشکی یا درخواست مالی را وارد نکنید. هیچ پرداختی در این نسخه فعال نیست.</div>
+  <div className="infoBanner">این پرتال فقط برای ثبت شناسه پیگیری ارجاع است. نام، شماره تماس، تشخیص، مدارک یا پرونده پزشکی بیمار را وارد نکنید. پرداخت کارمزد از این پرتال انجام نمی‌شود.</div>
   {error&&<div className="errorBox" role="alert">{error}</div>}
   {info&&<div className="infoBanner" role="status">{info}</div>}
   {profile&&<section className="panel" style={{padding:20,marginTop:16}}>
@@ -50,7 +51,7 @@ export default function AgentPortal(){
    <h2>پیگیری ارجاع‌های خودم</h2>
    {items.length===0?<p>هنوز شناسه‌ای ثبت نشده است.</p>:items.map(x=><div key={x.id} style={{padding:'12px 0',borderTop:'1px solid #d4dde7'}}>
     <strong>{x.request_key} · {x.status==='attributed'?'ارجاع منتسب شده':x.status==='blocked'?'ارجاع مسدود': 'منتظر بررسی داخلی'}</strong>
-    <p>کانال: {x.channel} · کمپین: {x.campaign_code} · {new Date(x.created_at).toLocaleString('fa-IR')}</p>
+    <p>کانال: {x.channel} · کمپین: {x.campaign_code} · {fmtDateTime(x.created_at)}</p>
     <small>هیچ اطلاعات هویتی یا درمانی ارائه نمی‌شود.</small>
    </div>)}
   </section>

@@ -1,4 +1,5 @@
 """Section26 diagnostics and non-production tenant isolation smoke tests."""
+import os
 from app.tenant_isolation_status import audit_status
 from app.models import Patient
 
@@ -14,10 +15,17 @@ def test_diagnostic_reports_legacy_global_session_not_enterprise_ready(context):
     assert res.status_code==200,res.text
     result=res.json()
     assert result["production_ready"] is False
-    assert result["authenticated_tenant_role"] is False
-    assert result["verified_end_to_end_routing"] is False
-    assert result["composite_tenant_fks"]==0
-    assert result["database"]=="not_postgresql"
+    if os.environ.get("MEDTOUR_TEST_PG"):
+        # Real PostgreSQL: the API runs as the non-privileged role with forced RLS.
+        assert result["database"]=="postgresql"
+        assert result["runtime_role_nonprivileged"] is True
+        assert result["authenticated_tenant_role"] is True
+        assert result["rls_policy_tables"]==result["tenant_scoped_tables"]>0
+    else:
+        assert result["authenticated_tenant_role"] is False
+        assert result["verified_end_to_end_routing"] is False
+        assert result["composite_tenant_fks"]==0
+        assert result["database"]=="not_postgresql"
     for forbidden in ("password","secret","dsn","postgres://","tenant_id"):
         assert forbidden not in res.text.lower()
     with Session() as db:

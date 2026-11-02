@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "project": "MedTour-AI",
+  "release_status": "development_only",
+  "production_accepted": false,
+  "artifacts": [
+    {
+      "id": "source_backend",
+      "path": "backend/app/main.py",
+      "required": true
+    },
+    {
+      "id": "source_frontend",
+      "path": "frontend/app/layout.tsx",
+      "required": true
+    },
+    {
+      "id": "backend_dependencies",
+      "path": "backend/requirements.txt",
+      "required": true
+    },
+    {
+      "id": "frontend_lockfile",
+      "path": "frontend/package-lock.json",
+      "required": true
+    },
+    {
+      "id": "compose",
+      "path": "docker-compose.yml",
+      "required": true
+    },
+    {
+      "id": "backend_dockerfile",
+      "path": "backend/Dockerfile",
+      "required": true
+    },
+    {
+      "id": "frontend_dockerfile",
+      "path": "frontend/Dockerfile",
+      "required": true
+    },
+    {
+      "id": "alembic_config",
+      "path": "backend/alembic.ini",
+      "required": true
+    },
+    {
+      "id": "migration_directory",
+      "path": "backend/alembic/versions",
+      "required": true
+    },
+    {
+      "id": "backend_test_suite",
+      "path": "backend/tests",
+      "required": true
+    },
+    {
+      "id": "backend_ci",
+      "path": ".github/workflows/backend-ci.yml",
+      "required": true
+    },
+    {
+      "id": "frontend_ci",
+      "path": ".github/workflows/frontend-ci.yml",
+      "required": true
+    },
+    {
+      "id": "readme",
+      "path": "README.md",
+      "required": true
+    },
+    {
+      "id": "security",
+      "path": "docs/SECURITY.md",
+      "required": true
+    },
+    {
+      "id": "roadmap",
+      "path": "docs/ROADMAP.md",
+      "required": true
+    },
+    {
+      "id": "scope_tracker",
+      "path": "docs/MASTER_45_TRACKER.md",
+      "required": true
+    },
+    {
+      "id": "telegram_gateway",
+      "path": "backend/app/telegram_entrypoint.py",
+      "required": true
+    },
+    {
+      "id": "telegram_setup",
+      "path": "scripts/configure-telegram-webhook.ps1",
+      "required": true
+    }
+  ],
+  "external_acceptance": [
+    "independent_privacy_review",
+    "clinical_signoff",
+    "live_tenant_rls_evidence",
+    "provider_contracts_and_eligibility",
+    "load_and_penetration_tests",
+    "backup_restore_drill",
+    "real_pilot_approval"
+  ]
+}

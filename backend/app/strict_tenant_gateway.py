@@ -32,7 +32,7 @@ from .staged_preauth_http import staged_preauth_router
 
 _PUBLIC=re.compile(r"^/api/v1/public/([a-z0-9][a-z0-9-]{0,99})(?:/.*)?$")
 _BEARER=re.compile(r"^Bearer ([^\s]{1,4096})$")
-_PREAUTH={"/api/v1/auth/login","/api/v1/auth/refresh"}
+_PREAUTH={"/api/v1/auth/login","/api/v1/auth/refresh","/api/v1/auth/mfa/verify"}
 _PORTAL_PREFIX="/api/v1/portal/"
 _CONSENT_PREFIX="/api/v1/consent-links/"
 _META="/api/v1/webhooks/whatsapp"

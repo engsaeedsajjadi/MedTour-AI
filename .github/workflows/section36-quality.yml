@@ -1,0 +1,24 @@
+name: Quality and contract smoke
+on:
+  push:
+  pull_request:
+jobs:
+  quality-smoke:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      APP_ENV: test
+      DATABASE_URL: "sqlite://"
+      JWT_SECRET: "ci_synthetic_quality_secret_longer_than_32_bytes"
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: python -m pip install -r backend/requirements.txt
+      - name: Run Section 36 security and CI gates
+        working-directory: backend
+        run: python -m pytest -q tests/test_section_36_quality_gates.py tests/test_section_36_delivery_contract.py

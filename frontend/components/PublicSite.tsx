@@ -42,7 +42,7 @@ export function PublicShell({tenant,locale,manifest,slug,children}:{
     </nav>
    </div>
    <div className="site-wide site-footer-bottom">
-     <span>© MedTour AI · Alpha demonstration</span>
+     <span>© MedTour AI</span>
      <span>{manifest.all_languages_complete?'5 / 5 locales published':'Content and translations pending review'}</span>
    </div>
   </footer>

@@ -4,6 +4,7 @@ from .database import Base, engine, SessionLocal
 from .models import Tenant, User
 from . import enterprise_models  # register tables
 from .security import password_hash
+from .tenant_context import bind_tenant
 
 def bootstrap():
     if os.getenv('APP_ENV','development')=='production':
@@ -18,6 +19,7 @@ def bootstrap():
         if not tenant:
             tenant=Tenant(slug=slug,name=name)
             db.add(tenant); db.flush()
+        bind_tenant(db,tenant.id)
         exists=db.scalar(select(User).where(User.tenant_id==tenant.id,User.email==email))
         if exists:
             print('Development bootstrap user already exists; no changes made')

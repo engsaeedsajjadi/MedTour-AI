@@ -1,10 +1,12 @@
 """Private encrypted development uploads; production requires independently audited object storage + malware scan."""
 from __future__ import annotations
 import hashlib,os,base64,secrets
+from datetime import datetime,timedelta,timezone
 from pathlib import Path
 from io import BytesIO
 from fastapi import APIRouter,Depends,HTTPException,UploadFile,File,Form,Header
 from fastapi.responses import Response
+from pydantic import BaseModel,Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -13,7 +15,7 @@ from .enterprise_models import MedicalDocumentEvent
 from .database import get_db
 from .security import roles
 from .patient_portal import portal_session
-from .secure_media import validate_file,s3_ready,scan_clamav,s3_store
+from .secure_media import validate_file,s3_ready,scan_clamav,s3_store,s3_store_encrypted,s3_delete,client_encryption
 from .medical_document_policy import (
     ACTIVE_STATUSES, cleaned_name, document_path, encrypt_local,
     load_document, private_download_response,
@@ -51,6 +53,17 @@ def location(doc_id:str,tenant_id:str):
 def sniff(data:bytes):
     return validate_file(data)[0]
 
+def scan_or_reject(db:Session,tenant_id:str,actor_id:str,case_id:str,raw:bytes,mime:str)->None:
+    """Scan with ClamAV; a detection is recorded in the audit log (no file content) before refusing."""
+    try:
+        scan_clamav(raw)
+    except HTTPException as exc:
+        if exc.status_code==422:
+            db.add(Audit(tenant_id=tenant_id,user_id=actor_id,event='document_malware_rejected',
+                entity_type='Case',entity_id=case_id,detail=f'mime={mime} bytes={len(raw)}'))
+            db.commit()
+        raise
+
 @router.post('/cases/{case_id}',status_code=201)
 async def upload(case_id:str,file:UploadFile=File(...),db:Session=Depends(get_db),user:User=Depends(roles('admin','operator'))):
     if not local_enabled() and not s3_ready():raise HTTPException(503,'Approved medical file storage and scanner are not configured')
@@ -62,7 +75,7 @@ async def upload(case_id:str,file:UploadFile=File(...),db:Session=Depends(get_db
     if len(raw)>MAX_BYTES:raise HTTPException(413,'Document exceeds 8 MiB')
     if not raw:raise HTTPException(422,'Empty document')
     mime, digest=validate_file(raw)
-    if s3_ready():scan_clamav(raw)
+    if s3_ready():scan_or_reject(db,user.tenant_id,user.id,c.id,raw,mime)
     # Store checked files only. Dev encryption remains explicitly unscanned.
     name=cleaned_name(file.filename)
     row=Document(tenant_id=user.tenant_id,patient_id=p.id,case_id=c.id,filename=name,
@@ -71,7 +84,10 @@ async def upload(case_id:str,file:UploadFile=File(...),db:Session=Depends(get_db
     db.add(row);db.flush()
     key=location(row.id,user.tenant_id)
     try:
-        if s3_ready():
+        if s3_ready() and client_encryption():
+            row.storage_key,row.wrapped_key=s3_store_encrypted(user.tenant_id,row.id,raw,mime)
+            event='scanned_s3_document_uploaded'
+        elif s3_ready():
             row.storage_key=s3_store(user.tenant_id,row.id,raw,mime)
             event='scanned_s3_document_uploaded'
         else:
@@ -89,8 +105,9 @@ async def upload(case_id:str,file:UploadFile=File(...),db:Session=Depends(get_db
 @router.get('/readiness')
 def document_readiness(user:User=Depends(roles('admin','operator'))):
     return {
-        'storage_mode': 'local_encrypted_unscanned_test' if local_enabled() else
-            's3_kms_configured_unverified' if s3_ready() else 'disabled',
+        # Uploads use scanned object storage whenever it is configured, even if the dev store is on.
+        'storage_mode': 's3_kms_configured_unverified' if s3_ready() else
+            'local_encrypted_unscanned_test' if local_enabled() else 'disabled',
         'configured':bool(local_enabled() or s3_ready()),
         'actual_s3_kms_scanner_verified':False,
         'production_ready':False,
@@ -149,7 +166,7 @@ async def patient_upload(case_id:str,file:UploadFile=File(...),
     require_consent(db,p)
     raw=await file.read(MAX_BYTES+1)
     mime,digest=validate_file(raw)
-    if s3_ready():scan_clamav(raw)
+    if s3_ready():scan_or_reject(db,grant.tenant_id,grant.id,c.id,raw,mime)
     name=cleaned_name(file.filename)
     row=Document(tenant_id=grant.tenant_id,patient_id=p.id,case_id=c.id,filename=name,
         category='report',status='scanned_private_s3' if s3_ready() else 'encrypted_dev_unscanned',
@@ -157,7 +174,9 @@ async def patient_upload(case_id:str,file:UploadFile=File(...),
     db.add(row);db.flush()
     location_key=location(row.id,grant.tenant_id)
     try:
-        if s3_ready():
+        if s3_ready() and client_encryption():
+            row.storage_key,row.wrapped_key=s3_store_encrypted(grant.tenant_id,row.id,raw,mime)
+        elif s3_ready():
             row.storage_key=s3_store(grant.tenant_id,row.id,raw,mime)
         else:
             encrypt_local(raw,grant.tenant_id,row.id,cipher())
@@ -236,27 +255,87 @@ def document_activity(case_id:str,db:Session=Depends(get_db),
         'action':x.action,'created_at':x.created_at} for x in rows],
         'raw_file_contents_included':False,'metadata_only':True}
 
+def retention_days()->int|None:
+    raw=os.getenv('MEDICAL_DOCUMENT_RETENTION_DAYS','').strip()
+    if not raw:return None
+    days=int(raw)
+    if days<1:raise HTTPException(503,'MEDICAL_DOCUMENT_RETENTION_DAYS must be a positive number of days')
+    return days
+
+def _created(row):
+    c=row.created_at
+    return c.replace(tzinfo=timezone.utc) if c.tzinfo is None else c
+
+def retention_due(row,days:int|None)->bool:
+    if row.legal_hold or row.erased_at is not None:return False
+    if row.status=='access_revoked':return True
+    return days is not None and _created(row)<=datetime.now(timezone.utc)-timedelta(days=days)
+
 @router.get('/cases/{case_id}/retention-review')
 def retention_review(case_id:str,db:Session=Depends(get_db),
     user:User=Depends(roles('admin'))):
     case=db.scalar(select(Case).where(
         Case.id==case_id,Case.tenant_id==user.tenant_id))
     if not case:raise HTTPException(404,'Case not found')
+    days=retention_days()
     rows=db.scalars(select(Document).where(
         Document.tenant_id==user.tenant_id,
         Document.case_id==case.id,
         Document.patient_id==case.patient_id,
-        Document.status=='access_revoked'
-    ).order_by(Document.created_at.desc()).limit(100)).all()
-    # Access revocation != cryptographic erasure and != retention clearance.
-    # Do not implement deletion while independent legal retention requirements
-    # and S3 versioning/lifecycle semantics are still unaudited.
+    ).order_by(Document.created_at.desc()).limit(200)).all()
+    # Access revocation stops all reads. Cryptographic erasure is a separate,
+    # audited admin action that destroys the decryption key and the stored object.
     return {
-        'documents':[{'id':x.id,'status':x.status,'created_at':x.created_at}
-            for x in rows],
+        'documents':[{'id':x.id,'filename':x.filename,'status':x.status,'created_at':x.created_at,
+            'legal_hold':bool(x.legal_hold),'erased_at':x.erased_at,'erasure_due':retention_due(x,days)}
+            for x in rows if x.status=='access_revoked' or x.erased_at is not None or retention_due(x,days)],
         'metadata_only':True,
-        'access_revoked':True,
-        'physical_erasure_performed':False,
-        'legal_retention_policy_verified':False,
-        'requires_independent_retention_review':True,
+        'retention_days':days,
+        'access_revoked':any(x.status=='access_revoked' for x in rows),
+        'physical_erasure_performed':any(x.erased_at is not None for x in rows),
+        'legal_retention_policy_verified':days is not None,
+        'requires_independent_retention_review':days is None,
     }
+
+class ErasureIn(BaseModel):
+    reference:str=Field(min_length=6,max_length=100,pattern=r'^[A-Za-z0-9][A-Za-z0-9._:/-]{5,99}$')
+
+class HoldIn(ErasureIn):
+    legal_hold:bool
+
+def _admin_document(db:Session,user:User,document_id:str)->Document:
+    row=db.scalar(select(Document).where(Document.tenant_id==user.tenant_id,Document.id==document_id).with_for_update())
+    if not row:raise HTTPException(404,'Document unavailable')
+    return row
+
+@router.post('/{document_id}/legal-hold')
+def legal_hold(document_id:str,body:HoldIn,db:Session=Depends(get_db),user:User=Depends(roles('admin'))):
+    row=_admin_document(db,user,document_id)
+    if row.erased_at is not None:raise HTTPException(409,'Document already erased')
+    row.legal_hold=body.legal_hold
+    db.add(Audit(tenant_id=user.tenant_id,user_id=user.id,event='medical_document_legal_hold_'+('set' if body.legal_hold else 'released'),
+        entity_type='Document',entity_id=row.id,detail='reference='+body.reference))
+    db.commit()
+    return {'id':row.id,'legal_hold':row.legal_hold}
+
+@router.post('/{document_id}/erase')
+def erase(document_id:str,body:ErasureIn,db:Session=Depends(get_db),user:User=Depends(roles('admin'))):
+    """Cryptographic erasure: destroy the wrapped data key, delete the stored object, keep only metadata."""
+    row=_admin_document(db,user,document_id)
+    if row.erased_at is not None:return {'id':row.id,'status':row.status,'erased':True}
+    if row.legal_hold:raise HTTPException(409,'Document is under legal hold')
+    if not retention_due(row,retention_days()):
+        raise HTTPException(409,'Document is not due for erasure: revoke access or wait for the retention period')
+    if row.storage_key:
+        if row.storage_key.startswith('medical/'):
+            s3_delete(row.storage_key,user.tenant_id,row.id)
+        else:
+            location(row.id,user.tenant_id).unlink(missing_ok=True)
+    row.wrapped_key=None;row.storage_key=None
+    row.status='erased';row.erased_at=datetime.now(timezone.utc)
+    db.add(Audit(tenant_id=user.tenant_id,user_id=user.id,event='medical_document_erased',
+        entity_type='Document',entity_id=row.id,detail='reference='+body.reference))
+    db.add(MedicalDocumentEvent(tenant_id=user.tenant_id,document_id=row.id,case_id=row.case_id,
+        patient_id=row.patient_id,actor_type='staff',staff_user_id=user.id,action='document_erased'))
+    db.commit()
+    return {'id':row.id,'status':row.status,'erased':True,'erased_at':row.erased_at}
