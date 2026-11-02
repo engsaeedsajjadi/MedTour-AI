@@ -6,6 +6,8 @@ import {getSession,logout,request} from '@/lib/api';
 import {fa} from '@/lib/i18n';
 import {allowedFor,homeFor} from '@/lib/roles';
 import {cachedOrganization,loadOrganization,loadProfile} from '@/lib/preferences';
+import HelpLayer from './HelpLayer';
+import {NAV_HELP,PAGE_HELP,helpEnabled,setHelpEnabled} from '@/lib/help';
 
 const groups:{label:string;links:[string,string][]}[]=[
  {label:'پرتال',links:[['hospital-workspace','پرتال بیمارستان'],['physician-workspace','پرتال پزشک'],['doctor-cases','پرونده‌های مجاز پزشک'],['agent-portal','پرتال نماینده']]},
@@ -26,7 +28,8 @@ const ENV_LABEL=process.env.NEXT_PUBLIC_ENV_LABEL||'';
 export default function Shell({title,children}:{title:string,children:React.ReactNode}){
  const path=usePathname();
  const [email,setEmail]=useState(''),[role,setRole]=useState(''),[failed,setFailed]=useState(false);
- const [displayName,setDisplayName]=useState(''),[orgName,setOrgName]=useState('');
+ const [displayName,setDisplayName]=useState(''),[orgName,setOrgName]=useState(''),[help,setHelp]=useState(false);
+ useEffect(()=>{const sync=()=>setHelp(helpEnabled());sync();window.addEventListener('medtour-help',sync);return()=>window.removeEventListener('medtour-help',sync);},[]);
  useEffect(()=>{
   if(!getSession()){window.location.replace('/login');return;}
   request<{email:string;role:string}>('/auth/me').then(x=>{setEmail(x.email);setRole(x.role);}).catch(()=>setFailed(true));
@@ -47,22 +50,24 @@ export default function Shell({title,children}:{title:string,children:React.Reac
    <nav aria-label="ناوبری مدیریت">{visible.map(g=><div className="navGroup" key={g.label}>
     <div className="navGroupLabel">{g.label}</div>
     {g.links.map(([href,text])=>{const active=path==='/'+href||path.startsWith('/'+href+'/');
-     return <Link aria-current={active?'page':undefined} className={active?'navItem selected':'navItem'} key={href} href={'/'+href}><span className="navDot" aria-hidden="true"/>{text}</Link>;})}
+     return <Link aria-current={active?'page':undefined} className={active?'navItem selected':'navItem'} key={href} href={'/'+href} data-help={help?NAV_HELP[href]:undefined}><span className="navDot" aria-hidden="true"/>{text}</Link>;})}
    </div>)}</nav>
    {ENV_LABEL&&<div className="sidebarBottom"><span className="statusBullet" aria-hidden="true"/>{ENV_LABEL}</div>}
   </aside>
   <main className="main" id="main-content" tabIndex={-1}>
    <header className="topbar">
     <div className="breadcrumb">MedTour AI <span>/</span> {title}</div>
-    <div className="topActions">{role&&<span className="roleChip">{fa(role)}</span>}{displayName?<span className="loggedIn" title={email}>{displayName}</span>:<span className="loggedIn" dir="ltr">{email}</span>}<button type="button" className="logout" onClick={logout}>خروج</button></div>
+    <div className="topActions">{role&&<span className="roleChip">{fa(role)}</span>}{displayName?<span className="loggedIn" title={email}>{displayName}</span>:<span className="loggedIn" dir="ltr">{email}</span>}<button type="button" className={help?'helpToggle on':'helpToggle'} aria-pressed={help} onClick={()=>setHelpEnabled(!help)} data-help="راهنمای روی صفحه را روشن یا خاموش می‌کند. وقتی روشن است، با بردن موس روی هر منو یا بخش، توضیح آن نمایش داده می‌شود.">؟ راهنما: {help?'روشن':'خاموش'}</button><button type="button" className="logout" onClick={logout}>خروج</button></div>
    </header>
    <div className="content">
     <div className="pageHeader"><div><div className="eyebrow">عملیات گردشگری سلامت</div><h1>{title}</h1></div>{ENV_LABEL&&<div className="environmentFlag">● {ENV_LABEL}</div>}</div>
+    {help&&PAGE_HELP[section.split('/')[0]]&&<div className="pageHelp" role="note"><strong>راهنمای این صفحه:</strong> {PAGE_HELP[section.split('/')[0]]}</div>}
     {failed?<div role="alert" className="errorBox">اطلاعات حساب دریافت نشد؛ صفحه را دوباره بارگذاری کنید.</div>
      :!role?<div className="panel loadingPanel" aria-busy="true">در حال بارگذاری…</div>
      :permitted?children
      :<section className="panel accessPanel" role="status"><h2>این بخش برای نقش شما در دسترس نیست</h2><p>نقش فعلی شما «{fa(role)}» است. اگر به این بخش نیاز دارید، از مدیر سازمان بخواهید دسترسی لازم را بدهد.</p><Link className="button" href={homeFor(role)}>رفتن به صفحه اصلی من</Link></section>}
    </div>
   </main>
+  <HelpLayer section={section}/>
  </div>;
 }

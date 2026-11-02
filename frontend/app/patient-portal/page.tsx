@@ -28,7 +28,7 @@ function money(minor:number,currency:string){const digits=['IRR','JPY','KRW','IQ
 const PENDING_LABEL:Record<string,string>={appointment:'تأیید نوبت پزشک',quote:'تأیید برآورد هزینه',visa:'صدور ویزای درمانی',accommodation:'تأیید رزرو هتل',transfer:'تأیید ترانسفر فرودگاهی',case_approval:'تأیید نهایی پرونده توسط هماهنگ‌کننده'};
 const ZONE:Record<string,string>={airport:'فرودگاه',hotel:'هتل',hospital:'بیمارستان',city_center:'مرکز شهر',not_applicable:'—'};
 const ROOM:Record<string,string>={single:'یک‌تخته',double:'دوتخته',accessible:'مناسب معلولان'};
-function fmtDay(value:string){const d=new Date(value+(value.length===10?'T00:00:00':''));return Number.isNaN(d.getTime())?value:d.toLocaleDateString('fa-IR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});}
+function fmtDay(value:string){const d=new Date(value+(value.length===10?'T00:00:00':''));return Number.isNaN(d.getTime())?value:d.toLocaleDateString('fa-IR',{weekday:'long'})+'، '+d.toLocaleDateString('fa-IR',{day:'numeric',month:'long',year:'numeric'});}
 function TripPlan({t}:{t:Travel}){
  const r=t.readiness;
  return <div className="portalBox tripPlan">
