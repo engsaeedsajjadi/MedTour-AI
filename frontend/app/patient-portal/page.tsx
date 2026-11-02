@@ -28,7 +28,7 @@ function money(minor:number,currency:string){const digits=['IRR','JPY','KRW','IQ
 const PENDING_LABEL:Record<string,string>={appointment:'تأیید نوبت پزشک',quote:'تأیید برآورد هزینه',visa:'صدور ویزای درمانی',accommodation:'تأیید رزرو هتل',transfer:'تأیید ترانسفر فرودگاهی',case_approval:'تأیید نهایی پرونده توسط هماهنگ‌کننده'};
 const ZONE:Record<string,string>={airport:'فرودگاه',hotel:'هتل',hospital:'بیمارستان',city_center:'مرکز شهر',not_applicable:'—'};
 const ROOM:Record<string,string>={single:'یک‌تخته',double:'دوتخته',accessible:'مناسب معلولان'};
-function fmtDay(value:string){const d=new Date(value+(value.length===10?'T00:00:00':''));return Number.isNaN(d.getTime())?value:d.toLocaleDateString('fa-IR',{dateStyle:'full'});}
+function fmtDay(value:string){const d=new Date(value+(value.length===10?'T00:00:00':''));return Number.isNaN(d.getTime())?value:d.toLocaleDateString('fa-IR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});}
 function TripPlan({t}:{t:Travel}){
  const r=t.readiness;
  return <div className="portalBox tripPlan">
@@ -177,7 +177,7 @@ export default function PatientPortal(){
     </div>
     {c.travel&&<TripPlan t={c.travel}/>}
     <div className="portalGrid">
-     <div><h3>خدمات سفر و درمان</h3>{c.services.length===0?<p className="subtle">خدمت فعالی ثبت نشده است.</p>:c.services.map((s,i)=><p key={i}>{fa(s.service)} — <span className={'badge '+tone(s.status)}>{fa(s.status)}</span></p>)}</div>
+     {(c.services.length>0||!c.travel)&&<div><h3>سایر خدمات</h3>{c.services.length===0?<p className="subtle">خدمت دیگری ثبت نشده است.</p>:c.services.map((s,i)=><p key={i}>{fa(s.service)} — <span className={'badge '+tone(s.status)}>{fa(s.status)}</span></p>)}</div>}
      <div><h3>نوبت‌های تأییدشده</h3>{c.confirmed_appointments.length===0?<p className="subtle">نوبت تأییدشده‌ای ندارید.</p>:c.confirmed_appointments.map((a,i)=><p key={i}>{fmtDate(a.at)}</p>)}</div>
      <div><h3>برآورد هزینه تأییدشده</h3>{c.approved_quotes.length===0?<p className="subtle">برآورد تأییدشده‌ای ثبت نشده است.</p>:c.approved_quotes.map(q=><p key={q.id}>{money(q.amount_minor,q.currency)}</p>)}</div>
     </div>
